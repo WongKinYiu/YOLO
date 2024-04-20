@@ -1,0 +1,8 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.4.0  # Use the appropriate version or "stable" for the latest stable release
+    hooks:
+      - id: black
+        language_version: python3  # Specify the Python version
+        exclude: '.*\.yaml$'  # Regex pattern to exclude all YAML files
+        args: ["--line-length", "120"]  # Set max line length to 100 characters
