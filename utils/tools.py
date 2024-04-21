@@ -1,4 +1,5 @@
 import os
+import sys
 import yaml
 from loguru import logger
 from typing import Dict, Any
@@ -49,10 +50,6 @@ def load_model_cfg(file_path: str) -> Dict[str, Any]:
             model_cfg["nc"] = 80
             logger.warning("'nc' not found in the YAML file. Setting default 'nc' to 80.")
 
-        if "anchor" not in model_cfg:
-            logger.error("'anchor' is missing in the configuration file.")
-            raise ValueError("Missing required key: 'anchor'")
-
         if "model" not in model_cfg:
             logger.error("'model' is missing in the configuration file.")
             raise ValueError("Missing required key: 'model'")
@@ -65,3 +62,11 @@ def load_model_cfg(file_path: str) -> Dict[str, Any]:
     except yaml.YAMLError as e:
         logger.error(f"Error parsing YAML file: {e}")
         raise
+
+
+def custom_logger():
+    logger.remove()
+    logger.add(
+        sys.stderr,
+        format="<green>{time:MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
+    )
