@@ -1,0 +1,4 @@
+loguru
+pyyaml
+pytest
+torch
