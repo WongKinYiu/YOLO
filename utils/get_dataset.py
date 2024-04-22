@@ -81,4 +81,4 @@ if __name__ == "__main__":
     from tools.log_helper import custom_logger
 
     custom_logger()
-    download_coco_dataset()
+    prepare_dataset()
