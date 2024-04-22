@@ -1,8 +1,10 @@
-import requests
-import zipfile
 import os
-from tqdm.rich import tqdm
+import zipfile
+
+import hydra
 from loguru import logger
+import requests
+from tqdm.rich import tqdm
 
 
 def download_file(url, dest_path):
@@ -41,11 +43,14 @@ def check_files(directory, expected_count):
     return num_files == expected_count
 
 
-def download_coco_dataset(data_dir: str = "./data/coco"):
-    base_url = "http://images.cocodataset.org/zips/"
-    datasets = {"train2017.zip": ("train", 118287), "test2017.zip": ("test", 40670), "val2017.zip": ("val", 5000)}
+@hydra.main(config_path="../config/data", config_name="download", version_base=None)
+def download_coco_dataset(download_cfg):
+    data_dir = download_cfg.path
+    base_url = download_cfg.images.base_url
+    datasets = download_cfg.images.datasets
 
-    for file_name, (dataset_type, expected_files) in datasets.items():
+    for dataset_type in datasets:
+        file_name, expected_files = datasets[dataset_type].values()
         url = f"{base_url}{file_name}"
         local_zip_path = os.path.join(data_dir, file_name)
         extract_to = os.path.join(data_dir, dataset_type, "images")
