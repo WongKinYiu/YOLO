@@ -1,0 +1,8 @@
+hydra:
+  run:
+    dir: ./runs
+
+defaults:
+ - data_config: coco.yaml
+ - model: v7-base.yaml
+ - _self_

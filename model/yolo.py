@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Union
 import torch
 import torch.nn as nn
 from loguru import logger
+from omegaconf import OmegaConf
 
 from model import module
 from utils.tools import load_model_cfg
@@ -35,16 +36,15 @@ class YOLO(nn.Module):
         super(YOLO, self).__init__()
         self.nc = model_cfg["nc"]
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
-        self.build_model(model_cfg["model"])
+        self.build_model(model_cfg.model)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
         model_list = nn.ModuleList()
         output_dim = [3]
         layer_indices_by_tag = {}
-
-        for arch_name, arch in model_arch.items():
+        for arch_name in model_arch:
             logger.info(f"🏗️  Building model-{arch_name}")
-            for layer_idx, layer_spec in enumerate(arch, start=1):
+            for layer_idx, layer_spec in enumerate(model_arch[arch_name], start=1):
                 layer_type, layer_info = next(iter(layer_spec.items()))
                 layer_args = layer_info.get("args", {})
                 source = layer_info.get("source", -1)
@@ -72,7 +72,7 @@ class YOLO(nn.Module):
     def forward(self, x):
         y = [x]
         for layer in self.model:
-            if isinstance(layer.source, list):
+            if OmegaConf.is_list(layer.source):
                 model_input = [y[idx] for idx in layer.source]
             else:
                 model_input = y[layer.source]
