@@ -44,7 +44,7 @@ def check_files(directory, expected_count):
 
 
 @hydra.main(config_path="../config/data", config_name="download", version_base=None)
-def download_coco_dataset(download_cfg):
+def prepare_dataset(download_cfg):
     data_dir = download_cfg.path
     base_url = download_cfg.images.base_url
     datasets = download_cfg.images.datasets

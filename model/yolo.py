@@ -92,6 +92,7 @@ def get_model(model_cfg: dict) -> YOLO:
     Returns:
         YOLO: An instance of the model defined by the given configuration.
     """
+    OmegaConf.set_struct(model_cfg, False)
     model = YOLO(model_cfg)
     logger.info("✅ Success load model")
     return model
