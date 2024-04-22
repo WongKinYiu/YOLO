@@ -1,3 +1,4 @@
+auto: True
 path: data/coco
 images:
   base_url: http://images.cocodataset.org/zips/

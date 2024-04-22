@@ -9,5 +9,12 @@ class Model:
 
 
 @dataclass
+class Download:
+    auto: bool
+    path: str
+
+
+@dataclass
 class Config:
     model: Model
+    download: Download
