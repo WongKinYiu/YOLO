@@ -1,6 +1,6 @@
 from PIL import Image
-from os import path
-import os
+from os import path, listdir
+
 import hydra
 import numpy as np
 import torch
@@ -8,91 +8,119 @@ from torch.utils.data import Dataset
 from loguru import logger
 from tqdm.rich import tqdm
 import diskcache as dc
+from typing import Union
+from drawer import draw_bboxes
+from dataargument import Compose, RandomHorizontalFlip
 
 
 class YoloDataset(Dataset):
-    def __init__(self, dataset_cfg: dict, phase="train", transform=None, mixup=None):
+    def __init__(self, dataset_cfg: dict, phase: str = "train", transform=None):
         phase_name = dataset_cfg.get(phase, phase)
 
         self.transform = transform
-        self.mixup = mixup
         self.data = self.load_data(dataset_cfg.path, phase_name)
 
     def load_data(self, dataset_path, phase_name):
-        cache = dc.Cache(path.join(dataset_path, ".cache"))
+        """
+        Loads data from a cache or generates a new cache for a specific dataset phase.
 
-        if phase_name not in cache:
-            logger.info("Generate {} Cache", phase_name)
+        Parameters:
+            dataset_path (str): The root path to the dataset directory.
+            phase_name (str): The specific phase of the dataset (e.g., 'train', 'test') to load or generate data for.
 
+        Returns:
+            dict: The loaded data from the cache for the specified phase.
+        """
+        cache_path = path.join(dataset_path, ".cache")
+        cache = dc.Cache(cache_path)
+        data = cache.get(phase_name)
+
+        if data is None:
+            logger.info("Generating {} cache", phase_name)
             images_path = path.join(dataset_path, phase_name, "images")
             labels_path = path.join(dataset_path, phase_name, "labels")
+            data = self.filter_data(images_path, labels_path)
+            cache[phase_name] = data
 
-            cache[phase_name] = self.filter_data(images_path, labels_path)
-
-        logger.info("Load {} Cache", phase_name)
-        data = cache[phase_name]
         cache.close()
-
+        logger.info("Loaded {} cache", phase_name)
+        data = cache[phase_name]
         return data
 
-    def filter_data(self, images_path, labels_path):
+    def filter_data(self, images_path: str, labels_path: str) -> list:
+        """
+        Filters and collects dataset information by pairing images with their corresponding labels.
+
+        Parameters:
+            images_path (str): Path to the directory containing image files.
+            labels_path (str): Path to the directory containing label files.
+
+        Returns:
+            list: A list of tuples, each containing the path to an image file and its associated labels as a tensor.
+        """
         data = []
-        valid_input = 0
-        images_list = os.listdir(images_path)
-        images_list.sort()
-        for image_name in tqdm(images_list):
+        valid_inputs = 0
+        images_list = sorted(listdir(images_path))
+        for image_name in tqdm(images_list, desc="Filtering data"):
             if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
                 continue
+
             img_path = path.join(images_path, image_name)
             base_name, _ = path.splitext(image_name)
-            label_name = base_name + ".txt"
-            label_path = path.join(labels_path, label_name)
+            label_path = path.join(labels_path, f"{base_name}.txt")
 
-            if not path.isfile(label_path):
-                # logger.warning(f"Warning: No label file for {label_path}")
-                continue
+            if path.isfile(label_path):
+                labels = self.load_valid_labels(label_path)
+                if labels is not None:
+                    data.append((img_path, labels))
+                    valid_inputs += 1
 
-            labels = self.load_valid_labels(label_path)
-            if labels is not None:
-                data.append((img_path, labels))
-                valid_input += 1
-        logger.info("Finish Record {}/{}", valid_input, len(os.listdir(images_path)))
+        logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
 
-    def load_valid_labels(self, label_path):
+    def load_valid_labels(self, label_path: str) -> Union[torch.Tensor, None]:
+        """
+        Loads and validates bounding box data is [0, 1] from a label file.
+
+        Parameters:
+            label_path (str): The filepath to the label file containing bounding box data.
+
+        Returns:
+            torch.Tensor or None: A tensor of all valid bounding boxes if any are found; otherwise, None.
+        """
         bboxes = []
         with open(label_path, "r") as file:
             for line in file:
-                segment = list(map(float, line.strip().split()))
-                cls = segment[0]
-                # Ensure parts length is odd and more than two points
-                if len(segment) % 2 != 1 or len(segment) < 5:
-                    logger.warning(f"Warning: Format error in {label_path}")
-                    continue
-                points = np.array(segment[1:]).reshape(-1, 2)  # change points to n x 2
-                valid_idx = np.any((points <= 1) | (points >= 0), axis=1)  # filter outlier points
-                points = points[valid_idx]  # only keep valid points
+                parts = list(map(float, line.strip().split()))
+                cls = parts[0]
+                points = np.array(parts[1:]).reshape(-1, 2)
+                valid_points = points[(points >= 0) & (points <= 1)].reshape(-1, 2)
+                if valid_points.size > 1:
+                    bbox = torch.tensor([cls, *valid_points.min(axis=0), *valid_points.max(axis=0)])
+                    bboxes.append(bbox)
 
-                bbox = torch.tensor([cls, *points.max(axis=0), *points.min(axis=0)])
-                bboxes.append(bbox)
-        if not bboxes:
-            logger.warning(f"Warning: No valid BBox in {label_path}")
+        if bboxes:
+            return torch.stack(bboxes)
+        else:
+            logger.warning("No valid BBox in {}", label_path)
             return None
-        return torch.stack(bboxes)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Union[Image.Image, torch.Tensor]:
         img_path, bboxes = self.data[idx]
         img = Image.open(img_path).convert("RGB")
-
+        if self.transform:
+            img, bboxes = self.transform(img, bboxes)
         return img, bboxes
 
-    def __len__(self):
-        return len(self.images)
+    def __len__(self) -> int:
+        return len(self.data)
 
 
-@hydra.main(config_path="../config/data", config_name="coco", version_base=None)
+@hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg):
-    dataset = YoloDataset(cfg)
+    transform = Compose([eval(aug)(prob) for aug, prob in cfg.augmentation.items()])
+    dataset = YoloDataset(cfg.data, transform=transform)
+    draw_bboxes(*dataset[0])
 
 
 if __name__ == "__main__":
