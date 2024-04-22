@@ -1,0 +1,16 @@
+path: data/coco
+images:
+  base_url: http://images.cocodataset.org/zips/
+  datasets:
+    train:
+      file_name: train2017.zip
+      file_num: 118287
+    val: 
+      file_name: val2017.zip
+      num_files: 5000
+    test:
+      file_name: test2017.zip
+      num_files: 40670
+hydra:
+  run:
+    dir: ./runs
