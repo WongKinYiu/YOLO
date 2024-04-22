@@ -297,7 +297,7 @@ class CSPELAN(nn.Module):
 
 
 class Concat(nn.Module):
-    def __init__(self, dim=-1):
+    def __init__(self, dim=1):
         super(Concat, self).__init__()
         self.dim = dim
 
