@@ -1,9 +1,9 @@
 import torch.nn as nn
+import torch
 from loguru import logger
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union
 import inspect
 from utils.tools import load_model_cfg
-
 from model import module
 
 
@@ -23,7 +23,6 @@ def get_layer_map():
 class YOLO(nn.Module):
     """
     A preliminary YOLO (You Only Look Once) model class still under development.
-    #TODO: Next: Finish forward proccess
 
     Parameters:
         model_cfg: Configuration for the YOLO model. Expected to define the layers,
@@ -33,10 +32,8 @@ class YOLO(nn.Module):
     def __init__(self, model_cfg: Dict[str, Any]):
         super(YOLO, self).__init__()
         self.nc = model_cfg["nc"]
-        self.layer_map = get_layer_map()  # Dynamically get the mapping
+        self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
         self.build_model(model_cfg["model"])
-        print(self.model)
-        # raise NotImplementedError("Constructor not implemented.")
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
         model_list = nn.ModuleList()
@@ -44,7 +41,7 @@ class YOLO(nn.Module):
         layer_indices_by_tag = {}
 
         for arch_name, arch in model_arch.items():
-            logger.info(f"Building model-{arch_name}")
+            logger.info(f"🏗️  Building model-{arch_name}")
             for layer_idx, layer_spec in enumerate(arch, start=1):
                 layer_type, layer_info = next(iter(layer_spec.items()))
                 layer_args = layer_info.get("args", {})
@@ -56,8 +53,9 @@ class YOLO(nn.Module):
                     layer_args["in_channels"] = output_dim[source]
                 if "Detect" in layer_type:
                     layer_args["nc"] = self.nc
+                    layer_args["ch"] = [output_dim[idx] for idx in source]
 
-                layer = self.create_layer(layer_type, **layer_args)
+                layer = self.create_layer(layer_type, source, **layer_args)
                 model_list.append(layer)
 
                 if "tags" in layer_info:
@@ -69,22 +67,32 @@ class YOLO(nn.Module):
                 output_dim.append(out_channels)
         self.model = model_list
 
-    def get_out_channels(self, layer_type, layer_args, output_dim, source):
+    def forward(self, x):
+        y = [x]
+        for layer in self.model:
+            if isinstance(layer.source, list):
+                model_input = [y[idx] for idx in layer.source]
+            else:
+                model_input = y[layer.source]
+            x = layer(model_input)
+            y.append(x)
+        return x
+
+    def get_out_channels(self, layer_type: str, layer_args: dict, output_dim: list, source: Union[int, list]):
         if "Conv" in layer_type:
             return layer_args["out_channels"]
+        if layer_type in ["MaxPool", "UpSample"]:
+            return output_dim[source]
         if layer_type == "Concat":
             return sum(output_dim[idx] for idx in source)
-        if "Pool" in layer_type:
-            return output_dim[source] // 2
-        if layer_type == "UpSample":
-            return output_dim[source] * 2
         if layer_type == "IDetect":
             return None
 
-    def create_layer(self, layer_type: str, **kwargs):
-        # Dictionary mapping layer names to actual layer classes
+    def create_layer(self, layer_type: str, source: Union[int, list], **kwargs):
         if layer_type in self.layer_map:
-            return self.layer_map[layer_type](**kwargs)
+            layer = self.layer_map[layer_type](**kwargs)
+            layer.source = source
+            return layer
         else:
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
@@ -99,6 +107,7 @@ def get_model(model_cfg: dict) -> YOLO:
         YOLO: An instance of the model defined by the given configuration.
     """
     model = YOLO(model_cfg)
+    logger.info("✅ Success load model")
     return model
 
 
