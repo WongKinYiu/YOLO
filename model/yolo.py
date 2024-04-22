@@ -1,10 +1,12 @@
-import torch.nn as nn
-import torch
-from loguru import logger
-from typing import Dict, Any, List, Union
 import inspect
-from utils.tools import load_model_cfg
+from typing import Any, Dict, List, Union
+
+import torch
+import torch.nn as nn
+from loguru import logger
+
 from model import module
+from utils.tools import load_model_cfg
 
 
 def get_layer_map():
