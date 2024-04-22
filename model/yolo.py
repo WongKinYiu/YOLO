@@ -1,26 +1,10 @@
-import inspect
 from typing import Any, Dict, List, Union
 
 import torch
 import torch.nn as nn
 from loguru import logger
 from omegaconf import OmegaConf
-
-from model import module
-from utils.tools import load_model_cfg
-
-
-def get_layer_map():
-    """
-    Dynamically generates a dictionary mapping class names to classes,
-    filtering to include only those that are subclasses of nn.Module,
-    ensuring they are relevant neural network layers.
-    """
-    layer_map = {}
-    for name, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, nn.Module) and obj is not nn.Module:
-            layer_map[name] = obj
-    return layer_map
+from tools.layer_helper import get_layer_map
 
 
 class YOLO(nn.Module):

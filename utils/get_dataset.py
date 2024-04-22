@@ -78,7 +78,7 @@ def download_coco_dataset(download_cfg):
 
 
 if __name__ == "__main__":
-    from tools import custom_logger
+    from tools.log_helper import custom_logger
 
     custom_logger()
     download_coco_dataset()

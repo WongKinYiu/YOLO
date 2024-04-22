@@ -1,7 +1,6 @@
-import argparse
 from loguru import logger
 from model.yolo import get_model
-from utils.tools import load_model_cfg, custom_logger
+from tools.log_helper import custom_logger
 from utils.get_dataset import download_coco_dataset
 import hydra
 from config.config import Config
