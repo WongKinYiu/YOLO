@@ -2,3 +2,6 @@ loguru
 pyyaml
 pytest
 torch
+requests
+tqdm
+rich
