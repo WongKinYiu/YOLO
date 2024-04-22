@@ -1,5 +1,5 @@
-anchor:
-  [1, 2, 3]
+nc: 80
+
 model:
   backbone:
   - Conv: 
@@ -27,8 +27,8 @@ model:
       source: [-1, -3, -5, -6]
   - Conv: 
       args: {out_channels: 256, kernel_size: 1}
-  - MP: 
-      args: []
+  - MaxPool: 
+      args: {}
   - Conv: 
       args: {out_channels: 128, kernel_size: 1}
   - Conv: 
@@ -56,8 +56,8 @@ model:
       tags: 8x
   - Conv: 
       args: {out_channels: 512, kernel_size: 1}
-  - MP: 
-      args: []
+  - MaxPool: 
+      args: {}
   - Conv: 
       args: {out_channels: 256, kernel_size: 1}
   - Conv: 
@@ -85,8 +85,8 @@ model:
   - Conv: 
       args: {out_channels: 1024, kernel_size: 1}
       tags: 16x
-  - MP: 
-      args: []
+  - MaxPool: 
+      args: {}
   - Conv: 
       args: {out_channels: 512, kernel_size: 1}
   - Conv: 
@@ -115,12 +115,12 @@ model:
       args: {out_channels: 1024, kernel_size: 1}
       tags: 32x
   head:
-  - SPPCSPC: 
-      args: [512]
+  - SPPCSPConv: 
+      args: {out_channels: 512}
   - Conv: 
       args: {out_channels: 256, kernel_size: 1}
-  - Upsample: 
-      args: [None, 2, nearest]
+  - UpSample: 
+      args: {scale_factor: 2}
   - Conv: 
       args: {out_channels: 256, kernel_size: 1}
       source: 16x
@@ -145,8 +145,8 @@ model:
       args: {out_channels: 256, kernel_size: 1}
   - Conv: 
       args: {out_channels: 128, kernel_size: 1}
-  - Upsample: 
-      args: [None, 2, nearest]
+  - UpSample: 
+      args: {scale_factor: 2}
   - Conv: 
       args: {out_channels: 128, kernel_size: 1}
       source: 8x
@@ -169,8 +169,8 @@ model:
       source: [-1, -2, -3, -4, -5, -6]
   - Conv: 
       args: {out_channels: 128, kernel_size: 1}
-  - MP: 
-      args: []
+  - MaxPool: 
+      args: {}
   - Conv: 
       args: {out_channels: 128, kernel_size: 1}
   - Conv: 
@@ -197,8 +197,8 @@ model:
       source: [-1, -2, -3, -4, -5, -6]
   - Conv: 
       args: {out_channels: 256, kernel_size: 1}
-  - MP: 
-      args: []
+  - MaxPool: 
+      args: {}
   - Conv: 
       args: {out_channels: 256, kernel_size: 1}
   - Conv: 
@@ -226,14 +226,18 @@ model:
   - Conv: 
       args: {out_channels: 512, kernel_size: 1}
   - RepConv: 
-      args: [256, 3, 1]
+      args: {out_channels: 256}
       source: 75
   - RepConv: 
-      args: [512, 3, 1]
+      args: {out_channels: 512}
       source: 88
   - RepConv: 
-      args: [1024, 3, 1]
+      args: {out_channels: 1024}
       source: 101
   - IDetect: 
-      args: [nc, anchors]
+      args:
+        anchors:
+            - [12,16, 19,36, 40,28]  # P3/8
+            - [36,75, 76,55, 72,146]  # P4/16
+            - [142,110, 192,243, 459,401]  # P5/32
       source: [102, 103, 104]
