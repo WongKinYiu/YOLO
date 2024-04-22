@@ -1,7 +1,9 @@
+hydra-core
 loguru
-pyyaml
+numpy
 pytest
-torch
+pyyaml
 requests
-tqdm
 rich
+torch
+tqdm
