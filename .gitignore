@@ -111,8 +111,8 @@ dmypy.json
 
 # Machine learning specific folders and symlinks
 runs
-data
-datasets
+./data
+./datasets
 
 # Datasets and model checkpoints
 *.pth

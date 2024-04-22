@@ -3,6 +3,7 @@ hydra:
     dir: ./runs
 
 defaults:
- - data_config: coco.yaml
- - model: v7-base.yaml
+ - data: coco
+ - download: ../data/download
+ - model: v7-base
  - _self_
