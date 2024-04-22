@@ -3,7 +3,7 @@ An MIT license rewrite of YOLOv9
 
 ## To-Do Lists
 - [ ] Project Setup
-    - [X] requirements
+    - [ ] requirements
     - [ ] LICENSE
     - [ ] README
     - [ ] pytests
