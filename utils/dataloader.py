@@ -10,14 +10,17 @@ from tqdm.rich import tqdm
 import diskcache as dc
 from typing import Union
 from drawer import draw_bboxes
-from dataargument import Compose, RandomHorizontalFlip
+from dataargument import Compose, RandomHorizontalFlip, Mosaic
 
 
 class YoloDataset(Dataset):
-    def __init__(self, dataset_cfg: dict, phase: str = "train", transform=None):
+    def __init__(self, dataset_cfg: dict, phase: str = "train", image_size: int = 640, transform=None):
         phase_name = dataset_cfg.get(phase, phase)
+        self.image_size = image_size
 
         self.transform = transform
+        self.transform.get_more_data = self.get_more_data
+        self.transform.image_size = self.image_size
         self.data = self.load_data(dataset_cfg.path, phase_name)
 
     def load_data(self, dataset_path, phase_name):
@@ -105,9 +108,17 @@ class YoloDataset(Dataset):
             logger.warning("No valid BBox in {}", label_path)
             return None
 
-    def __getitem__(self, idx) -> Union[Image.Image, torch.Tensor]:
+    def get_data(self, idx):
         img_path, bboxes = self.data[idx]
         img = Image.open(img_path).convert("RGB")
+        return img, bboxes
+
+    def get_more_data(self, num: int = 1):
+        indices = torch.randint(0, len(self), (num,))
+        return [self.get_data(idx) for idx in indices]
+
+    def __getitem__(self, idx) -> Union[Image.Image, torch.Tensor]:
+        img, bboxes = self.get_data(idx)
         if self.transform:
             img, bboxes = self.transform(img, bboxes)
         return img, bboxes
