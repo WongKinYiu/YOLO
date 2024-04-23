@@ -10,7 +10,7 @@ from tqdm.rich import tqdm
 import diskcache as dc
 from typing import Union
 from drawer import draw_bboxes
-from dataargument import Compose, RandomHorizontalFlip, RandomVerticalFlip, Mosaic
+from dataargument import Compose, RandomHorizontalFlip, Mosaic, RandomVerticalFlip
 
 
 class YoloDataset(Dataset):
