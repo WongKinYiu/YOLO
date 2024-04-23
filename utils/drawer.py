@@ -14,9 +14,9 @@ def draw_bboxes(img, bboxes):
 
     # Font for class_id (optional)
     try:
-        font = ImageFont.truetype("arial.ttf", 15)
+        font = ImageFont.truetype("arial.ttf", 30)
     except IOError:
-        font = ImageFont.load_default()
+        font = ImageFont.load_default(30)
     width, height = img.size
 
     for bbox in bboxes:
@@ -27,6 +27,6 @@ def draw_bboxes(img, bboxes):
         y_max = y_max * height
         shape = [(x_min, y_min), (x_max, y_max)]
         draw.rectangle(shape, outline="red", width=2)
-        draw.text((x_min, y_min), str(class_id), font=font, fill="blue")
+        draw.text((x_min, y_min), str(int(class_id)), font=font, fill="blue")
 
     img.save("output.jpg")
