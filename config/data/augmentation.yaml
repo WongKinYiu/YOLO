@@ -1,2 +1,3 @@
 RandomHorizontalFlip: 0.5
+RandomVerticalFlip: 0.5
 Mosaic: 0.5
