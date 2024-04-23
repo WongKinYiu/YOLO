@@ -1,0 +1,9 @@
+hydra-core
+loguru
+numpy
+pytest
+pyyaml
+requests
+rich
+torch
+tqdm

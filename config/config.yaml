@@ -1,0 +1,9 @@
+hydra:
+  run:
+    dir: ./runs
+
+defaults:
+ - data: coco
+ - download: ../data/download
+ - model: v7-base
+ - _self_
