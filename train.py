@@ -1,9 +1,9 @@
-from loguru import logger
+import hydra
+
+from config.config import Config
 from model.yolo import get_model
 from tools.log_helper import custom_logger
 from utils.get_dataset import prepare_dataset
-import hydra
-from config.config import Config
 
 
 @hydra.main(config_path="config", config_name="config", version_base=None)
