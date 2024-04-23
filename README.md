@@ -30,7 +30,7 @@ If you are interested in contributing, please keep an eye on project updates or 
         - [ ] Auto Download
         - [ ] xywh, xxyy, xcyc
     - [ ] Dataloder
-        - [ ] Data arugment
+        - [ ] Data augment
 - [ ] Model
     - [ ] load model
         - [ ] from yaml
