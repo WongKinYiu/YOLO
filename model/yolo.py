@@ -1,10 +1,12 @@
-import torch.nn as nn
-import torch
-from loguru import logger
-from typing import Dict, Any, List, Union
 import inspect
-from utils.tools import load_model_cfg
+from typing import Any, Dict, List, Union
+
+import torch
+import torch.nn as nn
+from loguru import logger
+
 from model import module
+from utils.tools import load_model_cfg
 
 
 def get_layer_map():
@@ -46,6 +48,7 @@ class YOLO(nn.Module):
                 layer_type, layer_info = next(iter(layer_spec.items()))
                 layer_args = layer_info.get("args", {})
                 source = layer_info.get("source", -1)
+                output = layer_info.get("output", False)
 
                 if isinstance(source, str):
                     source = layer_indices_by_tag[source]
@@ -55,7 +58,7 @@ class YOLO(nn.Module):
                     layer_args["nc"] = self.nc
                     layer_args["ch"] = [output_dim[idx] for idx in source]
 
-                layer = self.create_layer(layer_type, source, **layer_args)
+                layer = self.create_layer(layer_type, source, output, **layer_args)
                 model_list.append(layer)
 
                 if "tags" in layer_info:
@@ -69,6 +72,7 @@ class YOLO(nn.Module):
 
     def forward(self, x):
         y = [x]
+        output = []
         for layer in self.model:
             if isinstance(layer.source, list):
                 model_input = [y[idx] for idx in layer.source]
@@ -76,7 +80,9 @@ class YOLO(nn.Module):
                 model_input = y[layer.source]
             x = layer(model_input)
             y.append(x)
-        return x
+            if layer.output:
+                output.append(x)
+        return output
 
     def get_out_channels(self, layer_type: str, layer_args: dict, output_dim: list, source: Union[int, list]):
         if "Conv" in layer_type:
@@ -88,10 +94,11 @@ class YOLO(nn.Module):
         if layer_type == "IDetect":
             return None
 
-    def create_layer(self, layer_type: str, source: Union[int, list], **kwargs):
+    def create_layer(self, layer_type: str, source: Union[int, list], output=False, **kwargs):
         if layer_type in self.layer_map:
             layer = self.layer_map[layer_type](**kwargs)
             layer.source = source
+            layer.output = output
             return layer
         else:
             raise ValueError(f"Unsupported layer type: {layer_type}")
