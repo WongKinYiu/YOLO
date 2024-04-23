@@ -1,9 +1,11 @@
 hydra-core
 loguru
 numpy
+Pillow
 pytest
 pyyaml
 requests
 rich
 torch
+torchvision
 tqdm
