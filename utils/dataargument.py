@@ -36,6 +36,19 @@ class RandomHorizontalFlip:
         return image, boxes
 
 
+class RandomVerticalFlip:
+    """Randomly vertically flips the image along with the bounding boxes."""
+
+    def __init__(self, prob=0.5):
+        self.prob = prob
+
+    def __call__(self, image, boxes):
+        if torch.rand(1) < self.prob:
+            image = TF.vflip(image)
+            boxes[:, [2, 4]] = 1 - boxes[:, [4, 2]]
+        return image, boxes
+
+
 class Mosaic:
     """Applies the Mosaic augmentation to a batch of images and their corresponding boxes."""
 
