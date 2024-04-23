@@ -33,7 +33,7 @@ def test_yolo_forward_output_shape():
 
     # Forward pass through the model
     output = model(dummy_input)
-    output_shape = [x.shape for x in output[0]]
+    output_shape = [x.shape for x in output[-1]]
     assert output_shape == [
         torch.Size([2, 3, 20, 20, 85]),
         torch.Size([2, 3, 80, 80, 85]),
