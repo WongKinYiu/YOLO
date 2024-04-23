@@ -16,7 +16,7 @@ An MIT license rewrite of YOLOv9
         - [ ] Auto Download
         - [ ] xywh, xxyy, xcyc
     - [ ] Dataloder
-        - [ ] Data arugment
+        - [ ] Data augment
 - [ ] Model
     - [ ] load model
         - [ ] from yaml
