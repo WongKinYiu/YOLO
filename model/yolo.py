@@ -1,25 +1,10 @@
-import inspect
 from typing import Any, Dict, List, Union
 
 import torch
 import torch.nn as nn
 from loguru import logger
-
-from model import module
-from utils.tools import load_model_cfg
-
-
-def get_layer_map():
-    """
-    Dynamically generates a dictionary mapping class names to classes,
-    filtering to include only those that are subclasses of nn.Module,
-    ensuring they are relevant neural network layers.
-    """
-    layer_map = {}
-    for name, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, nn.Module) and obj is not nn.Module:
-            layer_map[name] = obj
-    return layer_map
+from omegaconf import OmegaConf
+from tools.layer_helper import get_layer_map
 
 
 class YOLO(nn.Module):
@@ -35,16 +20,15 @@ class YOLO(nn.Module):
         super(YOLO, self).__init__()
         self.nc = model_cfg["nc"]
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
-        self.build_model(model_cfg["model"])
+        self.build_model(model_cfg.model)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
         model_list = nn.ModuleList()
         output_dim = [3]
         layer_indices_by_tag = {}
-
-        for arch_name, arch in model_arch.items():
+        for arch_name in model_arch:
             logger.info(f"🏗️  Building model-{arch_name}")
-            for layer_idx, layer_spec in enumerate(arch, start=1):
+            for layer_idx, layer_spec in enumerate(model_arch[arch_name], start=1):
                 layer_type, layer_info = next(iter(layer_spec.items()))
                 layer_args = layer_info.get("args", {})
                 source = layer_info.get("source", -1)
@@ -74,7 +58,7 @@ class YOLO(nn.Module):
         y = [x]
         output = []
         for layer in self.model:
-            if isinstance(layer.source, list):
+            if OmegaConf.is_list(layer.source):
                 model_input = [y[idx] for idx in layer.source]
             else:
                 model_input = y[layer.source]
@@ -113,6 +97,7 @@ def get_model(model_cfg: dict) -> YOLO:
     Returns:
         YOLO: An instance of the model defined by the given configuration.
     """
+    OmegaConf.set_struct(model_cfg, False)
     model = YOLO(model_cfg)
     logger.info("✅ Success load model")
     return model

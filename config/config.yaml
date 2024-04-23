@@ -1,0 +1,10 @@
+hydra:
+  run:
+    dir: ./runs
+
+defaults:
+ - data: coco
+ - download: ../data/download
+ - augmentation: ../data/augmentation
+ - model: v7-base
+ - _self_
