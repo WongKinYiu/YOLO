@@ -7,3 +7,6 @@ requests
 rich
 torch
 tqdm
+Pillow
+diskcache
+torchvision
