@@ -7,8 +7,9 @@ from torchvision.transforms import functional as TF
 class Compose:
     """Composes several transforms together."""
 
-    def __init__(self, transforms):
+    def __init__(self, transforms, image_size: int = 640):
         self.transforms = transforms
+        self.image_size = image_size
 
         for transform in self.transforms:
             if hasattr(transform, "set_parent"):
@@ -18,9 +19,6 @@ class Compose:
         for transform in self.transforms:
             image, boxes = transform(image, boxes)
         return image, boxes
-
-    def get_more_data(self):
-        raise NotImplementedError("This method should be overridden by subclass instances!")
 
 
 class RandomHorizontalFlip:

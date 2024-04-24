@@ -5,22 +5,25 @@ import diskcache as dc
 import hydra
 import numpy as np
 import torch
-from dataargument import Compose, Mosaic, RandomHorizontalFlip
-from drawer import draw_bboxes
 from loguru import logger
 from PIL import Image
 from torch.utils.data import Dataset
 from tqdm.rich import tqdm
 
+from utils.dataargument import Compose, Mosaic, RandomHorizontalFlip
+from utils.drawer import draw_bboxes
+
 
 class YoloDataset(Dataset):
-    def __init__(self, dataset_cfg: dict, phase: str = "train", image_size: int = 640, transform=None):
+    def __init__(self, config: dict, phase: str = "train", image_size: int = 640):
+        dataset_cfg = config.data
+        augment_cfg = config.augmentation
         phase_name = dataset_cfg.get(phase, phase)
         self.image_size = image_size
 
-        self.transform = transform
+        transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
+        self.transform = Compose(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.transform.image_size = self.image_size
         self.data = self.load_data(dataset_cfg.path, phase_name)
 
     def load_data(self, dataset_path, phase_name):
@@ -129,8 +132,7 @@ class YoloDataset(Dataset):
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg):
-    transform = Compose([eval(aug)(prob) for aug, prob in cfg.augmentation.items()])
-    dataset = YoloDataset(cfg.data, transform=transform)
+    dataset = YoloDataset(cfg)
     draw_bboxes(*dataset[0])
 
 
