@@ -13,7 +13,9 @@ While the project's structure is still being finalized, we ask that potential co
 
 If you are interested in contributing, please keep an eye on project updates or contact us directly at [henrytsui000@gmail.com](mailto:henrytsui000@gmail.com) for more information.
 
+## Star History
 
+[![Star History Chart](https://api.star-history.com/svg?repos=WongKinYiu/yolov9mit&type=Date)](https://star-history.com/#WongKinYiu/yolov9mit&Date)
 
 ## To-Do Lists
 - [ ] Project Setup
