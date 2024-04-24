@@ -1,11 +1,12 @@
+import sys
+
 import pytest
 import torch
 from PIL import Image
 from torchvision.transforms import functional as TF
-import sys
 
 sys.path.append("./")
-from utils.dataargument import RandomHorizontalFlip, Compose, Mosaic
+from utils.dataargument import Compose, Mosaic, RandomHorizontalFlip
 
 
 def test_random_horizontal_flip():

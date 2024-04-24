@@ -48,10 +48,12 @@ class Conv(nn.Module):
 # RepVGG
 class RepConv(nn.Module):
     # https://github.com/DingXiaoH/RepVGG
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=None, stride=1, groups=1, act=nn.SiLU(), deploy=False):
+    def __init__(
+        self, in_channels, out_channels, kernel_size=3, padding=None, stride=1, groups=1, act=nn.SiLU(), deploy=False
+    ):
 
         super().__init__()
-        self.deploy = deploy 
+        self.deploy = deploy
         self.conv1 = Conv(in_channels, out_channels, kernel_size, stride, groups=groups, act=False)
         self.conv2 = Conv(in_channels, out_channels, 1, stride, groups=groups, act=False)
         self.act = act if isinstance(act, nn.Module) else nn.Identity()
@@ -73,15 +75,17 @@ class RepConv(nn.Module):
         weights = conv.weight * t
 
         bn = nn.Identity()
-        conv = nn.Conv2d(in_channels = conv.in_channels,
-                              out_channels = conv.out_channels,
-                              kernel_size = conv.kernel_size,
-                              stride=conv.stride,
-                              padding = conv.padding,
-                              dilation = conv.dilation,
-                              groups = conv.groups,
-                              bias = True,
-                              padding_mode = conv.padding_mode)
+        conv = nn.Conv2d(
+            in_channels=conv.in_channels,
+            out_channels=conv.out_channels,
+            kernel_size=conv.kernel_size,
+            stride=conv.stride,
+            padding=conv.padding,
+            dilation=conv.dilation,
+            groups=conv.groups,
+            bias=True,
+            padding_mode=conv.padding_mode,
+        )
 
         conv.weight = torch.nn.Parameter(weights)
         conv.bias = torch.nn.Parameter(bias)

@@ -1,10 +1,10 @@
+import sys
+
 import pytest
 import torch
-from hydra import initialize, compose
+from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
-
-import sys
 
 sys.path.append("./")
 from model.yolo import YOLO, get_model

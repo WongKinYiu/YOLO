@@ -2,8 +2,8 @@ import os
 import zipfile
 
 import hydra
-from loguru import logger
 import requests
+from loguru import logger
 from tqdm.rich import tqdm
 
 
