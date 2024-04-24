@@ -60,7 +60,7 @@ def prepare_dataset(download_cfg):
 
         # Check if the correct number of files exists
         if check_files(extract_to, expected_files):
-            logger.info(f"Dataset {dataset_type} already verified.")
+            logger.info(f"✅ Dataset {dataset_type: >4} already verified.")
             continue
 
         if os.path.exists(local_zip_path):
