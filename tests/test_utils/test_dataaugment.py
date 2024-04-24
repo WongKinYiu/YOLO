@@ -6,7 +6,7 @@ from PIL import Image
 from torchvision.transforms import functional as TF
 
 sys.path.append("./")
-from utils.dataargument import Compose, Mosaic, RandomHorizontalFlip
+from utils.data_augment import Compose, Mosaic, RandomHorizontalFlip
 
 
 def test_random_horizontal_flip():

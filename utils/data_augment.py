@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from PIL import Image
 from torchvision.transforms import functional as TF
-from torchvision.transforms.functional import to_pil_image, to_tensor
 
 
 class Compose:
@@ -22,7 +21,7 @@ class Compose:
         return image, boxes
 
 
-class RandomHorizontalFlip:
+class HorizontalFlip:
     """Randomly horizontally flips the image along with the bounding boxes."""
 
     def __init__(self, prob=0.5):
@@ -35,7 +34,7 @@ class RandomHorizontalFlip:
         return image, boxes
 
 
-class RandomVerticalFlip:
+class VerticalFlip:
     """Randomly vertically flips the image along with the bounding boxes."""
 
     def __init__(self, prob=0.5):
@@ -88,6 +87,7 @@ class Mosaic:
             all_labels.append(adjusted_boxes)
 
         all_labels = torch.cat(all_labels, dim=0)
+        mosaic_image = mosaic_image.resize((img_sz, img_sz))
         return mosaic_image, all_labels
 
 
@@ -116,10 +116,10 @@ class MixUp:
         lam = np.random.beta(self.alpha, self.alpha) if self.alpha > 0 else 0.5
 
         # Mix images
-        image1, image2 = to_tensor(image), to_tensor(image2)
+        image1, image2 = TF.to_tensor(image), TF.to_tensor(image2)
         mixed_image = lam * image1 + (1 - lam) * image2
 
         # Mix bounding boxes
         mixed_boxes = torch.cat([lam * boxes, (1 - lam) * boxes2])
 
-        return to_pil_image(mixed_image), mixed_boxes
+        return TF.to_pil_image(mixed_image), mixed_boxes
