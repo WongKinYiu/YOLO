@@ -45,7 +45,7 @@ class YoloDataset(Dataset):
         if data is None:
             logger.info("Generating {} cache", phase_name)
             images_path = path.join(dataset_path, "images", phase_name)
-            labels_path = path.join(dataset_path, "label", phase_name)
+            labels_path = path.join(dataset_path, "labels", phase_name)
             data = self.filter_data(images_path, labels_path)
             cache[phase_name] = data
 

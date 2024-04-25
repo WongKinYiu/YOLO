@@ -25,6 +25,8 @@ def process_annotations(
     """
     for image_id, annotations in tqdm(image_annotations.items(), desc="Processing annotations"):
         file_path = os.path.join(output_dir, f"{image_id:0>12}.txt")
+        if not annotations:
+            continue
         with open(file_path, "w") as file:
             for annotation in annotations:
                 process_annotation(annotation, image_info_dict[image_id], id_to_idx, file)
