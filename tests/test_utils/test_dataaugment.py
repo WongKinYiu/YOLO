@@ -6,23 +6,22 @@ from PIL import Image
 from torchvision.transforms import functional as TF
 
 sys.path.append("./")
-from utils.dataargument import Compose, Mosaic, RandomHorizontalFlip
+from utils.data_augment import Compose, HorizontalFlip, Mosaic, VerticalFlip
 
 
-def test_random_horizontal_flip():
+def test_horizontal_flip():
     # Create a mock image and bounding boxes
     img = Image.new("RGB", (100, 100), color="red")
-    boxes = torch.tensor([[1, 0.1, 0.1, 0.9, 0.9]])  # class, xmin, ymin, xmax, ymax
+    boxes = torch.tensor([[1, 0.05, 0.1, 0.7, 0.9]])  # class, xmin, ymin, xmax, ymax
 
-    flip_transform = RandomHorizontalFlip(prob=1)  # Set probability to 1 to ensure flip
+    flip_transform = HorizontalFlip(prob=1)  # Set probability to 1 to ensure flip
     flipped_img, flipped_boxes = flip_transform(img, boxes)
 
     # Assert image is flipped by comparing it to a manually flipped image
     assert TF.hflip(img) == flipped_img
 
     # Assert bounding boxes are flipped correctly
-    expected_boxes = torch.tensor([[1, 0.1, 0.1, 0.9, 0.9]])
-    expected_boxes[:, [1, 3]] = 1 - expected_boxes[:, [3, 1]]
+    expected_boxes = torch.tensor([[1, 0.3, 0.1, 0.95, 0.9]])
     assert torch.allclose(flipped_boxes, expected_boxes), "Bounding boxes were not flipped correctly"
 
 
@@ -60,5 +59,5 @@ def test_mosaic():
     # Checks here would depend on the exact expected behavior of the mosaic function,
     # such as dimensions and content of the output image and boxes.
 
-    assert mosaic_img.size == (200, 200), "Mosaic image size should be doubled"
+    assert mosaic_img.size == (100, 100), "Mosaic image size should be same"
     assert len(mosaic_boxes) > 0, "Should have some bounding boxes"

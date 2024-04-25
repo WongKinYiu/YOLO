@@ -31,8 +31,13 @@ If you are interested in contributing, please keep an eye on project updates or 
         - [x] Download script
         - [ ] Auto Download
         - [ ] xywh, xxyy, xcyc
+<<<<<<< HEAD
     - [x] Dataloder
         - [x] Data arugment
+=======
+    - [ ] Dataloder
+        - [ ] Data augment
+>>>>>>> upstream/TEST
 - [ ] Model
     - [ ] load model
         - [ ] from yaml
