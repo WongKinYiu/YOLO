@@ -1,26 +1,30 @@
-from PIL import Image
-from os import path, listdir
+from os import listdir, path
+from typing import List, Tuple, Union
 
+import diskcache as dc
 import hydra
 import numpy as np
 import torch
-from torch.utils.data import Dataset
 from loguru import logger
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+from torchvision.transforms import functional as TF
 from tqdm.rich import tqdm
-import diskcache as dc
-from typing import Union
-from drawer import draw_bboxes
-from data_augment import Compose, RandomHorizontalFlip, RandomVerticalFlip, Mosaic, MixUp
+
+from utils.data_augment import Compose, HorizontalFlip, MixUp, Mosaic, VerticalFlip
+from utils.drawer import draw_bboxes
 
 
 class YoloDataset(Dataset):
-    def __init__(self, dataset_cfg: dict, phase: str = "train", image_size: int = 640, transform=None):
+    def __init__(self, config: dict, phase: str = "train", image_size: int = 640):
+        dataset_cfg = config.data
+        augment_cfg = config.augmentation
         phase_name = dataset_cfg.get(phase, phase)
         self.image_size = image_size
 
-        self.transform = transform
+        transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
+        self.transform = Compose(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.transform.image_size = self.image_size
         self.data = self.load_data(dataset_cfg.path, phase_name)
 
     def load_data(self, dataset_path, phase_name):
@@ -121,17 +125,55 @@ class YoloDataset(Dataset):
         img, bboxes = self.get_data(idx)
         if self.transform:
             img, bboxes = self.transform(img, bboxes)
+        img = TF.to_tensor(img)
         return img, bboxes
 
     def __len__(self) -> int:
         return len(self.data)
 
 
+class YoloDataLoader(DataLoader):
+    def __init__(self, config: dict):
+        """Initializes the YoloDataLoader with hydra-config files."""
+        hyper = config.hyper.data
+        dataset = YoloDataset(config)
+
+        super().__init__(
+            dataset,
+            batch_size=hyper.batch_size,
+            shuffle=hyper.shuffle,
+            num_workers=hyper.num_workers,
+            pin_memory=hyper.pin_memory,
+            collate_fn=self.collate_fn,
+        )
+
+    def collate_fn(self, batch: List[Tuple[torch.Tensor, torch.Tensor]]) -> Tuple[torch.Tensor, List[torch.Tensor]]:
+        """
+        A collate function to handle batching of images and their corresponding targets.
+
+        Args:
+            batch (list of tuples): Each tuple contains:
+                - image (torch.Tensor): The image tensor.
+                - labels (torch.Tensor): The tensor of labels for the image.
+
+        Returns:
+            Tuple[torch.Tensor, List[torch.Tensor]]: A tuple containing:
+                - A tensor of batched images.
+                - A list of tensors, each corresponding to bboxes for each image in the batch.
+        """
+        images = torch.stack([item[0] for item in batch])
+        targets = [item[1] for item in batch]
+        return images, targets
+
+
+def get_dataloader(config):
+    return YoloDataLoader(config)
+
+
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg):
-    transform = Compose([eval(aug)(prob) for aug, prob in cfg.augmentation.items()])
-    dataset = YoloDataset(cfg.data, transform=transform)
-    draw_bboxes(*dataset[0])
+    dataloader = get_dataloader(cfg)
+    draw_bboxes(next(iter(dataloader)))
 
 
 if __name__ == "__main__":

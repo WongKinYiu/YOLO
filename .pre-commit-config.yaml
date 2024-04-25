@@ -6,3 +6,9 @@ repos:
         language_version: python3  # Specify the Python version
         exclude: '.*\.yaml$'  # Regex pattern to exclude all YAML files
         args: ["--line-length", "120"]  # Set max line length to 100 characters
+        
+  - repo: https://github.com/pre-commit/mirrors-isort
+    rev: v5.10.1  # Use the appropriate version or "stable" for the latest stable release
+    hooks:
+      - id: isort
+        args: ["--profile", "black", "--verbose"]
