@@ -15,6 +15,25 @@ class Download:
 
 
 @dataclass
+class Dataset:
+    file_name: str
+    num_files: int
+
+
+@dataclass
+class Datasets:
+    base_url: str
+    images: Dict[str, Dataset]
+
+
+@dataclass
+class Download:
+    auto: bool
+    save_path: str
+    datasets: Datasets
+
+
+@dataclass
 class Config:
     model: Model
     download: Download
