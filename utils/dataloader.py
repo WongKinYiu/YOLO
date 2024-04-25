@@ -16,7 +16,7 @@ from utils.drawer import draw_bboxes
 
 
 class YoloDataset(Dataset):
-    def __init__(self, config: dict, phase: str = "train", image_size: int = 640):
+    def __init__(self, config: dict, phase: str = "train2017", image_size: int = 640):
         dataset_cfg = config.data
         augment_cfg = config.augmentation
         phase_name = dataset_cfg.get(phase, phase)
@@ -44,8 +44,8 @@ class YoloDataset(Dataset):
 
         if data is None:
             logger.info("Generating {} cache", phase_name)
-            images_path = path.join(dataset_path, phase_name, "images")
-            labels_path = path.join(dataset_path, phase_name, "labels")
+            images_path = path.join(dataset_path, "images", phase_name)
+            labels_path = path.join(dataset_path, "label", phase_name)
             data = self.filter_data(images_path, labels_path)
             cache[phase_name] = data
 
@@ -173,7 +173,7 @@ def get_dataloader(config):
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg):
     dataloader = get_dataloader(cfg)
-    draw_bboxes(next(iter(dataloader)))
+    draw_bboxes(*next(iter(dataloader)))
 
 
 if __name__ == "__main__":
