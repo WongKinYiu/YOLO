@@ -3,3 +3,17 @@ data:
   shuffle: True
   num_workers: 4
   pin_memory: True
+train:
+  optimizer:
+    type: Adam
+    args:
+      lr: 0.001
+      weight_decay: 0.0001
+  scheduler:
+    type: StepLR
+    args:
+      step_size: 10
+      gamma: 0.1
+  ema:
+      enabled: true
+      decay: 0.995
