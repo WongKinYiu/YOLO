@@ -13,20 +13,22 @@ While the project's structure is still being finalized, we ask that potential co
 
 If you are interested in contributing, please keep an eye on project updates or contact us directly at [henrytsui000@gmail.com](mailto:henrytsui000@gmail.com) for more information.
 
+## Star History
 
+[![Star History Chart](https://api.star-history.com/svg?repos=WongKinYiu/yolov9mit&type=Date)](https://star-history.com/#WongKinYiu/yolov9mit&Date)
 
 ## To-Do Lists
 - [ ] Project Setup
     - [X] requirements
-    - [ ] LICENSE
+    - [x] LICENSE
     - [ ] README
-    - [ ] pytests
+    - [x] pytests
     - [ ] setup.py/pip install
-    - [ ] log format
+    - [x] log format
     - [ ] hugging face
 - [ ] Data proccess
     - [ ] Dataset
-        - [ ] Download script
+        - [x] Download script
         - [ ] Auto Download
         - [ ] xywh, xxyy, xcyc
     - [ ] Dataloder
@@ -35,14 +37,14 @@ If you are interested in contributing, please keep an eye on project updates or 
     - [ ] load model
         - [ ] from yaml
         - [ ] from github
-    - [ ] trainer
-        - [ ] train_one_iter
-        - [ ] train_one_epoch
-    - [ ] DDP, EMA, OTA
+    - [x] trainer
+        - [x] train_one_iter
+        - [x] train_one_epoch
+    - [ ] DDP
+    - [x] EMA, OTA
+- [ ] Loss
 - [ ] Run
     - [ ] train
     - [ ] test
     - [ ] demo
-- [ ] Configuration
-    - [ ] hyperparams: dataclass
-    - [ ] model cfg: yaml
+- [x] Configuration

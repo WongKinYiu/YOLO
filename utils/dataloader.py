@@ -96,7 +96,7 @@ class YoloDataset(Dataset):
             cache[phase_name] = data
 
         cache.close()
-        logger.info("Loaded {} cache", phase_name)
+        logger.info("📦 Loaded {} cache", phase_name)
         data = cache[phase_name]
         return data
 
