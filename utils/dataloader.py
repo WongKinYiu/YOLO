@@ -1,3 +1,6 @@
+import json
+import os
+from itertools import chain
 from os import listdir, path
 from typing import List, Tuple, Union
 
@@ -5,14 +8,59 @@ import diskcache as dc
 import hydra
 import numpy as np
 import torch
+from data_augment import Compose, HorizontalFlip, MixUp, Mosaic, VerticalFlip
+from drawer import draw_bboxes
 from loguru import logger
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
 from tqdm.rich import tqdm
 
-from utils.data_augment import Compose, HorizontalFlip, MixUp, Mosaic, VerticalFlip
-from utils.drawer import draw_bboxes
+
+def find_labels_path(dataset_path, phase_name):
+    json_labels_path = path.join(dataset_path, "annotations", f"instances_{phase_name}.json")
+
+    txt_labels_path = path.join(dataset_path, "label", phase_name)
+
+    if path.isfile(json_labels_path):
+        return json_labels_path, "json"
+
+    elif path.isdir(txt_labels_path):
+        txt_files = [f for f in os.listdir(txt_labels_path) if f.endswith(".txt")]
+        if txt_files:
+            return txt_labels_path, "txt"
+
+    raise FileNotFoundError("No labels found in the specified dataset path and phase name.")
+
+
+def load_json_labels(json_labels_path):
+    with open(json_labels_path, "r") as file:
+        data = json.load(file)
+    return data
+
+
+def create_annotation_lookup(data):
+    annotation_lookup = {}
+    for anno in data["annotations"]:
+        if anno["iscrowd"] == 0:  # Exclude crowd annotations
+            image_id = anno["image_id"]
+            if image_id not in annotation_lookup:
+                annotation_lookup[image_id] = []
+            annotation_lookup[image_id].append(anno)
+    return annotation_lookup
+
+
+def process_annotations(annotations, image_id, image_dimensions):
+    ret_array = []
+    h, w = image_dimensions["height"], image_dimensions["width"]
+    for anno in annotations:
+        category_id = anno["category_id"]
+        flat_list = [item for sublist in anno["segmentation"] for item in sublist]
+        normalized_data = (np.array(flat_list).reshape(-1, 2) / [w, h]).tolist()
+        normalized_flat = list(chain(*normalized_data))
+        normalized_flat.insert(0, category_id)
+        ret_array.append(normalized_flat)
+    return ret_array
 
 
 class YoloDataset(Dataset):
@@ -44,9 +92,7 @@ class YoloDataset(Dataset):
 
         if data is None:
             logger.info("Generating {} cache", phase_name)
-            images_path = path.join(dataset_path, "images", phase_name)
-            labels_path = path.join(dataset_path, "label", phase_name)
-            data = self.filter_data(images_path, labels_path)
+            data = self.filter_data(dataset_path, phase_name)
             cache[phase_name] = data
 
         cache.close()
@@ -54,7 +100,7 @@ class YoloDataset(Dataset):
         data = cache[phase_name]
         return data
 
-    def filter_data(self, images_path: str, labels_path: str) -> list:
+    def filter_data(self, dataset_path: str, phase_name: str) -> list:
         """
         Filters and collects dataset information by pairing images with their corresponding labels.
 
@@ -63,29 +109,58 @@ class YoloDataset(Dataset):
             labels_path (str): Path to the directory containing label files.
 
         Returns:
-            list: A list of tuples, each containing the path to an image file and its associated labels as a tensor.
+            list: A list of tuples, each containing the path to an image file and its associated segmentation as a tensor.
         """
+        images_path = path.join(dataset_path, "images", phase_name)
+        labels_path, data_type = find_labels_path(dataset_path, phase_name)
+        images_list = sorted(os.listdir(images_path))
         data = []
         valid_inputs = 0
-        images_list = sorted(listdir(images_path))
-        for image_name in tqdm(images_list, desc="Filtering data"):
-            if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
-                continue
 
-            img_path = path.join(images_path, image_name)
-            base_name, _ = path.splitext(image_name)
-            label_path = path.join(labels_path, f"{base_name}.txt")
+        if data_type == "json":
+            labels_data = load_json_labels(labels_path)
+            annotations_lookup = create_annotation_lookup(labels_data)
+            image_info_dict = {path.splitext(img["file_name"])[0]: img for img in labels_data["images"]}
 
-            if path.isfile(label_path):
-                labels = self.load_valid_labels(label_path)
-                if labels is not None:
-                    data.append((img_path, labels))
-                    valid_inputs += 1
+            for image_name in tqdm(images_list, desc="Filtering data"):
+                if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
+                    continue
+                base_name, _ = path.splitext(image_name)
+                if base_name in image_info_dict:
+                    image_info = image_info_dict[base_name]
+                    annotations = annotations_lookup.get(image_info["id"], [])
+                    if annotations:
+                        processed_data = process_annotations(annotations, image_info["id"], image_info)
+                        if processed_data:
+                            img_path = path.join(images_path, image_name)
+                            labels = self.load_valid_labels(img_path, processed_data)
+                            if labels is not None:
+                                data.append((img_path, labels))
+                                valid_inputs += 1
+
+        elif data_type == "txt":
+            for image_name in tqdm(images_list, desc="Filtering data"):
+                if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
+                    continue
+                img_path = path.join(images_path, image_name)
+                base_name, _ = path.splitext(image_name)
+                label_path = path.join(labels_path, f"{base_name}.txt")
+
+                if path.isfile(label_path):
+                    seg_data_one_img = []
+                    with open(label_path, "r") as file:
+                        for line in file:
+                            parts = list(map(float, line.strip().split()))
+                            seg_data_one_img.append(parts)
+                    labels = self.load_valid_labels(label_path, seg_data_one_img)
+                    if labels is not None:
+                        data.append((img_path, labels))
+                        valid_inputs += 1
 
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
 
-    def load_valid_labels(self, label_path: str) -> Union[torch.Tensor, None]:
+    def load_valid_labels(self, label_path, seg_data_one_img) -> Union[torch.Tensor, None]:
         """
         Loads and validates bounding box data is [0, 1] from a label file.
 
@@ -96,15 +171,13 @@ class YoloDataset(Dataset):
             torch.Tensor or None: A tensor of all valid bounding boxes if any are found; otherwise, None.
         """
         bboxes = []
-        with open(label_path, "r") as file:
-            for line in file:
-                parts = list(map(float, line.strip().split()))
-                cls = parts[0]
-                points = np.array(parts[1:]).reshape(-1, 2)
-                valid_points = points[(points >= 0) & (points <= 1)].reshape(-1, 2)
-                if valid_points.size > 1:
-                    bbox = torch.tensor([cls, *valid_points.min(axis=0), *valid_points.max(axis=0)])
-                    bboxes.append(bbox)
+        for seg_data in seg_data_one_img:
+            cls = seg_data[0]
+            points = np.array(seg_data[1:]).reshape(-1, 2)
+            valid_points = points[(points >= 0) & (points <= 1)].reshape(-1, 2)
+            if valid_points.size > 1:
+                bbox = torch.tensor([cls, *valid_points.min(axis=0), *valid_points.max(axis=0)])
+                bboxes.append(bbox)
 
         if bboxes:
             return torch.stack(bboxes)
