@@ -2,7 +2,7 @@ import json
 import os
 from itertools import chain
 from os import listdir, path
-from typing import List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import diskcache as dc
 import hydra
@@ -17,7 +17,17 @@ from torchvision.transforms import functional as TF
 from tqdm.rich import tqdm
 
 
-def find_labels_path(dataset_path, phase_name):
+def find_labels_path(dataset_path: str, phase_name: str):
+    """
+    Find the path to label files for a specified dataset and phase(e.g. training).
+
+    Args:
+        dataset_path (str): The path to the root directory of the dataset.
+        phase_name (str): The name of the phase for which labels are being searched (e.g., "train", "val", "test").
+
+    Returns:
+        Tuple[str, str]: A tuple containing the path to the labels file and the file format ("json" or "txt").
+    """
     json_labels_path = path.join(dataset_path, "annotations", f"instances_{phase_name}.json")
 
     txt_labels_path = path.join(dataset_path, "label", phase_name)
@@ -33,34 +43,74 @@ def find_labels_path(dataset_path, phase_name):
     raise FileNotFoundError("No labels found in the specified dataset path and phase name.")
 
 
-def load_json_labels(json_labels_path):
-    with open(json_labels_path, "r") as file:
-        data = json.load(file)
-    return data
+def create_image_info_dict(labels_path: str) -> Tuple[Dict[str, List], Dict[str, Dict]]:
+    """
+    Create a dictionary containing image information and annotations indexed by image ID.
+
+    Args:
+        labels_path (str): The path to the annotation json file.
+
+    Returns:
+        - annotations_index: A dictionary where keys are image IDs and values are lists of annotations.
+        - image_info_dict: A dictionary where keys are image file names without extension and values are image information dictionaries.
+    """
+    with open(labels_path, "r") as file:
+        labels_data = json.load(file)
+        annotations_index = index_annotations_by_image(labels_data)  # check lookup is a good name?
+        image_info_dict = {path.splitext(img["file_name"])[0]: img for img in labels_data["images"]}
+        return annotations_index, image_info_dict
 
 
-def create_annotation_lookup(data):
+def index_annotations_by_image(data: Dict[str, Any]):
+    """
+    Use image index to lookup every annotations
+    Args:
+        data (Dict[str, Any]): A dictionary containing annotation data.
+
+    Returns:
+        Dict[int, List[Dict[str, Any]]]: A dictionary where keys are image IDs and values are lists of annotations.
+        Annotations with "iscrowd" set to True are excluded from the index.
+
+    """
     annotation_lookup = {}
     for anno in data["annotations"]:
-        if anno["iscrowd"] == 0:  # Exclude crowd annotations
-            image_id = anno["image_id"]
-            if image_id not in annotation_lookup:
-                annotation_lookup[image_id] = []
-            annotation_lookup[image_id].append(anno)
+        if anno["iscrowd"]:
+            continue
+        image_id = anno["image_id"]
+        if image_id not in annotation_lookup:
+            annotation_lookup[image_id] = []
+        annotation_lookup[image_id].append(anno)
     return annotation_lookup
 
 
-def process_annotations(annotations, image_id, image_dimensions):
-    ret_array = []
+def get_scaled_segmentation(
+    annotations: List[Dict[str, Any]], image_dimensions: Dict[str, int]
+) -> Optional[List[List[float]]]:
+    """
+    Scale the segmentation data based on image dimensions and return a list of scaled segmentation data.
+
+    Args:
+        annotations (List[Dict[str, Any]]): A list of annotation dictionaries.
+        image_dimensions (Dict[str, int]): A dictionary containing image dimensions (height and width).
+
+    Returns:
+        Optional[List[List[float]]]: A list of scaled segmentation data, where each sublist contains category_id followed by scaled (x, y) coordinates.
+    """
+    if annotations is None:
+        return None
+
+    seg_array_with_cat = []
     h, w = image_dimensions["height"], image_dimensions["width"]
     for anno in annotations:
         category_id = anno["category_id"]
-        flat_list = [item for sublist in anno["segmentation"] for item in sublist]
-        normalized_data = (np.array(flat_list).reshape(-1, 2) / [w, h]).tolist()
-        normalized_flat = list(chain(*normalized_data))
-        normalized_flat.insert(0, category_id)
-        ret_array.append(normalized_flat)
-    return ret_array
+        seg_list = [item for sublist in anno["segmentation"] for item in sublist]
+        scaled_seg_data = (
+            np.array(seg_list).reshape(-1, 2) / [w, h]
+        ).tolist()  # make the list group in x, y pairs and scaled with image width, height
+        scaled_flat_seg_data = [category_id] + list(chain(*scaled_seg_data))  # flatten the scaled_seg_data list
+        seg_array_with_cat.append(scaled_flat_seg_data)
+
+    return seg_array_with_cat
 
 
 class YoloDataset(Dataset):
@@ -114,48 +164,39 @@ class YoloDataset(Dataset):
         images_path = path.join(dataset_path, "images", phase_name)
         labels_path, data_type = find_labels_path(dataset_path, phase_name)
         images_list = sorted(os.listdir(images_path))
+        if data_type == "json":
+            annotations_index, image_info_dict = create_image_info_dict(labels_path)
+
         data = []
         valid_inputs = 0
+        for image_name in tqdm(images_list, desc="Filtering data"):
+            if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
+                continue
+            image_id, _ = path.splitext(image_name)
 
-        if data_type == "json":
-            labels_data = load_json_labels(labels_path)
-            annotations_lookup = create_annotation_lookup(labels_data)
-            image_info_dict = {path.splitext(img["file_name"])[0]: img for img in labels_data["images"]}
-
-            for image_name in tqdm(images_list, desc="Filtering data"):
-                if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
+            if data_type == "json":
+                image_info = image_info_dict.get(image_id, None)
+                if image_info is None:
                     continue
-                base_name, _ = path.splitext(image_name)
-                if base_name in image_info_dict:
-                    image_info = image_info_dict[base_name]
-                    annotations = annotations_lookup.get(image_info["id"], [])
-                    if annotations:
-                        processed_data = process_annotations(annotations, image_info["id"], image_info)
-                        if processed_data:
-                            img_path = path.join(images_path, image_name)
-                            labels = self.load_valid_labels(img_path, processed_data)
-                            if labels is not None:
-                                data.append((img_path, labels))
-                                valid_inputs += 1
-
-        elif data_type == "txt":
-            for image_name in tqdm(images_list, desc="Filtering data"):
-                if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
+                annotations = annotations_index.get(image_info["id"], [])
+                image_seg_annotations = get_scaled_segmentation(annotations, image_info)
+                if not image_seg_annotations:
                     continue
+
+            elif data_type == "txt":
+                label_path = path.join(labels_path, f"{image_id}.txt")
+                if not path.isfile(label_path):
+                    continue
+                with open(label_path, "r") as file:
+                    image_seg_annotations = [
+                        list(map(float, line.strip().split())) for line in file
+                    ]  # add a comment for this line, complicated, do you need "list", im not sure
+
+            labels = self.load_valid_labels(image_id, image_seg_annotations)
+            if labels is not None:
                 img_path = path.join(images_path, image_name)
-                base_name, _ = path.splitext(image_name)
-                label_path = path.join(labels_path, f"{base_name}.txt")
-
-                if path.isfile(label_path):
-                    seg_data_one_img = []
-                    with open(label_path, "r") as file:
-                        for line in file:
-                            parts = list(map(float, line.strip().split()))
-                            seg_data_one_img.append(parts)
-                    labels = self.load_valid_labels(label_path, seg_data_one_img)
-                    if labels is not None:
-                        data.append((img_path, labels))
-                        valid_inputs += 1
+                data.append((img_path, labels))
+                valid_inputs += 1
 
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
