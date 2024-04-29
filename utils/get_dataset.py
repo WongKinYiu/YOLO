@@ -1,83 +1,83 @@
 import os
 import zipfile
 
-import hydra
 import requests
+from hydra import main
 from loguru import logger
-from tqdm.rich import tqdm
+from tqdm import tqdm
 
 
-def download_file(url, dest_path):
+def download_file(url, destination):
     """
-    Downloads a file from a specified URL to a destination path with progress logging.
+    Downloads a file from the specified URL to the destination path with progress logging.
     """
-    logger.info(f"Downloading {os.path.basename(dest_path)}...")
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
-        total_length = int(r.headers.get("content-length", 0))
-        with open(dest_path, "wb") as f, tqdm(
-            total=total_length, unit="iB", unit_scale=True, desc=os.path.basename(dest_path), leave=True
-        ) as bar:
-            for chunk in r.iter_content(chunk_size=1024 * 1024):
-                f.write(chunk)
-                bar.update(len(chunk))
-    logger.info("Download complete!")
+    logger.info(f"Downloading {os.path.basename(destination)}...")
+    with requests.get(url, stream=True) as response:
+        response.raise_for_status()
+        total_size = int(response.headers.get("content-length", 0))
+        progress = tqdm(total=total_size, unit="iB", unit_scale=True, desc=os.path.basename(destination), leave=True)
+
+        with open(destination, "wb") as file:
+            for data in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
+                file.write(data)
+                progress.update(len(data))
+        progress.close()
+    logger.info("Download completed.")
 
 
-def unzip_file(zip_path, extract_to):
+def unzip_file(source, destination):
     """
-    Unzips a ZIP file to a specified directory.
+    Extracts a ZIP file to the specified directory and removes the ZIP file after extraction.
     """
-    logger.info(f"Unzipping {os.path.basename(zip_path)}...")
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(extract_to)
-    os.remove(zip_path)
-    logger.info(f"Removed {zip_path}")
+    logger.info(f"Unzipping {os.path.basename(source)}...")
+    with zipfile.ZipFile(source, "r") as zip_ref:
+        zip_ref.extractall(destination)
+    os.remove(source)
+    logger.info(f"Removed {source}.")
 
 
-def check_files(directory, expected_count):
+def check_files(directory, expected_count=None):
     """
-    Checks if the specified directory has the expected number of files.
+    Returns True if the number of files in the directory matches expected_count, False otherwise.
     """
-    num_files = len([name for name in os.listdir(directory) if os.path.isfile(os.path.join(directory, name))])
-    return num_files == expected_count
+    files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    return len(files) == expected_count if expected_count is not None else bool(files)
 
 
-@hydra.main(config_path="../config/data", config_name="download", version_base=None)
-def prepare_dataset(download_cfg):
-    data_dir = download_cfg.path
-    base_url = download_cfg.images.base_url
-    datasets = download_cfg.images.datasets
+@main(config_path="../config/data", config_name="download", version_base=None)
+def prepare_dataset(cfg):
+    """
+    Prepares dataset by downloading and unzipping if necessary.
+    """
+    data_dir = cfg.save_path
+    for data_type, settings in cfg.datasets.items():
+        base_url = settings["base_url"]
+        for dataset_type, dataset_args in settings.items():
+            if dataset_type == "base_url":
+                continue  # Skip the base_url entry
+            file_name = f"{dataset_args.get('file_name', dataset_type)}.zip"
+            url = f"{base_url}{file_name}"
+            local_zip_path = os.path.join(data_dir, file_name)
+            extract_to = os.path.join(data_dir, data_type) if data_type != "annotations" else data_dir
+            final_place = os.path.join(extract_to, dataset_type)
 
-    for dataset_type in datasets:
-        file_name, expected_files = datasets[dataset_type].values()
-        url = f"{base_url}{file_name}"
-        local_zip_path = os.path.join(data_dir, file_name)
-        extract_to = os.path.join(data_dir, dataset_type, "images")
+            os.makedirs(extract_to, exist_ok=True)
+            if check_files(final_place, dataset_args.get("file_num")):
+                logger.info(f"Dataset {dataset_type} already verified.")
+                continue
 
-        # Ensure the extraction directory exists
-        os.makedirs(extract_to, exist_ok=True)
+            if not os.path.exists(local_zip_path):
+                download_file(url, local_zip_path)
+            unzip_file(local_zip_path, extract_to)
 
-        # Check if the correct number of files exists
-        if check_files(extract_to, expected_files):
-            logger.info(f"✅ Dataset {dataset_type: >4} already verified.")
-            continue
-
-        if os.path.exists(local_zip_path):
-            logger.info(f"Dataset {dataset_type} already downloaded.")
-        else:
-            download_file(url, local_zip_path)
-
-        unzip_file(local_zip_path, extract_to)
-
-        print(os.path.exists(local_zip_path), check_files(extract_to, expected_files))
-
-        # Additional verification post extraction
-        if not check_files(extract_to, expected_files):
-            logger.error(f"Error in verifying the {dataset_type} dataset after extraction.")
+            if not check_files(final_place, dataset_args.get("file_num")):
+                logger.error(f"Error verifying the {dataset_type} dataset after extraction.")
 
 
 if __name__ == "__main__":
+    import sys
+
+    sys.path.append("./")
     from tools.log_helper import custom_logger
 
     custom_logger()

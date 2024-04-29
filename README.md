@@ -32,12 +32,17 @@ If you are interested in contributing, please keep an eye on project updates or 
         - [ ] Auto Download
         - [ ] xywh, xxyy, xcyc
 <<<<<<< HEAD
+<<<<<<< HEAD
     - [ ] Dataloder
         - [ ] Data augment
 =======
     - [x] Dataloder
         - [x] Data arugment
 >>>>>>> a2c4a3f06f75f8b7dcbbf089b87309451fc1accd
+=======
+    - [ ] Dataloder
+        - [ ] Data augment
+>>>>>>> 6c616961e2d81c3639c3a058888dc666680d8dfc
 - [ ] Model
     - [ ] load model
         - [ ] from yaml
