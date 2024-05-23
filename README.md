@@ -20,31 +20,31 @@ If you are interested in contributing, please keep an eye on project updates or 
 ## To-Do Lists
 - [ ] Project Setup
     - [X] requirements
-    - [ ] LICENSE
+    - [x] LICENSE
     - [ ] README
-    - [ ] pytests
+    - [x] pytests
     - [ ] setup.py/pip install
-    - [ ] log format
+    - [x] log format
     - [ ] hugging face
 - [ ] Data proccess
     - [ ] Dataset
-        - [ ] Download script
+        - [x] Download script
         - [ ] Auto Download
         - [ ] xywh, xxyy, xcyc
-    - [ ] Dataloder
-        - [ ] Data augment
+    - [x] Dataloder
+        - [x] Data arugment
 - [ ] Model
     - [ ] load model
         - [ ] from yaml
         - [ ] from github
-    - [ ] trainer
-        - [ ] train_one_iter
-        - [ ] train_one_epoch
-    - [ ] DDP, EMA, OTA
+    - [x] trainer
+        - [x] train_one_iter
+        - [x] train_one_epoch
+    - [ ] DDP
+    - [x] EMA, OTA
+- [ ] Loss
 - [ ] Run
     - [ ] train
     - [ ] test
     - [ ] demo
-- [ ] Configuration
-    - [ ] hyperparams: dataclass
-    - [ ] model cfg: yaml
+- [x] Configuration

@@ -5,7 +5,7 @@ import torch.nn as nn
 from loguru import logger
 from omegaconf import OmegaConf
 
-from tools.layer_helper import get_layer_map
+from yolo.tools.layer_helper import get_layer_map
 
 
 class YOLO(nn.Module):
