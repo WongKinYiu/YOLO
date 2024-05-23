@@ -4,7 +4,6 @@ from typing import Any, List, Tuple
 import torch
 import torch.nn.functional as F
 from einops import rearrange
-from hydra import main
 from loguru import logger
 from torch import Tensor, nn
 from torch.nn import BCEWithLogitsLoss
@@ -144,7 +143,7 @@ class YOLOLoss:
         # Batch_Size x (Anchor + Class) x H x W
         # TODO: check datatype, why targets has a little bit error with origin version
         predicts, predicts_anc = self.parse_predicts(predicts[0])
-        targets = self.parse_targets(targets)
+        targets = self.parse_targets(targets, batch_size=predicts.size(0))
 
         align_targets, valid_masks = self.matcher(targets, predicts)
         # calculate loss between with instance and predict
