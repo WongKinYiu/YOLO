@@ -2,10 +2,10 @@ import torch
 from loguru import logger
 from tqdm import tqdm
 
-from config.config import TrainConfig
-from model.yolo import YOLO
-from tools.model_helper import EMA, get_optimizer, get_scheduler
-from utils.loss import get_loss_function
+from yolo.config.config import TrainConfig
+from yolo.model.yolo import YOLO
+from yolo.tools.model_helper import EMA, get_optimizer, get_scheduler
+from yolo.utils.loss import get_loss_function
 
 
 class Trainer:
