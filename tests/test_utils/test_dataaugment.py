@@ -1,12 +1,15 @@
 import sys
+from pathlib import Path
 
 import pytest
 import torch
 from PIL import Image
 from torchvision.transforms import functional as TF
 
-sys.path.append("./")
-from utils.data_augment import Compose, HorizontalFlip, Mosaic, VerticalFlip
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(project_root))
+
+from yolo.utils.data_augment import Compose, HorizontalFlip, Mosaic, VerticalFlip
 
 
 def test_horizontal_flip():
