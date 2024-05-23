@@ -2,7 +2,7 @@ import inspect
 
 import torch.nn as nn
 
-from model import module
+from yolo.model import module
 
 
 def auto_pad():
