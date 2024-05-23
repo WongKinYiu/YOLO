@@ -4,7 +4,7 @@ import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 
-from config.config import OptimizerConfig, SchedulerConfig
+from yolo.config.config import OptimizerConfig, SchedulerConfig
 
 
 class EMA:
