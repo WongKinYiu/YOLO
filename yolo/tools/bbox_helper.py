@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from config.config import MatcherConfig
+from yolo.config.config import MatcherConfig
 
 
 def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
