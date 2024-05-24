@@ -1,6 +1,42 @@
+from typing import Tuple, Union
+
 import torch
 import torch.nn as nn
 from torch import Tensor
+
+
+def auto_pad(
+    kernel: Union[int, Tuple[int, int]], dilation: Union[int, Tuple[int, int]] = 1, **kwargs
+) -> Tuple[int, int]:
+    """
+    Auto Padding for the convolution blocks
+    """
+    if isinstance(kernel, int):
+        kernel = (kernel, kernel)
+    if isinstance(dilation, int):
+        dilation = (dilation, dilation)
+
+    pad_h = ((kernel[0] - 1) * dilation[0]) // 2
+    pad_w = ((kernel[1] - 1) * dilation[1]) // 2
+    return (pad_h, pad_w)
+
+
+def get_activation(activation: str) -> nn.Module:
+    """
+    Retrieves an activation function from the PyTorch nn module based on its name, case-insensitively.
+    """
+
+    activation_map = {
+        name.lower(): obj
+        for name, obj in nn.modules.activation.__dict__.items()
+        if isinstance(obj, type) and issubclass(obj, nn.Module)
+    }
+
+    # Look up the activation function case-insensitively
+    if activation.lower() in activation_map:
+        return activation_map[activation.lower()]()
+    else:
+        raise ValueError(f"Activation function '{activation}' is not found in torch.nn")
 
 
 class Identity(nn.Module):
@@ -11,47 +47,30 @@ class Identity(nn.Module):
         return x
 
 
-# basic
 class Conv(nn.Module):
-    # basic convlution
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride=1,
-        padding=None,
-        dilation=1,
-        groups=1,
-        act=nn.SiLU(),
-        bias=False,
-        auto_padding=True,
-        padding_mode="zeros",
-    ):
+    """
+    Basic convolutional block with batch normalization and activation.
 
+    Args:
+        act (str): The activation function to use. Defaults to "SiLU".
+        **kwargs: Additional keyword arguments for the nn.Conv2d layer.
+    """
+
+    def __init__(self, act: str = "SiLU", **kwargs) -> None:
         super().__init__()
+        out_channels = kwargs.get("out_channels")
+        if out_channels is None:
+            raise ValueError("out_channels must be specified in kwargs")
 
-        # not yet handle the case when dilation is a tuple
-        if auto_padding:
-            if isinstance(kernel_size, int):
-                padding = (dilation * (kernel_size - 1) + 1) // 2
-            else:
-                padding = [(dilation * (k - 1) + 1) // 2 for k in kernel_size]
-
-        self.conv = nn.Conv2d(
-            in_channels, out_channels, kernel_size, stride, padding, groups=groups, dilation=dilation, bias=bias
-        )
+        self.conv = nn.Conv2d(**kwargs)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.act = act if isinstance(act, nn.Module) else nn.Identity()
+        self.act = get_activation(act)
 
-    def forward(self, x):
-        return self.act(self.bn(self.conv(x)))
-
-    def forward_fuse(self, x):
-        return self.act(self.conv(x))
-
-    # to be implement
-    # def fuse_conv_bn(self):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.act(x)
+        return x
 
 
 # RepVGG
