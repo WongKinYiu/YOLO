@@ -1,5 +1,9 @@
 nc: 80
 
+anchor:
+  reg_max: 16
+  strides: [8, 16, 32]
+
 model:
   backbone:
   - Conv: 

@@ -3,8 +3,14 @@ from typing import Dict, List, Union
 
 
 @dataclass
+class AnchorConfig:
+    reg_max: int
+    strides: List[int]
+
+
+@dataclass
 class Model:
-    anchor: List[List[int]]
+    anchor: AnchorConfig
     model: Dict[str, List[Dict[str, Union[Dict, List, int]]]]
 
 
@@ -20,6 +26,8 @@ class DataLoaderConfig:
     shuffle: bool
     num_workers: int
     pin_memory: bool
+    image_size: List[int]
+    class_num: int
 
 
 @dataclass
@@ -53,10 +61,18 @@ class EMAConfig:
 
 
 @dataclass
+class MatcherConfig:
+    iou: str
+    topk: int
+    factor: Dict[str, int]
+
+
+@dataclass
 class TrainConfig:
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     ema: EMAConfig
+    matcher: MatcherConfig
 
 
 @dataclass
