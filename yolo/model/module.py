@@ -1,5 +1,96 @@
+from typing import Optional
+
 import torch
-import torch.nn as nn
+from torch import Tensor, nn
+from torch.nn.common_types import _size_2_t
+
+from yolo.tools.module_helper import auto_pad, get_activation
+
+
+class Conv(nn.Module):
+    """A basic convolutional block that includes convolution, batch normalization, and activation."""
+
+    def __init__(
+        self, in_channels: int, out_channels: int, kernel_size: _size_2_t, activation: Optional[str] = "SiLU", **kwargs
+    ):
+        super().__init__()
+        kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, **kwargs)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.act = get_activation(activation)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.act(self.bn(self.conv(x)))
+
+
+class Pool(nn.Module):
+    """A generic pooling block supporting 'max' and 'avg' pooling methods."""
+
+    def __init__(self, method: str = "max", kernel_size: _size_2_t = 1, **kwargs):
+        super().__init__()
+        kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
+        pool_classes = {"max": nn.MaxPool2d, "avg": nn.AvgPool2d}
+        self.pool = pool_classes[method.lower()](kernel_size=kernel_size, **kwargs)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.pool(x)
+
+
+class ADown(nn.Module):
+    """Downsampling module combining average and max pooling with convolution for feature reduction."""
+
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        half_in_channels = in_channels // 2
+        half_out_channels = out_channels // 2
+        mid_layer = {"kernel_size": 3, "stride": 2}
+        self.avg_pool = Pool("avg", kernel_size=2, stride=1)
+        self.conv1 = Conv(half_in_channels, half_out_channels, **mid_layer)
+        self.max_pool = Pool("max", **mid_layer)
+        self.conv2 = Conv(half_in_channels, half_out_channels, kernel_size=1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.avg_pool(x)
+        x1, x2 = x.chunk(2, dim=1)
+        x1 = self.conv1(x1)
+        x2 = self.max_pool(x2)
+        x2 = self.conv2(x2)
+        return torch.cat((x1, x2), dim=1)
+
+
+class CBLinear(nn.Module):
+    """Convolutional block that outputs multiple feature maps split along the channel dimension."""
+
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 1, **kwargs):
+        super(CBLinear, self).__init__()
+        kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
+        self.conv = nn.Conv2d(in_channels, sum(out_channels), kernel_size, **kwargs)
+        self.out_channels = out_channels
+
+    def forward(self, x: Tensor) -> tuple[Tensor]:
+        x = self.conv(x)
+        return x.split(self.out_channels, dim=1)
+
+
+class SPPELAN(nn.Module):
+    """SPPELAN module comprising multiple pooling and convolution layers."""
+
+    def __init__(self, in_channels, out_channels, neck_channels=Optional[int]):
+        super(SPPELAN, self).__init__()
+        neck_channels = neck_channels or out_channels // 2
+
+        self.conv1 = Conv(in_channels, neck_channels, kernel_size=1)
+        self.pools = nn.ModuleList([Pool("max", 5, padding=0) for _ in range(3)])
+        self.conv5 = Conv(4 * neck_channels, out_channels, kernel_size=1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        features = [self.conv1(x)]
+        for pool in self.pools:
+            features.append(pool(features[-1]))
+        return self.conv5(torch.cat(features, dim=1))
+
+
+#### -- ####
 
 
 # basic
@@ -247,20 +338,18 @@ class RepDark(nn.Module):
 # CSPNet
 class CSP(nn.Module):
     # CSPNet
-    def __init__(self, in_channels, out_channels, repeat=1, cb_repeat=2, act=nn.ReLU(), ratio=1.0):
-
+    def __init__(self, in_channels, out_channels, repeat=1, cb_repeat=2, act=nn.ReLU()):
         super().__init__()
-
         h_channels = in_channels // 2
         self.cv1 = Conv(in_channels, in_channels, 1, 1, act=act)
         self.cb = nn.Sequential(*(ResConvBlock(h_channels, act=act, repeat=cb_repeat) for _ in range(repeat)))
         self.cv2 = Conv(2 * h_channels, out_channels, 1, 1, act=act)
 
     def forward(self, x):
-
-        y = list(self.cv1(x).chunk(2, 1))
-
-        return self.cv2(torch.cat((self.cb(y[0]), y[1]), 1))
+        x = list(self.cv1(x).chunk(2, 1))
+        x = torch.cat((self.cb(x[0]), x[1]), 1)
+        x = self.cv2(x)
+        return x
 
 
 class CSPDark(nn.Module):
