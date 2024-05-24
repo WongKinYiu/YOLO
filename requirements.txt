@@ -1,3 +1,5 @@
+diskcache
+einops
 hydra-core
 loguru
 numpy
