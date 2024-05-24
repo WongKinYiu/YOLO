@@ -80,7 +80,7 @@ class SPPELAN(nn.Module):
         neck_channels = neck_channels or out_channels // 2
 
         self.conv1 = Conv(in_channels, neck_channels, kernel_size=1)
-        self.pools = nn.ModuleList([Pool("max", 5, padding=0) for _ in range(3)])
+        self.pools = nn.ModuleList([Pool("max", 5, padding=2, stride=1) for _ in range(3)])
         self.conv5 = Conv(4 * neck_channels, out_channels, kernel_size=1)
 
     def forward(self, x: Tensor) -> Tensor:
