@@ -102,9 +102,3 @@ def get_model(model_cfg: dict) -> YOLO:
     model = YOLO(model_cfg)
     logger.info("✅ Success load model")
     return model
-
-
-if __name__ == "__main__":
-    model_cfg = load_model_cfg("v7-base")
-
-    YOLO(model_cfg)
