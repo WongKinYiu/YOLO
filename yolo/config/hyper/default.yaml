@@ -3,12 +3,28 @@ data:
   shuffle: True
   num_workers: 4
   pin_memory: True
+  class_num: 80
+  image_size: [640, 640]
 train:
   optimizer:
     type: Adam
     args:
       lr: 0.001
       weight_decay: 0.0001
+  loss:
+    BCELoss:
+      args:
+    BoxLoss:
+      args: 
+      alpha: 0.1
+    DFLoss:
+      args:
+  matcher:
+    iou: CIoU
+    topk: 10
+    factor:
+      iou: 6.0
+      cls: 0.5
   scheduler:
     type: StepLR
     args:

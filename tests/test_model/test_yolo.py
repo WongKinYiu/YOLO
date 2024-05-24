@@ -1,20 +1,20 @@
 import sys
+from pathlib import Path
 
-import pytest
 import torch
 from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 
-sys.path.append("./")
-from model.yolo import YOLO, get_model
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(project_root))
 
-config_path = "../../config/model"
+from yolo.model.yolo import YOLO, get_model
+
+config_path = "../../yolo/config/model"
 config_name = "v7-base"
 
 
 def test_build_model():
-
     with initialize(config_path=config_path, version_base=None):
         model_cfg = compose(config_name=config_name)
         OmegaConf.set_struct(model_cfg, False)
