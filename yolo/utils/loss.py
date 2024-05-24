@@ -24,7 +24,8 @@ def get_loss_function(*args, **kwargs):
 class BCELoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.bce = BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=torch.device("cuda")), reduction="none")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.bce = BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=device), reduction="none")
 
     def forward(self, predicts_cls: Tensor, targets_cls: Tensor, cls_norm: Tensor) -> Any:
         return self.bce(predicts_cls, targets_cls).sum() / cls_norm
@@ -138,7 +139,7 @@ class YOLOLoss:
         anchors_box = anchors_box / self.scaler[None, :, None]
         return anchors_cls, anchors_box
 
-    @torch.autocast("cuda")
+    @torch.autocast("cuda" if torch.cuda.is_available() else "cpu")
     def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         # Batch_Size x (Anchor + Class) x H x W
         # TODO: check datatype, why targets has a little bit error with origin version
