@@ -27,8 +27,9 @@ class YOLO(nn.Module):
         model_list = nn.ModuleList()
         output_dim = [3]
         layer_indices_by_tag = {}
+        logger.info(f"🚜 Building YOLO")
         for arch_name in model_arch:
-            logger.info(f"🏗️  Building model-{arch_name}")
+            logger.info(f"  🏗️  Building {arch_name}")
             for layer_idx, layer_spec in enumerate(model_arch[arch_name], start=1):
                 layer_type, layer_info = next(iter(layer_spec.items()))
                 layer_args = layer_info.get("args", {})
