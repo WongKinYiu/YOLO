@@ -72,7 +72,7 @@ class YOLO(nn.Module):
     def get_out_channels(self, layer_type: str, layer_args: dict, output_dim: list, source: Union[int, list]):
         if "Conv" in layer_type:
             return layer_args["out_channels"]
-        if layer_type in ["MaxPool", "UpSample"]:
+        if layer_type in ["Pool", "UpSample"]:
             return output_dim[source]
         if layer_type == "Concat":
             return sum(output_dim[idx] for idx in source)
