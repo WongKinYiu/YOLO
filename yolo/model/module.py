@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 from torch import Tensor, nn
@@ -67,7 +67,7 @@ class CBLinear(nn.Module):
         self.conv = nn.Conv2d(in_channels, sum(out_channels), kernel_size, **kwargs)
         self.out_channels = out_channels
 
-    def forward(self, x: Tensor) -> tuple[Tensor]:
+    def forward(self, x: Tensor) -> Tuple[Tensor]:
         x = self.conv(x)
         return x.split(self.out_channels, dim=1)
 
