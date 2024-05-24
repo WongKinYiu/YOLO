@@ -11,7 +11,13 @@ class Conv(nn.Module):
     """A basic convolutional block that includes convolution, batch normalization, and activation."""
 
     def __init__(
-        self, in_channels: int, out_channels: int, kernel_size: _size_2_t, activation: Optional[str] = "SiLU", **kwargs
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: _size_2_t,
+        *,
+        activation: Optional[str] = "SiLU",
+        **kwargs
     ):
         super().__init__()
         kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
@@ -26,7 +32,7 @@ class Conv(nn.Module):
 class Pool(nn.Module):
     """A generic pooling block supporting 'max' and 'avg' pooling methods."""
 
-    def __init__(self, method: str = "max", kernel_size: _size_2_t = 1, **kwargs):
+    def __init__(self, method: str = "max", kernel_size: _size_2_t = 2, **kwargs):
         super().__init__()
         kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
         pool_classes = {"max": nn.MaxPool2d, "avg": nn.AvgPool2d}
@@ -80,7 +86,7 @@ class SPPELAN(nn.Module):
         neck_channels = neck_channels or out_channels // 2
 
         self.conv1 = Conv(in_channels, neck_channels, kernel_size=1)
-        self.pools = nn.ModuleList([Pool("max", 5, padding=2, stride=1) for _ in range(3)])
+        self.pools = nn.ModuleList([Pool("max", 5, stride=1) for _ in range(3)])
         self.conv5 = Conv(4 * neck_channels, out_channels, kernel_size=1)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -93,49 +99,6 @@ class SPPELAN(nn.Module):
 #### -- ####
 
 
-# basic
-class Conv(nn.Module):
-    # basic convlution
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride=1,
-        padding=None,
-        dilation=1,
-        groups=1,
-        act=nn.SiLU(),
-        bias=False,
-        auto_padding=True,
-        padding_mode="zeros",
-    ):
-
-        super().__init__()
-
-        # not yet handle the case when dilation is a tuple
-        if auto_padding:
-            if isinstance(kernel_size, int):
-                padding = (dilation * (kernel_size - 1) + 1) // 2
-            else:
-                padding = [(dilation * (k - 1) + 1) // 2 for k in kernel_size]
-
-        self.conv = nn.Conv2d(
-            in_channels, out_channels, kernel_size, stride, padding, groups=groups, dilation=dilation, bias=bias
-        )
-        self.bn = nn.BatchNorm2d(out_channels)
-        self.act = act if isinstance(act, nn.Module) else nn.Identity()
-
-    def forward(self, x):
-        return self.act(self.bn(self.conv(x)))
-
-    def forward_fuse(self, x):
-        return self.act(self.conv(x))
-
-    # to be implement
-    # def fuse_conv_bn(self):
-
-
 # RepVGG
 class RepConv(nn.Module):
     # https://github.com/DingXiaoH/RepVGG
@@ -145,8 +108,8 @@ class RepConv(nn.Module):
 
         super().__init__()
         self.deploy = deploy
-        self.conv1 = Conv(in_channels, out_channels, kernel_size, stride, groups=groups, act=False)
-        self.conv2 = Conv(in_channels, out_channels, 1, stride, groups=groups, act=False)
+        self.conv1 = Conv(in_channels, out_channels, kernel_size, stride=stride, groups=groups, activation=False)
+        self.conv2 = Conv(in_channels, out_channels, 1, stride=stride, groups=groups, activation=False)
         self.act = act if isinstance(act, nn.Module) else nn.Identity()
 
     def forward(self, x):
@@ -420,29 +383,20 @@ class Concat(nn.Module):
         return torch.cat(x, self.dim)
 
 
-class MaxPool(nn.Module):
-    def __init__(self, kernel_size: int = 2):
-        super().__init__()
-        self.pool_layer = nn.MaxPool2d(kernel_size=kernel_size, stride=kernel_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.pool_layer(x)
-
-
 # TODO: check if Mit
 class SPPCSPConv(nn.Module):
     # CSP https://github.com/WongKinYiu/CrossStagePartialNetworks
     def __init__(self, in_channels, out_channels, n=1, shortcut=False, g=1, e=0.5, k=(5, 9, 13)):
         super(SPPCSPConv, self).__init__()
         c_ = int(2 * out_channels * e)  # hidden channels
-        self.cv1 = Conv(in_channels, c_, 1, 1)
-        self.cv2 = Conv(in_channels, c_, 1, 1)
-        self.cv3 = Conv(c_, c_, 3, 1)
-        self.cv4 = Conv(c_, c_, 1, 1)
-        self.m = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
-        self.cv5 = Conv(4 * c_, c_, 1, 1)
-        self.cv6 = Conv(c_, c_, 3, 1)
-        self.cv7 = Conv(2 * c_, out_channels, 1, 1)
+        self.cv1 = Conv(in_channels, c_, 1)
+        self.cv2 = Conv(in_channels, c_, 1)
+        self.cv3 = Conv(c_, c_, 3)
+        self.cv4 = Conv(c_, c_, 1)
+        self.m = nn.ModuleList([Pool(method="max", kernel_size=x, stride=1, padding=x // 2) for x in k])
+        self.cv5 = Conv(4 * c_, c_, 1)
+        self.cv6 = Conv(c_, c_, 3)
+        self.cv7 = Conv(2 * c_, out_channels, 1)
 
     def forward(self, x):
         x1 = self.cv4(self.cv3(self.cv1(x)))
