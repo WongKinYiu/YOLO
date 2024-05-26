@@ -1,6 +1,6 @@
-from typing import Tuple
+from typing import Tuple, Union
 
-from torch import nn
+from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
 
 
@@ -34,3 +34,27 @@ def get_activation(activation: str) -> nn.Module:
         return activation_map[activation.lower()]()
     else:
         raise ValueError(f"Activation function '{activation}' is not found in torch.nn")
+
+
+def round_up(x: Union[int, Tensor], div: int = 1) -> Union[int, Tensor]:
+    """
+    Rounds up `x` to the bigger-nearest multiple of `div`.
+    """
+    return x + (-x % div)
+
+
+def make_chunk(input_list, chunk_num):
+    """
+    Args: input_list: [0, 1, 2, 3, 4, 5], chunk: 2
+    Return: [[0, 1, 2], [3, 4, 5]]
+    """
+    list_size = len(input_list)
+
+    if list_size % chunk_num != 0:
+        raise ValueError(
+            f"The length of the input list ({list_size}) must be exactly\
+                            divisible by the number of chunks ({chunk_num})."
+        )
+
+    chunk_size = list_size // chunk_num
+    return [input_list[i : i + chunk_size] for i in range(0, list_size, chunk_size)]

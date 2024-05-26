@@ -1,10 +1,10 @@
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import torch
 from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
 
-from yolo.tools.module_helper import auto_pad, get_activation
+from yolo.tools.module_helper import auto_pad, get_activation, round_up
 
 
 class Conv(nn.Module):
@@ -99,6 +99,47 @@ class SPPELAN(nn.Module):
 #### -- ####
 
 
+class Detection(nn.Module):
+    """A single YOLO Detection head for detection models"""
+
+    def __init__(self, in_channels: int, num_classes: int, *, reg_max: int = 16, use_group: bool = True):
+        super().__init__()
+
+        groups = 4 if use_group else 1
+        anchor_channels = 4 * reg_max
+        # TODO: round up head[0] channels or each head?
+        anchor_neck = max(round_up(in_channels // 4, groups), anchor_channels, 16)
+        class_neck = max(in_channels, min(num_classes * 2, 128))
+
+        self.anchor_conv = nn.Sequential(
+            Conv(in_channels, anchor_neck, 3),
+            Conv(anchor_neck, anchor_neck, 3, groups=groups),
+            nn.Conv2d(anchor_neck, anchor_channels, 1, groups=groups),
+        )
+        self.class_conv = nn.Sequential(
+            Conv(in_channels, class_neck, 3), Conv(class_neck, class_neck, 3), nn.Conv2d(class_neck, num_classes, 1)
+        )
+
+    def forward(self, x: List[Tensor]) -> List[Tensor]:
+        anchor_x = self.anchor_conv(x)
+        class_x = self.class_conv(x)
+        return torch.cat([anchor_x, class_x], dim=1)
+
+
+class MultiheadDetection(nn.Module):
+    """Mutlihead Detection module for Dual detect or Triple detect"""
+
+    def __init__(self, in_channels: List[int], num_classes: int, **head_kwargs):
+        super().__init__()
+        self.heads = nn.ModuleList(
+            [Detection(head_in_channels, num_classes, **head_kwargs) for head_in_channels in in_channels]
+        )
+
+    def forward(self, x_list: List[torch.Tensor]) -> List[torch.Tensor]:
+        return [head(x) for x, head in zip(x_list, self.heads)]
+
+
+#### -- ####
 # RepVGG
 class RepConv(nn.Module):
     """A convolutional block that combines two convolution layers (kernel and point-wise)."""
