@@ -269,6 +269,21 @@ class UpSample(nn.Module):
         return self.UpSample(x)
 
 
+class CBFuse(nn.Module):
+    def __init__(self, index: List[int], mode: str = "nearest"):
+        super().__init__()
+        self.idx = index
+        self.mode = mode
+
+    def forward(self, x_list: List[torch.Tensor]) -> List[Tensor]:
+        target = x_list[-1]
+        target_size = target.shape[2:]  # Batch, Channel, H, W
+
+        res = [F.interpolate(x[pick_id], size=target_size, mode=self.mode) for pick_id, x in zip(self.idx, x_list)]
+        out = torch.stack(res + [target]).sum(dim=0)
+        return out
+
+
 ############# Waiting For Refactor #############
 # ResNet
 class Res(nn.Module):
