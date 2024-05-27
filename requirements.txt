@@ -11,6 +11,3 @@ rich
 torch
 torchvision
 tqdm
-Pillow
-diskcache
-torchvision
