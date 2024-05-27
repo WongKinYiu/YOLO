@@ -1,4 +1,4 @@
-nc: 80
+num_classes: 80
 
 anchor:
   reg_max: 16

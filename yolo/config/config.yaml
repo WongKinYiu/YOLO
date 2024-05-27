@@ -6,6 +6,6 @@ defaults:
  - data: coco
  - download: ../data/download
  - augmentation: ../data/augmentation
- - model: v7-base
+ - model: v9-c
  - hyper: default
  - _self_
