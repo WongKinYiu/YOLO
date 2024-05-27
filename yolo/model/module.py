@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from torch import Tensor, nn
@@ -142,49 +142,134 @@ class MultiheadDetection(nn.Module):
 #### -- ####
 # RepVGG
 class RepConv(nn.Module):
-    # https://github.com/DingXiaoH/RepVGG
+    """A convolutional block that combines two convolution layers (kernel and point-wise)."""
+
     def __init__(
-        self, in_channels, out_channels, kernel_size=3, padding=None, stride=1, groups=1, act=nn.SiLU(), deploy=False
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: _size_2_t = 3,
+        *,
+        activation: Optional[str] = "SiLU",
+        **kwargs
     ):
-
         super().__init__()
-        self.deploy = deploy
-        self.conv1 = Conv(in_channels, out_channels, kernel_size, stride=stride, groups=groups, activation=False)
-        self.conv2 = Conv(in_channels, out_channels, 1, stride=stride, groups=groups, activation=False)
-        self.act = act if isinstance(act, nn.Module) else nn.Identity()
+        self.act = get_activation(activation)
+        self.conv1 = Conv(in_channels, out_channels, kernel_size, activation=False, **kwargs)
+        self.conv2 = Conv(in_channels, out_channels, 1, activation=False, **kwargs)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         return self.act(self.conv1(x) + self.conv2(x))
 
-    def forward_fuse(self, x):
-        return self.act(self.conv(x))
 
-    # to be implement
-    # def fuse_convs(self):
-    def fuse_conv_bn(self, conv, bn):
+class RepNBottleneck(nn.Module):
+    """A bottleneck block with optional residual connections."""
 
-        std = (bn.running_var + bn.eps).sqrt()
-        bias = bn.bias - bn.running_mean * bn.weight / std
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        *,
+        kernel_size: Tuple[int, int] = (3, 3),
+        residual: bool = True,
+        expand: float = 1.0,
+        **kwargs
+    ):
+        super().__init__()
+        neck_channels = int(out_channels * expand)
+        self.conv1 = RepConv(in_channels, neck_channels, kernel_size[0], **kwargs)
+        self.conv2 = Conv(neck_channels, out_channels, kernel_size[1], **kwargs)
+        self.residual = residual
 
-        t = (bn.weight / std).reshape(-1, 1, 1, 1)
-        weights = conv.weight * t
+        if residual and (in_channels != out_channels):
+            self.residual = False
+            logging.warning("Residual is turned off since in_channels is not equal to out_channels.")
 
-        bn = nn.Identity()
-        conv = nn.Conv2d(
-            in_channels=conv.in_channels,
-            out_channels=conv.out_channels,
-            kernel_size=conv.kernel_size,
-            stride=conv.stride,
-            padding=conv.padding,
-            dilation=conv.dilation,
-            groups=conv.groups,
-            bias=True,
-            padding_mode=conv.padding_mode,
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        y = self.conv2(self.conv1(x))
+        return x + y if self.residual else y
+
+
+class RepNCSP(nn.Module):
+    """RepNCSP block with convolutions, split, and bottleneck processing."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int = 1,
+        *,
+        csp_expand: float = 0.5,
+        repeat_num: int = 1,
+        bottleneck_args: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ):
+        super().__init__()
+
+        if bottleneck_args is None:
+            bottleneck_args = {"kernel_size": (3, 3), "residual": True, "expand": 0.5}
+
+        neck_channels = int(out_channels * csp_expand)
+        self.conv1 = Conv(in_channels, neck_channels, kernel_size, **kwargs)
+        self.conv2 = Conv(in_channels, neck_channels, kernel_size, **kwargs)
+        self.conv3 = Conv(2 * neck_channels, out_channels, kernel_size, **kwargs)
+
+        self.bottleneck_block = nn.Sequential(
+            *[RepNBottleneck(neck_channels, neck_channels, **bottleneck_args) for _ in range(repeat_num)]
         )
 
-        conv.weight = torch.nn.Parameter(weights)
-        conv.bias = torch.nn.Parameter(bias)
-        return conv
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        input_features = self.conv1(x)
+        split_features = self.conv2(x)
+        bottleneck_output = self.bottleneck_block(input_features)
+        return self.conv3(torch.cat((bottleneck_output, split_features), dim=1))
+
+
+class RepNCSPELAN(nn.Module):
+    """RepNCSPELAN block combining RepNCSP blocks with ELAN structure."""
+
+    def __init__(
+        self,
+        *,
+        in_channels: int,
+        out_channels: int,
+        partition_channels: int,
+        process_channels: int,
+        expand: float,
+        repncsp_args: Optional[Dict[str, Any]] = None,
+        bottleneck_args: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ):
+        super().__init__()
+
+        if repncsp_args is None:
+            repncsp_args = {}
+
+        self.conv1 = Conv(in_channels, partition_channels, 1, **kwargs)
+        self.conv2 = nn.Sequential(
+            RepNCSP(
+                partition_channels // 2,
+                process_channels,
+                csp_expand=expand,
+                bottleneck_args=bottleneck_args,
+                **repncsp_args
+            ),
+            Conv(process_channels, process_channels, 3, padding=1, **kwargs),
+        )
+        self.conv3 = nn.Sequential(
+            RepNCSP(
+                process_channels, process_channels, csp_expand=expand, bottleneck_args=bottleneck_args, **repncsp_args
+            ),
+            Conv(process_channels, process_channels, 3, padding=1, **kwargs),
+        )
+        self.conv4 = Conv(partition_channels + 2 * process_channels, out_channels, 1, **kwargs)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        partition1, partition2 = self.conv1(x).chunk(2, 1)
+        csp_output1 = self.conv2(partition2)
+        csp_output2 = self.conv3(csp_output1)
+        concat = torch.cat([partition1, partition2, csp_output1, csp_output2], dim=1)
+        return self.conv4(concat)
 
 
 # ResNet
