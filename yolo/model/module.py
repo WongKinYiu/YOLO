@@ -189,11 +189,11 @@ class RepNCSPELAN(nn.Module):
 
         self.conv1 = Conv(in_channels, part_channels, 1, **kwargs)
         self.conv2 = nn.Sequential(
-            RepNCSP(part_channels // 2, process_channels, csp_neck_args=csp_neck_args, **csp_args),
+            RepNCSP(part_channels // 2, process_channels, neck_args=csp_neck_args, **csp_args),
             Conv(process_channels, process_channels, 3, padding=1, **kwargs),
         )
         self.conv3 = nn.Sequential(
-            RepNCSP(process_channels, process_channels, csp_neck_args=csp_neck_args, **csp_args),
+            RepNCSP(process_channels, process_channels, neck_args=csp_neck_args, **csp_args),
             Conv(process_channels, process_channels, 3, padding=1, **kwargs),
         )
         self.conv4 = Conv(part_channels + 2 * process_channels, out_channels, 1, **kwargs)
@@ -245,7 +245,7 @@ class CBLinear(nn.Module):
 class SPPELAN(nn.Module):
     """SPPELAN module comprising multiple pooling and convolution layers."""
 
-    def __init__(self, in_channels, out_channels, neck_channels=Optional[int]):
+    def __init__(self, in_channels: int, out_channels: int, neck_channels: Optional[int] = None):
         super(SPPELAN, self).__init__()
         neck_channels = neck_channels or out_channels // 2
 
