@@ -236,7 +236,7 @@ class CBLinear(nn.Module):
         super(CBLinear, self).__init__()
         kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
         self.conv = nn.Conv2d(in_channels, sum(out_channels), kernel_size, **kwargs)
-        self.out_channels = out_channels
+        self.out_channels = list(out_channels)
 
     def forward(self, x: Tensor) -> Tuple[Tensor]:
         x = self.conv(x)
