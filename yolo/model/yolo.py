@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Union
 
-import torch
 import torch.nn as nn
 from loguru import logger
 from omegaconf import OmegaConf
@@ -17,7 +16,7 @@ class YOLO(nn.Module):
                    parameters, and any other relevant configuration details.
     """
 
-    def __init__(self, model_cfg: Dict[str, Any]):
+    def __init__(self, model_cfg: Model):
         super(YOLO, self).__init__()
         self.nc = model_cfg["nc"]
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
