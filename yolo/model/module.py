@@ -1,12 +1,14 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
+from loguru import logger
 from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
 
 from yolo.tools.module_helper import auto_pad, get_activation, round_up
 
 
+# ----------- Basic Class ----------- #
 class Conv(nn.Module):
     """A basic convolutional block that includes convolution, batch normalization, and activation."""
 
@@ -42,63 +44,7 @@ class Pool(nn.Module):
         return self.pool(x)
 
 
-class ADown(nn.Module):
-    """Downsampling module combining average and max pooling with convolution for feature reduction."""
-
-    def __init__(self, in_channels: int, out_channels: int):
-        super().__init__()
-        half_in_channels = in_channels // 2
-        half_out_channels = out_channels // 2
-        mid_layer = {"kernel_size": 3, "stride": 2}
-        self.avg_pool = Pool("avg", kernel_size=2, stride=1)
-        self.conv1 = Conv(half_in_channels, half_out_channels, **mid_layer)
-        self.max_pool = Pool("max", **mid_layer)
-        self.conv2 = Conv(half_in_channels, half_out_channels, kernel_size=1)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.avg_pool(x)
-        x1, x2 = x.chunk(2, dim=1)
-        x1 = self.conv1(x1)
-        x2 = self.max_pool(x2)
-        x2 = self.conv2(x2)
-        return torch.cat((x1, x2), dim=1)
-
-
-class CBLinear(nn.Module):
-    """Convolutional block that outputs multiple feature maps split along the channel dimension."""
-
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 1, **kwargs):
-        super(CBLinear, self).__init__()
-        kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
-        self.conv = nn.Conv2d(in_channels, sum(out_channels), kernel_size, **kwargs)
-        self.out_channels = out_channels
-
-    def forward(self, x: Tensor) -> Tuple[Tensor]:
-        x = self.conv(x)
-        return x.split(self.out_channels, dim=1)
-
-
-class SPPELAN(nn.Module):
-    """SPPELAN module comprising multiple pooling and convolution layers."""
-
-    def __init__(self, in_channels, out_channels, neck_channels=Optional[int]):
-        super(SPPELAN, self).__init__()
-        neck_channels = neck_channels or out_channels // 2
-
-        self.conv1 = Conv(in_channels, neck_channels, kernel_size=1)
-        self.pools = nn.ModuleList([Pool("max", 5, stride=1) for _ in range(3)])
-        self.conv5 = Conv(4 * neck_channels, out_channels, kernel_size=1)
-
-    def forward(self, x: Tensor) -> Tensor:
-        features = [self.conv1(x)]
-        for pool in self.pools:
-            features.append(pool(features[-1]))
-        return self.conv5(torch.cat(features, dim=1))
-
-
-#### -- ####
-
-
+# ----------- Detection Class ----------- #
 class Detection(nn.Module):
     """A single YOLO Detection head for detection models"""
 
@@ -139,8 +85,7 @@ class MultiheadDetection(nn.Module):
         return [head(x) for x, head in zip(x_list, self.heads)]
 
 
-#### -- ####
-# RepVGG
+# ----------- Backbone Class ----------- #
 class RepConv(nn.Module):
     """A convolutional block that combines two convolution layers (kernel and point-wise)."""
 
@@ -172,7 +117,7 @@ class RepNBottleneck(nn.Module):
         *,
         kernel_size: Tuple[int, int] = (3, 3),
         residual: bool = True,
-        expand: float = 1.0,
+        expand: float = 0.5,
         **kwargs
     ):
         super().__init__()
@@ -183,7 +128,9 @@ class RepNBottleneck(nn.Module):
 
         if residual and (in_channels != out_channels):
             self.residual = False
-            logging.warning("Residual is turned off since in_channels is not equal to out_channels.")
+            logger.warning(
+                "Residual connection disabled: in_channels ({}) != out_channels ({})", in_channels, out_channels
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y = self.conv2(self.conv1(x))
@@ -201,28 +148,24 @@ class RepNCSP(nn.Module):
         *,
         csp_expand: float = 0.5,
         repeat_num: int = 1,
-        bottleneck_args: Optional[Dict[str, Any]] = None,
+        neck_args: Dict[str, Any] = {},
         **kwargs
     ):
         super().__init__()
-
-        if bottleneck_args is None:
-            bottleneck_args = {"kernel_size": (3, 3), "residual": True, "expand": 0.5}
 
         neck_channels = int(out_channels * csp_expand)
         self.conv1 = Conv(in_channels, neck_channels, kernel_size, **kwargs)
         self.conv2 = Conv(in_channels, neck_channels, kernel_size, **kwargs)
         self.conv3 = Conv(2 * neck_channels, out_channels, kernel_size, **kwargs)
 
-        self.bottleneck_block = nn.Sequential(
-            *[RepNBottleneck(neck_channels, neck_channels, **bottleneck_args) for _ in range(repeat_num)]
+        self.bottleneck = nn.Sequential(
+            *[RepNBottleneck(neck_channels, neck_channels, **neck_args) for _ in range(repeat_num)]
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        input_features = self.conv1(x)
-        split_features = self.conv2(x)
-        bottleneck_output = self.bottleneck_block(input_features)
-        return self.conv3(torch.cat((bottleneck_output, split_features), dim=1))
+        x1 = self.bottleneck(self.conv1(x))
+        x2 = self.conv2(x)
+        return self.conv3(torch.cat((x1, x2), dim=1))
 
 
 class RepNCSPELAN(nn.Module):
@@ -230,48 +173,103 @@ class RepNCSPELAN(nn.Module):
 
     def __init__(
         self,
-        *,
         in_channels: int,
         out_channels: int,
-        partition_channels: int,
-        process_channels: int,
-        expand: float,
-        repncsp_args: Optional[Dict[str, Any]] = None,
-        bottleneck_args: Optional[Dict[str, Any]] = None,
+        part_channels: int,
+        *,
+        process_channels: Optional[int] = None,
+        csp_args: Dict[str, Any] = {},
+        csp_neck_args: Dict[str, Any] = {},
         **kwargs
     ):
         super().__init__()
 
-        if repncsp_args is None:
-            repncsp_args = {}
+        if process_channels is None:
+            process_channels = part_channels // 2
 
-        self.conv1 = Conv(in_channels, partition_channels, 1, **kwargs)
+        self.conv1 = Conv(in_channels, part_channels, 1, **kwargs)
         self.conv2 = nn.Sequential(
-            RepNCSP(
-                partition_channels // 2,
-                process_channels,
-                csp_expand=expand,
-                bottleneck_args=bottleneck_args,
-                **repncsp_args
-            ),
+            RepNCSP(part_channels // 2, process_channels, csp_neck_args=csp_neck_args, **csp_args),
             Conv(process_channels, process_channels, 3, padding=1, **kwargs),
         )
         self.conv3 = nn.Sequential(
-            RepNCSP(
-                process_channels, process_channels, csp_expand=expand, bottleneck_args=bottleneck_args, **repncsp_args
-            ),
+            RepNCSP(process_channels, process_channels, csp_neck_args=csp_neck_args, **csp_args),
             Conv(process_channels, process_channels, 3, padding=1, **kwargs),
         )
-        self.conv4 = Conv(partition_channels + 2 * process_channels, out_channels, 1, **kwargs)
+        self.conv4 = Conv(part_channels + 2 * process_channels, out_channels, 1, **kwargs)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        partition1, partition2 = self.conv1(x).chunk(2, 1)
-        csp_output1 = self.conv2(partition2)
-        csp_output2 = self.conv3(csp_output1)
-        concat = torch.cat([partition1, partition2, csp_output1, csp_output2], dim=1)
-        return self.conv4(concat)
+        x1, x2 = self.conv1(x).chunk(2, 1)
+        x3 = self.conv2(x2)
+        x4 = self.conv3(x3)
+        x5 = self.conv4(torch.cat([x1, x2, x3, x4], dim=1))
+        return x5
 
 
+class ADown(nn.Module):
+    """Downsampling module combining average and max pooling with convolution for feature reduction."""
+
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        half_in_channels = in_channels // 2
+        half_out_channels = out_channels // 2
+        mid_layer = {"kernel_size": 3, "stride": 2}
+        self.avg_pool = Pool("avg", kernel_size=2, stride=1)
+        self.conv1 = Conv(half_in_channels, half_out_channels, **mid_layer)
+        self.max_pool = Pool("max", **mid_layer)
+        self.conv2 = Conv(half_in_channels, half_out_channels, kernel_size=1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.avg_pool(x)
+        x1, x2 = x.chunk(2, dim=1)
+        x1 = self.conv1(x1)
+        x2 = self.max_pool(x2)
+        x2 = self.conv2(x2)
+        return torch.cat((x1, x2), dim=1)
+
+
+class CBLinear(nn.Module):
+    """Convolutional block that outputs multiple feature maps split along the channel dimension."""
+
+    def __init__(self, in_channels: int, out_channels: List[int], kernel_size: int = 1, **kwargs):
+        super(CBLinear, self).__init__()
+        kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
+        self.conv = nn.Conv2d(in_channels, sum(out_channels), kernel_size, **kwargs)
+        self.out_channels = out_channels
+
+    def forward(self, x: Tensor) -> Tuple[Tensor]:
+        x = self.conv(x)
+        return x.split(self.out_channels, dim=1)
+
+
+class SPPELAN(nn.Module):
+    """SPPELAN module comprising multiple pooling and convolution layers."""
+
+    def __init__(self, in_channels, out_channels, neck_channels=Optional[int]):
+        super(SPPELAN, self).__init__()
+        neck_channels = neck_channels or out_channels // 2
+
+        self.conv1 = Conv(in_channels, neck_channels, kernel_size=1)
+        self.pools = nn.ModuleList([Pool("max", 5, stride=1) for _ in range(3)])
+        self.conv5 = Conv(4 * neck_channels, out_channels, kernel_size=1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        features = [self.conv1(x)]
+        for pool in self.pools:
+            features.append(pool(features[-1]))
+        return self.conv5(torch.cat(features, dim=1))
+
+
+class UpSample(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.UpSample = nn.Upsample(**kwargs)
+
+    def forward(self, x):
+        return self.UpSample(x)
+
+
+############# Waiting For Refactor #############
 # ResNet
 class Res(nn.Module):
     # ResNet bottleneck
@@ -565,15 +563,6 @@ class ImplicitM(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.implicit * x
-
-
-class UpSample(nn.Module):
-    def __init__(self, **kwargs):
-        super().__init__()
-        self.UpSample = nn.Upsample(**kwargs)
-
-    def forward(self, x):
-        return self.UpSample(x)
 
 
 class IDetect(nn.Module):
