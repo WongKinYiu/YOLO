@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
+import torch.nn.functional as F
 from loguru import logger
 from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
