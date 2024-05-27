@@ -1,4 +1,6 @@
-num_classes: 80
+anchor:
+  reg_max: 16
+  strides: [8, 16, 32]
 
 model:
   backbone:
@@ -117,3 +119,4 @@ model:
 
     - MultiheadDetection:
         source: [A3, A4, A5, P3, P4, P5]
+        output: True

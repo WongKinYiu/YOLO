@@ -23,7 +23,7 @@ def main(cfg: Config):
         prepare_dataset(cfg.download)
 
     dataloader = get_dataloader(cfg)
-    model = get_model(cfg.model)
+    model = get_model(cfg)
     draw_model(model=model)
     # TODO: get_device or rank, for DDP mode
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
