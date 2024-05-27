@@ -42,7 +42,7 @@ def draw_bboxes(img: Union[Image.Image, torch.Tensor], bboxes: List[List[Union[i
     logger.info("Saved visualize image at visualize.png")
 
 
-def draw_model(*, model_cfg=None, model=None):
+def draw_model(*, model_cfg=None, model=None, v7_base=False):
     from graphviz import Digraph
 
     if model_cfg:
@@ -52,12 +52,14 @@ def draw_model(*, model_cfg=None, model=None):
     elif model is None:
         raise ValueError("Drawing Object is None")
 
-    model_size = len(model.model)
+    model_size = len(model.model) + 1
     model_mat = np.zeros((model_size, model_size), dtype=bool)
 
-    layer_name = []
-    for idx, layer in enumerate(model.model):
+    layer_name = ["INPUT"]
+    for idx, layer in enumerate(model.model, start=1):
         layer_name.append(str(type(layer)).split(".")[-1][:-2])
+        if layer.tags is not None:
+            layer_name[-1] = f"{layer.tags}-{layer_name[-1]}"
         if isinstance(layer.source, int):
             source = layer.source + (layer.source < 0) * idx
             model_mat[source, idx] = True
@@ -66,12 +68,13 @@ def draw_model(*, model_cfg=None, model=None):
                 source = source + (source < 0) * idx
                 model_mat[source, idx] = True
 
-    pattern_list = [("ELAN", 8, 3), ("ELAN", 8, 55), ("MP", 5, 11)]
     pattern_mat = []
-    for name, size, position in pattern_list:
-        pattern_mat.append(
-            (name, size, model_mat[position : position + size, position + 1 : position + 1 + size].copy())
-        )
+    if v7_base:
+        pattern_list = [("ELAN", 8, 3), ("ELAN", 8, 55), ("MP", 5, 11)]
+        for name, size, position in pattern_list:
+            pattern_mat.append(
+                (name, size, model_mat[position : position + size, position + 1 : position + 1 + size].copy())
+            )
 
     dot = Digraph(comment="Model Flow Chart")
     node_idx = 0
@@ -83,12 +86,10 @@ def draw_model(*, model_cfg=None, model=None):
                     layer_name[idx] = name
                     model_mat[idx : idx + size, jdx : jdx + size] = False
                     model_mat[idx, idx + size] = True
-
-        if model_mat[idx].any():
-            dot.node(str(idx), f"{node_idx}-{layer_name[idx]}")
-            node_idx += 1
+        dot.node(str(idx), f"{layer_name[idx]}")
+        node_idx += 1
         for jdx in range(idx, model_size):
-            if model_mat[idx, jdx] == 1:
+            if model_mat[idx, jdx]:
                 dot.edge(str(idx), str(jdx))
 
     dot.render("Model-arch", format="png", cleanup=True)
