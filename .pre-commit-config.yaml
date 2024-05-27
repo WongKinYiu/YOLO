@@ -11,4 +11,4 @@ repos:
     rev: v5.10.1  # Use the appropriate version or "stable" for the latest stable release
     hooks:
       - id: isort
-        args: ["--profile", "black", "--verbose"]
+        args: ["--profile", "black"]
