@@ -24,7 +24,7 @@ class Conv(nn.Module):
     ):
         super().__init__()
         kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, **kwargs)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, bias=False, **kwargs)
         self.bn = nn.BatchNorm2d(out_channels)
         self.act = get_activation(activation)
 
