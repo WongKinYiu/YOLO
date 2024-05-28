@@ -58,15 +58,16 @@ class YOLO(nn.Module):
             layer_idx += 1
 
     def forward(self, x):
-        y = [x]
+        y = {0: x}
         output = []
-        for layer in self.model:
+        for index, layer in enumerate(self.model, start=1):
             if isinstance(layer.source, list):
                 model_input = [y[idx] for idx in layer.source]
             else:
                 model_input = y[layer.source]
             x = layer(model_input)
-            y.append(x)
+            if hasattr(layer, "save"):
+                y[index] = x
             if layer.output:
                 output.append(x)
         return output
