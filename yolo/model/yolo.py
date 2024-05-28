@@ -25,10 +25,8 @@ class YOLO(nn.Module):
         self.build_model(model_cfg.model)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
-        model_list = nn.ModuleList()
-        output_dim = [3]
-        layer_indices_by_tag = {}
-        layer_idx = 1
+        self.layer_index = {}
+        output_dim, layer_idx = [3], 1
         logger.info(f"🚜 Building YOLO")
         for arch_name in model_arch:
             logger.info(f"  🏗️  Building {arch_name}")
@@ -37,11 +35,7 @@ class YOLO(nn.Module):
                 layer_args = layer_info.get("args", {})
 
                 # Get input source
-                source = layer_info.get("source", -1)
-                if isinstance(source, str):
-                    source = layer_indices_by_tag[source]
-                elif isinstance(source, ListConfig):
-                    source = [layer_indices_by_tag[idx] if isinstance(idx, str) else idx for idx in source]
+                source = self.get_source_idx(layer_info.get("source", -1), layer_idx)
 
                 # Find in channels
                 if any(module in layer_type for module in ["Conv", "ELAN", "ADown", "CBLinear"]):
@@ -52,18 +46,16 @@ class YOLO(nn.Module):
 
                 # create layers
                 layer = self.create_layer(layer_type, source, layer_info, **layer_args)
-                model_list.append(layer)
+                self.model.append(layer)
 
-                if "tags" in layer_info:
-                    if layer_info["tags"] in layer_indices_by_tag:
+                if layer.tags:
+                    if layer.tags in self.layer_index:
                         raise ValueError(f"Duplicate tag '{layer_info['tags']}' found.")
-                    layer_indices_by_tag[layer_info["tags"]] = layer_idx
+                    self.layer_index[layer.tags] = layer_idx
 
                 out_channels = self.get_out_channels(layer_type, layer_args, output_dim, source)
                 output_dim.append(out_channels)
             layer_idx += 1
-
-        self.model = model_list
 
     def forward(self, x):
         y = [x]
@@ -91,7 +83,18 @@ class YOLO(nn.Module):
         if layer_type == "IDetect":
             return None
 
-    def create_layer(self, layer_type: str, source: Union[int, list], layer_info, **kwargs):
+    def get_source_idx(self, source: Union[ListConfig, str, int], layer_idx: int):
+        if isinstance(source, ListConfig):
+            return [self.get_source_idx(index, layer_idx) for index in source]
+        if isinstance(source, str):
+            source = self.layer_index[source]
+        if source < 0:
+            source += layer_idx
+        if source > 0:
+            setattr(self.model[source - 1], "save", True)
+        return source
+
+    def create_layer(self, layer_type: str, source: Union[int, list], layer_info: Dict, **kwargs) -> YOLOLayer:
         if layer_type in self.layer_map:
             layer = self.layer_map[layer_type](**kwargs)
             setattr(layer, "source", source)
