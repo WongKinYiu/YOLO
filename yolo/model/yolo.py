@@ -6,6 +6,7 @@ from omegaconf import ListConfig, OmegaConf
 
 from yolo.config.config import Config, Model, YOLOLayer
 from yolo.tools.layer_helper import get_layer_map
+from yolo.tools.log_helper import log_model
 
 
 class YOLO(nn.Module):
@@ -23,6 +24,7 @@ class YOLO(nn.Module):
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
         self.model: List[YOLOLayer] = nn.ModuleList()
         self.build_model(model_cfg.model)
+        log_model(self.model)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
         self.layer_index = {}
@@ -55,6 +57,7 @@ class YOLO(nn.Module):
 
                 out_channels = self.get_out_channels(layer_type, layer_args, output_dim, source)
                 output_dim.append(out_channels)
+                setattr(layer, "out_c", out_channels)
             layer_idx += 1
 
     def forward(self, x):
@@ -98,7 +101,9 @@ class YOLO(nn.Module):
     def create_layer(self, layer_type: str, source: Union[int, list], layer_info: Dict, **kwargs) -> YOLOLayer:
         if layer_type in self.layer_map:
             layer = self.layer_map[layer_type](**kwargs)
+            setattr(layer, "layer_type", layer_type)
             setattr(layer, "source", source)
+            setattr(layer, "in_c", kwargs.get("in_channels", None))
             setattr(layer, "output", layer_info.get("output", False))
             setattr(layer, "tags", layer_info.get("tags", None))
             return layer
