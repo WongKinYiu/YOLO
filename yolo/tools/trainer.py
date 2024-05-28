@@ -18,7 +18,7 @@ class Trainer:
         self.device = device
         self.optimizer = get_optimizer(model.parameters(), train_cfg.optimizer)
         self.scheduler = get_scheduler(self.optimizer, train_cfg.scheduler)
-        self.loss_fn = get_loss_function()
+        self.loss_fn = get_loss_function(cfg)
 
         if train_cfg.ema.get("enabled", False):
             self.ema = EMA(model, decay=train_cfg.ema.decay)
