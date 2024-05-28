@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
 from tqdm.rich import tqdm
 
+from yolo.config.config import Config
 from yolo.tools.dataset_helper import (
     create_image_info_dict,
     find_labels_path,
@@ -149,7 +150,7 @@ class YoloDataset(Dataset):
 
 
 class YoloDataLoader(DataLoader):
-    def __init__(self, config: dict):
+    def __init__(self, config: Config):
         """Initializes the YoloDataLoader with hydra-config files."""
         hyper = config.hyper.data
         dataset = YoloDataset(config)
