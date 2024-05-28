@@ -20,9 +20,10 @@ def find_labels_path(dataset_path: str, phase_name: str):
     """
     json_labels_path = path.join(dataset_path, "annotations", f"instances_{phase_name}.json")
 
-    txt_labels_path = path.join(dataset_path, "label", phase_name)
+    txt_labels_path = path.join(dataset_path, "labels", phase_name)
 
-    if path.isfile(json_labels_path):
+    # TODO: Operation turned off, it may load wrong class_id, need converter_json2txt's function to map back?
+    if path.isfile(json_labels_path) and False:
         return json_labels_path, "json"
 
     elif path.isdir(txt_labels_path):
