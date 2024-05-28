@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Dict, List, Union
 
+from torch import nn
+
 
 @dataclass
 class AnchorConfig:
@@ -98,6 +100,17 @@ class Download:
     auto: bool
     save_path: str
     datasets: Datasets
+
+
+@dataclass
+class YOLOLayer(nn.Module):
+    source: Union[int, str, List[int]]
+    output: bool
+    tags: str
+    layer_type: str
+
+    def __post_init__(self):
+        super().__init__()
 
 
 @dataclass

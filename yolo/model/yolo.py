@@ -4,7 +4,7 @@ import torch.nn as nn
 from loguru import logger
 from omegaconf import ListConfig, OmegaConf
 
-from yolo.config.config import Config, Model
+from yolo.config.config import Config, Model, YOLOLayer
 from yolo.tools.layer_helper import get_layer_map
 
 
@@ -21,6 +21,7 @@ class YOLO(nn.Module):
         super(YOLO, self).__init__()
         self.num_classes = num_classes
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
+        self.model: List[YOLOLayer] = nn.ModuleList()
         self.build_model(model_cfg.model)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
