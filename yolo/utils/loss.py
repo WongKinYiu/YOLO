@@ -17,10 +17,6 @@ from yolo.tools.bbox_helper import (
 )
 
 
-def get_loss_function(*args, **kwargs):
-    raise NotImplementedError
-
-
 class BCELoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -144,7 +140,9 @@ class YOLOLoss:
         # Batch_Size x (Anchor + Class) x H x W
         # TODO: check datatype, why targets has a little bit error with origin version
         predicts, predicts_anc = self.parse_predicts(predicts[0])
-        targets = self.parse_targets(targets, batch_size=predicts.size(0))
+        # TODO: Refactor this operator
+        # targets = self.parse_targets(targets, batch_size=predicts.size(0))
+        targets[:, :, 1:] = targets[:, :, 1:] * self.scale_up
 
         align_targets, valid_masks = self.matcher(targets, predicts)
         # calculate loss between with instance and predict
@@ -162,5 +160,11 @@ class YOLOLoss:
         ## -- DFL -- ##
         loss_dfl = self.dfl(predicts_anc, targets_bbox, valid_masks, box_norm, cls_norm)
 
-        logger.info("Loss IoU: {:.5f}, DFL: {:.5f}, CLS: {:.5f}", loss_iou, loss_dfl, loss_cls)
-        return loss_iou, loss_dfl, loss_cls
+        loss_sum = loss_iou * 0.5 + loss_dfl * 1.5 + loss_cls * 0.5
+        return loss_sum, (loss_iou, loss_dfl, loss_cls)
+
+
+def get_loss_function(cfg: Config) -> YOLOLoss:
+    loss_function = YOLOLoss(cfg)
+    logger.info("✅ Success load loss function")
+    return loss_function

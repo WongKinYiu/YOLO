@@ -28,7 +28,7 @@ def main(cfg: Config):
     # TODO: get_device or rank, for DDP mode
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    trainer = Trainer(model, cfg.hyper.train, device)
+    trainer = Trainer(model, cfg, device)
     trainer.train(dataloader, 10)
 
 
