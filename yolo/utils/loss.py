@@ -140,7 +140,9 @@ class YOLOLoss:
         # Batch_Size x (Anchor + Class) x H x W
         # TODO: check datatype, why targets has a little bit error with origin version
         predicts, predicts_anc = self.parse_predicts(predicts[0])
-        targets = self.parse_targets(targets, batch_size=predicts.size(0))
+        # TODO: Refactor this operator
+        # targets = self.parse_targets(targets, batch_size=predicts.size(0))
+        targets[:, :, 1:] = targets[:, :, 1:] * self.scale_up
 
         align_targets, valid_masks = self.matcher(targets, predicts)
         # calculate loss between with instance and predict
