@@ -178,9 +178,14 @@ class YoloDataLoader(DataLoader):
                 - A tensor of batched images.
                 - A list of tensors, each corresponding to bboxes for each image in the batch.
         """
-        images = torch.stack([item[0] for item in batch])
-        targets = [item[1] for item in batch]
-        return images, targets
+        batch_size, target_size = len(batch), [item[1].size(0) for item in batch]
+        batch_targets = torch.zeros(batch_size, max(target_size), 5)
+        images = []
+        for idx, (image, target) in enumerate(batch):
+            images.append(image)
+            batch_targets[idx, : target_size[idx]] = target
+        batch_images = torch.stack(images)
+        return batch_images, batch_targets
 
 
 def get_dataloader(config):
