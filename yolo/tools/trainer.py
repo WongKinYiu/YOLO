@@ -9,7 +9,9 @@ from yolo.utils.loss import get_loss_function
 
 
 class Trainer:
-    def __init__(self, model: YOLO, train_cfg: TrainConfig, device):
+    def __init__(self, model: YOLO, cfg: Config, device):
+        train_cfg: TrainConfig = cfg.hyper.train
+
         self.model = model.to(device)
         self.device = device
         self.optimizer = get_optimizer(model.parameters(), train_cfg.optimizer)
