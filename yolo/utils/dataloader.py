@@ -2,7 +2,6 @@ import os
 from os import path
 from typing import List, Tuple, Union
 
-import diskcache as dc
 import hydra
 import numpy as np
 import torch
@@ -44,18 +43,15 @@ class YoloDataset(Dataset):
         Returns:
             dict: The loaded data from the cache for the specified phase.
         """
-        cache_path = path.join(dataset_path, ".cache")
-        cache = dc.Cache(cache_path)
-        data = cache.get(phase_name)
+        cache_path = path.join(dataset_path, f"{phase_name}.cache")
 
-        if data is None:
-            logger.info("Generating {} cache", phase_name)
+        if not path.isfile(cache_path):
+            logger.info("🏭 Generating {} cache", phase_name)
             data = self.filter_data(dataset_path, phase_name)
-            cache[phase_name] = data
-
-        cache.close()
-        logger.info("📦 Loaded {} cache", phase_name)
-        data = cache[phase_name]
+            torch.save(data, cache_path)
+        else:
+            data = torch.load(cache_path)
+            logger.info("📦 Loaded {} cache", phase_name)
         return data
 
     def filter_data(self, dataset_path: str, phase_name: str) -> list:

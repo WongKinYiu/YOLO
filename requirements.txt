@@ -1,4 +1,3 @@
-diskcache
 einops
 hydra-core
 loguru
