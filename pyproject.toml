@@ -1,0 +1,28 @@
+[project]
+name = "yolov9mit"
+version = "0.0.0"
+
+dependencies = [
+    "einops",
+    "hydra-core",
+    "loguru",
+    "numpy",
+    "Pillow",
+    "pyyaml",
+    "requests",
+    "rich",
+    "torch",
+    "torchvision",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+    "setuptools",
+]
