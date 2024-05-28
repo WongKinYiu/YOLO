@@ -24,7 +24,7 @@ class Conv(nn.Module):
     ):
         super().__init__()
         kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, **kwargs)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, bias=False, **kwargs)
         self.bn = nn.BatchNorm2d(out_channels)
         self.act = get_activation(activation)
 
@@ -49,14 +49,16 @@ class Pool(nn.Module):
 class Detection(nn.Module):
     """A single YOLO Detection head for detection models"""
 
-    def __init__(self, in_channels: int, num_classes: int, *, reg_max: int = 16, use_group: bool = True):
+    def __init__(self, in_channels: Tuple[int], num_classes: int, *, reg_max: int = 16, use_group: bool = True):
         super().__init__()
 
         groups = 4 if use_group else 1
         anchor_channels = 4 * reg_max
+
+        first_neck, in_channels = in_channels
         # TODO: round up head[0] channels or each head?
-        anchor_neck = max(round_up(in_channels // 4, groups), anchor_channels, 16)
-        class_neck = max(in_channels, min(num_classes * 2, 128))
+        anchor_neck = max(round_up(first_neck // 4, groups), anchor_channels, 16)
+        class_neck = max(first_neck, min(num_classes * 2, 128))
 
         self.anchor_conv = nn.Sequential(
             Conv(in_channels, anchor_neck, 3),
@@ -78,8 +80,12 @@ class MultiheadDetection(nn.Module):
 
     def __init__(self, in_channels: List[int], num_classes: int, **head_kwargs):
         super().__init__()
+        # TODO: Refactor these parts
         self.heads = nn.ModuleList(
-            [Detection(head_in_channels, num_classes, **head_kwargs) for head_in_channels in in_channels]
+            [
+                Detection((in_channels[3 * (idx // 3)], in_channel), num_classes, **head_kwargs)
+                for idx, in_channel in enumerate(in_channels)
+            ]
         )
 
     def forward(self, x_list: List[torch.Tensor]) -> List[torch.Tensor]:
@@ -118,7 +124,7 @@ class RepNBottleneck(nn.Module):
         *,
         kernel_size: Tuple[int, int] = (3, 3),
         residual: bool = True,
-        expand: float = 0.5,
+        expand: float = 1.0,
         **kwargs
     ):
         super().__init__()
