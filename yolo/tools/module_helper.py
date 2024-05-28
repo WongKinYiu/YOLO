@@ -31,7 +31,7 @@ def get_activation(activation: str) -> nn.Module:
         if isinstance(obj, type) and issubclass(obj, nn.Module)
     }
     if activation.lower() in activation_map:
-        return activation_map[activation.lower()]()
+        return activation_map[activation.lower()](inplace=True)
     else:
         raise ValueError(f"Activation function '{activation}' is not found in torch.nn")
 
