@@ -41,8 +41,7 @@ class Trainer:
         self.scaler.step(self.optimizer)
         self.scaler.update()
 
-        if self.ema:
-            self.ema.update()
+        return loss.item(), loss_item
 
         return loss.item()
 
