@@ -6,6 +6,7 @@ model:
   backbone:
     - Conv:
         args: {out_channels: 64, kernel_size: 3, stride: 2}
+        source: 0
     - Conv:
         args: {out_channels: 128, kernel_size: 3, stride: 2}
     - RepNCSPELAN:
