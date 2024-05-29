@@ -80,7 +80,7 @@ class YOLOLoss:
         self.strides = cfg.model.anchor.strides
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float16, device=device)
+        self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
         self.scale_up = torch.tensor(self.image_size * 2, device=device)
 
         self.anchors, self.scaler = make_anchor(self.image_size, self.strides, device)

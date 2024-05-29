@@ -27,14 +27,13 @@ def loss_function(cfg) -> YOLOLoss:
 def data():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     targets = torch.zeros(1, 20, 5, device=device)
-    predicts = [[torch.zeros(1, 144, 80 // i, 80 // i, device=device) for i in [1, 2, 4]] for _ in range(2)]
+    predicts = [torch.zeros(1, 144, 80 // i, 80 // i, device=device) for i in [1, 2, 4]]
     return predicts, targets
 
 
 def test_yolo_loss(loss_function, data):
     predicts, targets = data
-    loss, (loss_iou, loss_dfl, loss_cls) = loss_function(predicts, targets)
-    assert torch.isnan(loss)
+    loss_iou, loss_dfl, loss_cls = loss_function(predicts, targets)
     assert torch.isnan(loss_iou)
     assert torch.isnan(loss_dfl)
     assert torch.isinf(loss_cls)
