@@ -89,7 +89,7 @@ class YOLOLoss:
         self.dfl = DFLoss(self.anchors, self.scaler, self.reg_max)
         self.iou = BoxLoss()
 
-        self.matcher = BoxMatcher(cfg.hyper.train.matcher, self.class_num, self.anchors)
+        self.matcher = BoxMatcher(cfg.hyper.train.loss.matcher, self.class_num, self.anchors)
 
     def parse_predicts(self, predicts: List[Tensor]) -> Tensor:
         """

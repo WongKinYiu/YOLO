@@ -70,11 +70,18 @@ class MatcherConfig:
 
 
 @dataclass
+class LossConfig:
+    objective: List[List]
+    aux: bool
+    matcher: MatcherConfig
+
+
+@dataclass
 class TrainConfig:
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     ema: EMAConfig
-    matcher: MatcherConfig
+    loss: LossConfig
 
 
 @dataclass
