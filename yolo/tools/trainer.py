@@ -1,11 +1,13 @@
 import torch
 from loguru import logger
 from torch import Tensor
+
+# TODO: We may can't use CUDA?
 from torch.cuda.amp import GradScaler, autocast
-from tqdm import tqdm
 
 from yolo.config.config import Config, TrainConfig
 from yolo.model.yolo import YOLO
+from yolo.tools.log_helper import CustomProgress
 from yolo.tools.model_helper import EMA, get_optimizer, get_scheduler
 from yolo.utils.loss import get_loss_function
 
@@ -26,16 +28,13 @@ class Trainer:
             self.ema = None
         self.scaler = GradScaler()
 
-    def train_one_batch(self, data: Tensor, targets: Tensor, progress: tqdm):
+    def train_one_batch(self, data: Tensor, targets: Tensor):
         data, targets = data.to(self.device), targets.to(self.device)
         self.optimizer.zero_grad()
 
         with autocast():
             outputs = self.model(data)
             loss, loss_item = self.loss_fn(outputs, targets)
-            loss_iou, loss_dfl, loss_cls = loss_item
-
-        progress.set_description(f"Loss IoU: {loss_iou:.5f}, DFL: {loss_dfl:.5f}, CLS: {loss_cls:.5f}")
 
         self.scaler.scale(loss).backward()
         self.scaler.step(self.optimizer)
@@ -43,17 +42,21 @@ class Trainer:
 
         return loss.item(), loss_item
 
-        return loss.item()
-
-    def train_one_epoch(self, dataloader):
+    def train_one_epoch(self, dataloader, progress: CustomProgress):
         self.model.train()
         total_loss = 0
-        with tqdm(dataloader, desc="Training") as progress:
-            for data, targets in progress:
-                loss = self.train_one_batch(data, targets, progress)
-                total_loss += loss
-            if self.scheduler:
-                self.scheduler.step()
+        progress.start_batch(len(dataloader))
+
+        for data, targets in dataloader:
+            loss, loss_each = self.train_one_batch(data, targets)
+
+            total_loss += loss
+            progress.one_batch(loss_each)
+
+        if self.scheduler:
+            self.scheduler.step()
+
+        progress.finish_batch()
         return total_loss / len(dataloader)
 
     def save_checkpoint(self, epoch: int, filename="checkpoint.pt"):
@@ -69,9 +72,16 @@ class Trainer:
         torch.save(checkpoint, filename)
 
     def train(self, dataloader, num_epochs):
-        logger.info("start train")
-        for epoch in range(num_epochs):
-            epoch_loss = self.train_one_epoch(dataloader)
-            logger.info(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}")
-            if (epoch + 1) % 5 == 0:
-                self.save_checkpoint(epoch, f"checkpoint_epoch_{epoch+1}.pth")
+        logger.info("🚄 Start Training!")
+        progress = CustomProgress()
+
+        with progress.progress:
+            progress.start_train(num_epochs)
+            for epoch in range(num_epochs):
+
+                epoch_loss = self.train_one_epoch(dataloader, progress)
+                progress.one_epoch()
+
+                logger.info(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}")
+                if (epoch + 1) % 5 == 0:
+                    self.save_checkpoint(epoch, f"checkpoint_epoch_{epoch+1}.pth")

@@ -16,6 +16,7 @@ from typing import List
 
 from loguru import logger
 from rich.console import Console
+from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from rich.table import Table
 
 from yolo.config.config import YOLOLayer
@@ -27,6 +28,34 @@ def custom_logger():
         sys.stderr,
         format="<green>{time:MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
     )
+
+
+class CustomProgress:
+    def __init__(self):
+        self.progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(bar_width=None),
+            TextColumn("{task.completed}/{task.total}"),
+            TimeRemainingColumn(),
+        )
+
+    def start_train(self, num_epochs: int):
+        self.task_epoch = self.progress.add_task("[cyan]Epochs", total=num_epochs)
+
+    def one_epoch(self):
+        self.progress.update(self.task_epoch, advance=1)
+
+    def start_batch(self, num_batches):
+        self.batch_task = self.progress.add_task("[green]Batches", total=num_batches)
+
+    def one_batch(self, loss_each):
+        loss_iou, loss_dfl, loss_cls = loss_each
+        # TODO: make it flexible? if need add more loss
+        loss_str = f"Loss IoU: {loss_iou:.3f}, DFL: {loss_dfl:.3f}, CLS: {loss_cls:.3f}"
+        self.progress.update(self.batch_task, advance=1, description=f"[green]Batches {loss_str}")
+
+    def finish_batch(self):
+        self.progress.remove_task(self.batch_task)
 
 
 def log_model(model: List[YOLOLayer]):
