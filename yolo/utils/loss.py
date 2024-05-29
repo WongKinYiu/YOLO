@@ -15,6 +15,7 @@ from yolo.tools.bbox_helper import (
     make_anchor,
     transform_bbox,
 )
+from yolo.tools.module_helper import make_chunk
 
 
 class BCELoss(nn.Module):
@@ -135,14 +136,10 @@ class YOLOLoss:
         anchors_box = anchors_box / self.scaler[None, :, None]
         return anchors_cls, anchors_box
 
-    @torch.autocast("cuda" if torch.cuda.is_available() else "cpu")
     def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         # Batch_Size x (Anchor + Class) x H x W
         # TODO: check datatype, why targets has a little bit error with origin version
-        predicts, predicts_anc = self.parse_predicts(predicts[0])
-        # TODO: Refactor this operator
-        # targets = self.parse_targets(targets, batch_size=predicts.size(0))
-        targets[:, :, 1:] = targets[:, :, 1:] * self.scale_up
+        predicts, predicts_anc = self.parse_predicts(predicts)
 
         align_targets, valid_masks = self.matcher(targets, predicts)
         # calculate loss between with instance and predict
@@ -160,11 +157,35 @@ class YOLOLoss:
         ## -- DFL -- ##
         loss_dfl = self.dfl(predicts_anc, targets_bbox, valid_masks, box_norm, cls_norm)
 
-        loss_sum = loss_iou * 0.5 + loss_dfl * 1.5 + loss_cls * 0.5
-        return loss_sum, (loss_iou, loss_dfl, loss_cls)
+        return loss_iou, loss_dfl, loss_cls
+
+
+class DualLoss:
+    def __init__(self, cfg: Config) -> None:
+        self.loss = YOLOLoss(cfg)
+        self.aux_rate = cfg.hyper.train.loss.aux
+
+        self.iou_rate = cfg.hyper.train.loss.objective["BoxLoss"]
+        self.dfl_rate = cfg.hyper.train.loss.objective["DFLoss"]
+        self.cls_rate = cfg.hyper.train.loss.objective["BCELoss"]
+
+    def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Tuple[Tensor]]:
+        targets[:, :, 1:] = targets[:, :, 1:] * self.loss.scale_up
+
+        # TODO: Need Refactor this region, make it flexible!
+        predicts = make_chunk(predicts[0], 2)
+        aux_iou, aux_dfl, aux_cls = self.loss(predicts[0], targets)
+        main_iou, main_dfl, main_cls = self.loss(predicts[1], targets)
+
+        loss_iou = self.iou_rate * (aux_iou * self.aux_rate + main_iou)
+        loss_dfl = self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl)
+        loss_cls = self.cls_rate * (aux_cls * self.aux_rate + main_cls)
+
+        loss = (loss_iou + loss_dfl + loss_cls) / 3
+        return loss, (loss_iou, loss_dfl, loss_cls)
 
 
 def get_loss_function(cfg: Config) -> YOLOLoss:
-    loss_function = YOLOLoss(cfg)
+    loss_function = DualLoss(cfg)
     logger.info("✅ Success load loss function")
     return loss_function

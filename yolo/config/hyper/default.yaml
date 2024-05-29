@@ -1,7 +1,7 @@
 data:
-  batch_size: 8 
+  batch_size: 16 
   shuffle: True
-  num_workers: 4
+  num_workers: 16
   pin_memory: True
   class_num: 80
   image_size: [640, 640]
@@ -13,11 +13,11 @@ train:
       weight_decay: 0.0001
   loss:
     objective:
-      - [BCELoss, 0.1] 
-      - [BoxLoss, 0.1]  
-      - [DFLoss, 0.1]
+      BCELoss: 0.5
+      BoxLoss: 7.5  
+      DFLoss: 1.5
     aux:
-      True
+      0.25
     matcher:
       iou: CIoU
       topk: 10
