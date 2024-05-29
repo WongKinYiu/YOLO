@@ -12,19 +12,18 @@ train:
       lr: 0.001
       weight_decay: 0.0001
   loss:
-    BCELoss:
-      args:
-    BoxLoss:
-      args: 
-      alpha: 0.1
-    DFLoss:
-      args:
-  matcher:
-    iou: CIoU
-    topk: 10
-    factor:
-      iou: 6.0
-      cls: 0.5
+    objective:
+      - [BCELoss, 0.1] 
+      - [BoxLoss, 0.1]  
+      - [DFLoss, 0.1]
+    aux:
+      True
+    matcher:
+      iou: CIoU
+      topk: 10
+      factor:
+        iou: 6.0
+        cls: 0.5
   scheduler:
     type: StepLR
     args:
