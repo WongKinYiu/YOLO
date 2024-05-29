@@ -69,7 +69,8 @@ class YOLO(nn.Module):
             else:
                 model_input = y[layer.source]
             x = layer(model_input)
-            if hasattr(layer, "save"):
+            y[-1] = x
+            if layer.usable:
                 y[index] = x
             if layer.output:
                 output.append(x)
@@ -92,10 +93,10 @@ class YOLO(nn.Module):
             return [self.get_source_idx(index, layer_idx) for index in source]
         if isinstance(source, str):
             source = self.layer_index[source]
-        if source < 0:
+        if source < -1:
             source += layer_idx
-        if source > 0:
-            setattr(self.model[source - 1], "save", True)
+        if source > 0:  # Using Previous Layer's Output
+            self.model[source - 1].usable = True
         return source
 
     def create_layer(self, layer_type: str, source: Union[int, list], layer_info: Dict, **kwargs) -> YOLOLayer:
@@ -106,6 +107,7 @@ class YOLO(nn.Module):
             setattr(layer, "in_c", kwargs.get("in_channels", None))
             setattr(layer, "output", layer_info.get("output", False))
             setattr(layer, "tags", layer_info.get("tags", None))
+            setattr(layer, "usable", 0)
             return layer
         else:
             raise ValueError(f"Unsupported layer type: {layer_type}")
