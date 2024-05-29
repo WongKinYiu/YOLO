@@ -72,7 +72,7 @@ class MatcherConfig:
 @dataclass
 class LossConfig:
     objective: List[List]
-    aux: bool
+    aux: Union[bool, float]
     matcher: MatcherConfig
 
 

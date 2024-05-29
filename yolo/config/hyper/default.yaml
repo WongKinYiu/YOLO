@@ -13,11 +13,11 @@ train:
       weight_decay: 0.0001
   loss:
     objective:
-      - [BCELoss, 0.1] 
-      - [BoxLoss, 0.1]  
-      - [DFLoss, 0.1]
+      BCELoss: 0.5
+      BoxLoss: 7.5  
+      DFLoss: 1.5
     aux:
-      True
+      0.25
     matcher:
       iou: CIoU
       topk: 10
