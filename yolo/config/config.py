@@ -108,6 +108,7 @@ class YOLOLayer(nn.Module):
     output: bool
     tags: str
     layer_type: str
+    usable: bool
 
     def __post_init__(self):
         super().__init__()
