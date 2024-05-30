@@ -7,6 +7,7 @@ from omegaconf import ListConfig, OmegaConf
 from yolo.config.config import Config, Model, YOLOLayer
 from yolo.tools.layer_helper import get_layer_map
 from yolo.tools.log_helper import log_model
+from yolo.utils.drawer import draw_model
 
 
 class YOLO(nn.Module):
@@ -24,8 +25,6 @@ class YOLO(nn.Module):
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
         self.model: List[YOLOLayer] = nn.ModuleList()
         self.build_model(model_cfg.model)
-        # TODO: Move to other position
-        log_model(self.model)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
         self.layer_index = {}
@@ -126,4 +125,6 @@ def get_model(cfg: Config) -> YOLO:
     OmegaConf.set_struct(cfg.model, False)
     model = YOLO(cfg.model, cfg.hyper.data.class_num)
     logger.info("✅ Success load model")
+    log_model(model.model)
+    draw_model(model=model)
     return model
