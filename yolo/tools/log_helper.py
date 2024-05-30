@@ -47,7 +47,7 @@ class CustomProgress:
             self.wandb = wandb.init(project="YOLO", resume="allow", mode="online", dir="runs", name=cfg.name)
 
     def start_train(self, num_epochs: int):
-        self.task_epoch = self.progress.add_task("[cyan]Epochs", total=num_epochs)
+        self.task_epoch = self.progress.add_task("[cyan]Epochs  [white]| Loss | Box  | DFL  | BCE  |", total=num_epochs)
 
     def one_epoch(self):
         self.progress.update(self.task_epoch, advance=1)
@@ -63,9 +63,9 @@ class CustomProgress:
             for loss_name, loss_value in loss_dict.items():
                 self.wandb.log({f"Loss/{loss_name}": loss_value})
 
-        loss_str = "Loss"
+        loss_str = "| -.-- |"
         for loss_name, loss_val in loss_dict.items():
-            loss_str += f" {loss_name[:-4]}: {loss_val:.2f} |"
+            loss_str += f" {loss_val:2.2f} |"
 
         self.progress.update(self.batch_task, advance=1, description=f"[green]Batches [white]{loss_str}")
 
