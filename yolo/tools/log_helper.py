@@ -12,32 +12,39 @@ Example:
 """
 
 import sys
-from typing import List
+from typing import Dict, List
 
+import wandb
+import wandb.errors
 from loguru import logger
 from rich.console import Console
 from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from rich.table import Table
+from torch import Tensor
 
-from yolo.config.config import YOLOLayer
+from yolo.config.config import Config, YOLOLayer
 
 
 def custom_logger():
     logger.remove()
     logger.add(
         sys.stderr,
-        format="<green>{time:MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
+        format="<fg #003385>[{time:MM/DD HH:mm:ss}]</fg #003385><level>{level: ^8}</level>| <level>{message}</level>",
     )
 
 
 class CustomProgress:
-    def __init__(self):
+    def __init__(self, cfg: Config, use_wandb: bool = False):
         self.progress = Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(bar_width=None),
             TextColumn("{task.completed}/{task.total}"),
             TimeRemainingColumn(),
         )
+        self.use_wandb = use_wandb
+        if self.use_wandb:
+            wandb.errors.term._log = custom_wandb_log
+            self.wandb = wandb.init(project="YOLO", resume="allow", mode="online", dir="runs", name=cfg.name)
 
     def start_train(self, num_epochs: int):
         self.task_epoch = self.progress.add_task("[cyan]Epochs", total=num_epochs)
@@ -45,17 +52,32 @@ class CustomProgress:
     def one_epoch(self):
         self.progress.update(self.task_epoch, advance=1)
 
+    def finish_epoch(self):
+        self.wandb.finish()
+
     def start_batch(self, num_batches):
         self.batch_task = self.progress.add_task("[green]Batches", total=num_batches)
 
-    def one_batch(self, loss_each):
-        loss_iou, loss_dfl, loss_cls = loss_each
-        # TODO: make it flexible? if need add more loss
-        loss_str = f"Loss IoU: {loss_iou:.3f}, DFL: {loss_dfl:.3f}, CLS: {loss_cls:.3f}"
-        self.progress.update(self.batch_task, advance=1, description=f"[green]Batches {loss_str}")
+    def one_batch(self, loss_dict: Dict[str, Tensor]):
+        if self.use_wandb:
+            for loss_name, loss_value in loss_dict.items():
+                self.wandb.log({f"Loss/{loss_name}": loss_value})
+
+        loss_str = "Loss"
+        for loss_name, loss_val in loss_dict.items():
+            loss_str += f" {loss_name[:-4]}: {loss_val:.2f} |"
+
+        self.progress.update(self.batch_task, advance=1, description=f"[green]Batches [white]{loss_str}")
 
     def finish_batch(self):
         self.progress.remove_task(self.batch_task)
+
+
+def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=True, silent=False):
+    if silent:
+        return
+    for line in string.split("\n"):
+        logger.opt(raw=not newline).info("🌐 " + line)
 
 
 def log_model(model: List[YOLOLayer]):

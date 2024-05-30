@@ -1,5 +1,4 @@
-import time
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -169,7 +168,7 @@ class DualLoss:
         self.dfl_rate = cfg.hyper.train.loss.objective["DFLoss"]
         self.cls_rate = cfg.hyper.train.loss.objective["BCELoss"]
 
-    def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Tuple[Tensor]]:
+    def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Dict[str, Tensor]]:
         targets[:, :, 1:] = targets[:, :, 1:] * self.loss.scale_up
 
         # TODO: Need Refactor this region, make it flexible!
@@ -177,12 +176,13 @@ class DualLoss:
         aux_iou, aux_dfl, aux_cls = self.loss(predicts[0], targets)
         main_iou, main_dfl, main_cls = self.loss(predicts[1], targets)
 
-        loss_iou = self.iou_rate * (aux_iou * self.aux_rate + main_iou)
-        loss_dfl = self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl)
-        loss_cls = self.cls_rate * (aux_cls * self.aux_rate + main_cls)
-
-        loss = (loss_iou + loss_dfl + loss_cls) / 3
-        return loss, (loss_iou, loss_dfl, loss_cls)
+        loss_dict = {
+            "BoxLoss": self.iou_rate * (aux_iou * self.aux_rate + main_iou),
+            "DFLoss": self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl),
+            "BCELoss": self.cls_rate * (aux_cls * self.aux_rate + main_cls),
+        }
+        loss_sum = sum(list(loss_dict.values())) / len(loss_dict)
+        return loss_sum, loss_dict
 
 
 def get_loss_function(cfg: Config) -> YOLOLoss:

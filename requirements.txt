@@ -1,4 +1,5 @@
 einops
+graphviz
 hydra-core
 loguru
 numpy
@@ -10,3 +11,4 @@ rich
 torch
 torchvision
 tqdm
+wandb
