@@ -63,7 +63,7 @@ def prepare_dataset(cfg):
 
             os.makedirs(extract_to, exist_ok=True)
             if check_files(final_place, dataset_args.get("file_num")):
-                logger.info(f"✅ Dataset {dataset_type} already verified.")
+                logger.info(f"✅ Dataset {dataset_type: <12} already verified.")
                 continue
 
             if not os.path.exists(local_zip_path):
