@@ -24,6 +24,7 @@ class YOLO(nn.Module):
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
         self.model: List[YOLOLayer] = nn.ModuleList()
         self.build_model(model_cfg.model)
+        # TODO: Move to other position
         log_model(self.model)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
