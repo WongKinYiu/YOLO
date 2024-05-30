@@ -25,7 +25,7 @@ class Conv(nn.Module):
         super().__init__()
         kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, bias=False, **kwargs)
-        self.bn = nn.BatchNorm2d(out_channels)
+        self.bn = nn.BatchNorm2d(out_channels, eps=1e-3, momentum=3e-2)
         self.act = get_activation(activation)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -68,6 +68,9 @@ class Detection(nn.Module):
         self.class_conv = nn.Sequential(
             Conv(in_channels, class_neck, 3), Conv(class_neck, class_neck, 3), nn.Conv2d(class_neck, num_classes, 1)
         )
+
+        self.anchor_conv[-1].bias.data.fill_(1.0)
+        self.class_conv[-1].bias.data.fill_(-10)
 
     def forward(self, x: List[Tensor]) -> List[Tensor]:
         anchor_x = self.anchor_conv(x)

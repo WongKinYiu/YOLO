@@ -79,7 +79,7 @@ class Trainer:
             self.progress.start_train(num_epochs)
             for epoch in range(num_epochs):
 
-                epoch_loss = self.train_one_epoch(dataloader, self.progress)
+                epoch_loss = self.train_one_epoch(dataloader)
                 self.progress.one_epoch()
 
                 logger.info(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}")
