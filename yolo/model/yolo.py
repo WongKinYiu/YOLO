@@ -126,5 +126,5 @@ def get_model(cfg: Config) -> YOLO:
     model = YOLO(cfg.model, cfg.hyper.data.class_num)
     logger.info("✅ Success load model")
     log_model(model.model)
-    draw_model(model=model)
+    # draw_model(model=model)
     return model
