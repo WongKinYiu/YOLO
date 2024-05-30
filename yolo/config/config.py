@@ -78,6 +78,7 @@ class LossConfig:
 
 @dataclass
 class TrainConfig:
+    epoch: int
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     ema: EMAConfig
@@ -126,3 +127,4 @@ class Config:
     model: Model
     download: Download
     hyper: HyperConfig
+    name: str

@@ -6,6 +6,7 @@ data:
   class_num: 80
   image_size: [640, 640]
 train:
+  epoch: 10
   optimizer:
     type: Adam
     args:
