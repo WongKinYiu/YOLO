@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from yolo.utils.converter_json2txt import discretize_categories
+
 
 def find_labels_path(dataset_path: str, phase_name: str):
     """
@@ -22,8 +24,7 @@ def find_labels_path(dataset_path: str, phase_name: str):
 
     txt_labels_path = path.join(dataset_path, "labels", phase_name)
 
-    # TODO: Operation turned off, it may load wrong class_id, need converter_json2txt's function to map back?
-    if path.isfile(json_labels_path) and False:
+    if path.isfile(json_labels_path):
         return json_labels_path, "json"
 
     elif path.isdir(txt_labels_path):
@@ -47,12 +48,13 @@ def create_image_info_dict(labels_path: str) -> Tuple[Dict[str, List], Dict[str,
     """
     with open(labels_path, "r") as file:
         labels_data = json.load(file)
-        annotations_index = index_annotations_by_image(labels_data)  # check lookup is a good name?
+        id_to_idx = discretize_categories(labels_data.get("categories", [])) if "categories" in labels_data else None
+        annotations_index = index_annotations_by_image(labels_data, id_to_idx)  # check lookup is a good name?
         image_info_dict = {path.splitext(img["file_name"])[0]: img for img in labels_data["images"]}
         return annotations_index, image_info_dict
 
 
-def index_annotations_by_image(data: Dict[str, Any]):
+def index_annotations_by_image(data: Dict[str, Any], id_to_idx: Optional[Dict[int, int]]):
     """
     Use image index to lookup every annotations
     Args:
@@ -68,6 +70,8 @@ def index_annotations_by_image(data: Dict[str, Any]):
         if anno["iscrowd"]:
             continue
         image_id = anno["image_id"]
+        if id_to_idx:
+            anno["category_id"] = id_to_idx[anno["category_id"]]
         if image_id not in annotation_lookup:
             annotation_lookup[image_id] = []
         annotation_lookup[image_id].append(anno)

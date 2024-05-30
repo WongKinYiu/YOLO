@@ -86,5 +86,6 @@ def convert_annotations(json_file: str, output_dir: str) -> None:
     process_annotations(image_annotations, image_info_dict, output_dir, id_to_idx)
 
 
-convert_annotations("./data/coco/annotations/instances_train2017.json", "./data/coco/labels/train2017/")
-convert_annotations("./data/coco/annotations/instances_val2017.json", "./data/coco/labels/val2017/")
+if __name__ == "__main__":
+    convert_annotations("./data/coco/annotations/instances_train2017.json", "./data/coco/labels/train2017/")
+    convert_annotations("./data/coco/annotations/instances_val2017.json", "./data/coco/labels/val2017/")
