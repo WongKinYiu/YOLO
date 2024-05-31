@@ -53,6 +53,7 @@ class SchedulerArgs:
 class SchedulerConfig:
     type: str
     args: SchedulerArgs
+    warmup: Dict[str, Union[str, int, float]]
 
 
 @dataclass

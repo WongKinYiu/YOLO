@@ -2,9 +2,10 @@ from typing import Any, Dict, Type
 
 import torch
 from torch.optim import Optimizer
-from torch.optim.lr_scheduler import _LRScheduler
+from torch.optim.lr_scheduler import LambdaLR, SequentialLR, _LRScheduler
 
 from yolo.config.config import OptimizerConfig, SchedulerConfig
+from yolo.model.yolo import YOLO
 
 
 class EMA:
@@ -31,21 +32,38 @@ class EMA:
             self.shadow[name].copy_(param.data)
 
 
-def get_optimizer(model_parameters, optim_cfg: OptimizerConfig) -> Optimizer:
+def get_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
     """Create an optimizer for the given model parameters based on the configuration.
 
     Returns:
         An instance of the optimizer configured according to the provided settings.
     """
     optimizer_class: Type[Optimizer] = getattr(torch.optim, optim_cfg.type)
+
+    bias_params = [p for name, p in model.named_parameters() if "bias" in name]
+    norm_params = [p for name, p in model.named_parameters() if "weight" in name and "bn" in name]
+    conv_params = [p for name, p in model.named_parameters() if "weight" in name and "bn" not in name]
+
+    model_parameters = [
+        {"params": bias_params, "nestrov": True, "momentum": 0.937},
+        {"params": conv_params, "weight_decay": 0.0},
+        {"params": norm_params, "weight_decay": 1e-5},
+    ]
     return optimizer_class(model_parameters, **optim_cfg.args)
 
 
-def get_scheduler(optimizer: Optimizer, schedul_cfg: SchedulerConfig) -> _LRScheduler:
+def get_scheduler(optimizer: Optimizer, schedule_cfg: SchedulerConfig) -> _LRScheduler:
     """Create a learning rate scheduler for the given optimizer based on the configuration.
 
     Returns:
         An instance of the scheduler configured according to the provided settings.
     """
-    scheduler_class: Type[_LRScheduler] = getattr(torch.optim.lr_scheduler, schedul_cfg.type)
-    return scheduler_class(optimizer, **schedul_cfg.args)
+    scheduler_class: Type[_LRScheduler] = getattr(torch.optim.lr_scheduler, schedule_cfg.type)
+    schedule = scheduler_class(optimizer, **schedule_cfg.args)
+    if hasattr(schedule_cfg, "warmup"):
+        wepoch = schedule_cfg.warmup.epochs
+        lambda1 = lambda epoch: 0.1 + 0.9 * (epoch + 1 / wepoch) if epoch < wepoch else 1
+        lambda2 = lambda epoch: 10 - 9 * (epoch + 1 / wepoch) if epoch < wepoch else 1
+        warmup_schedule = LambdaLR(optimizer, lr_lambda=[lambda1, lambda2, lambda1])
+        schedule = SequentialLR(optimizer, schedulers=[warmup_schedule, schedule], milestones=[2])
+    return schedule

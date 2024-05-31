@@ -15,12 +15,13 @@ data:
   shuffle: True
   pin_memory: True
 train:
-  epoch: 10
+  epoch: 500
   optimizer:
-    type: Adam
+    type: SGD
     args:
-      lr: 0.001
-      weight_decay: 0.0001
+      lr: 0.01
+      weight_decay: 0.0005
+      momentum: 0.937
   loss:
     objective:
       BCELoss: 0.5
@@ -35,10 +36,13 @@ train:
         iou: 6.0
         cls: 0.5
   scheduler:
-    type: StepLR
+    type: LinearLR
+    warmup:
+      epochs: 3.0
     args:
-      step_size: 10
-      gamma: 0.1
+      total_iters: ${hyper.train.epoch}
+      start_factor: 1
+      end_factor: 0.01
   ema:
       enabled: true
       decay: 0.995
