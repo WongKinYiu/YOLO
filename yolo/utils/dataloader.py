@@ -160,7 +160,7 @@ class YoloDataLoader(DataLoader):
             dataset,
             batch_size=hyper.batch_size,
             shuffle=hyper.shuffle,
-            num_workers=hyper.num_workers,
+            num_workers=config.hyper.general.cpu_num,
             pin_memory=hyper.pin_memory,
             collate_fn=self.collate_fn,
         )

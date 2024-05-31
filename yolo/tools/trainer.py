@@ -6,22 +6,23 @@ from torch import Tensor
 from torch.cuda.amp import GradScaler, autocast
 
 from yolo.config.config import Config, TrainConfig
-from yolo.model.yolo import YOLO
+from yolo.model.yolo import get_model
 from yolo.tools.log_helper import CustomProgress
 from yolo.tools.model_helper import EMA, get_optimizer, get_scheduler
 from yolo.utils.loss import get_loss_function
 
 
 class Trainer:
-    def __init__(self, model: YOLO, cfg: Config, device):
+    def __init__(self, cfg: Config, save_path: str, device):
         train_cfg: TrainConfig = cfg.hyper.train
+        model = get_model(cfg)
 
         self.model = model.to(device)
         self.device = device
-        self.optimizer = get_optimizer(model.parameters(), train_cfg.optimizer)
+        self.optimizer = get_optimizer(model, train_cfg.optimizer)
         self.scheduler = get_scheduler(self.optimizer, train_cfg.scheduler)
         self.loss_fn = get_loss_function(cfg)
-        self.progress = CustomProgress(cfg, use_wandb=True)
+        self.progress = CustomProgress(cfg, save_path, use_wandb=True)
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = EMA(model, decay=train_cfg.ema.decay)
@@ -46,7 +47,6 @@ class Trainer:
     def train_one_epoch(self, dataloader):
         self.model.train()
         total_loss = 0
-        self.progress.start_batch(len(dataloader))
 
         for data, targets in dataloader:
             loss, loss_each = self.train_one_batch(data, targets)
@@ -57,7 +57,6 @@ class Trainer:
         if self.scheduler:
             self.scheduler.step()
 
-        self.progress.finish_batch()
         return total_loss / len(dataloader)
 
     def save_checkpoint(self, epoch: int, filename="checkpoint.pt"):
@@ -79,8 +78,9 @@ class Trainer:
             self.progress.start_train(num_epochs)
             for epoch in range(num_epochs):
 
+                self.progress.start_one_epoch(len(dataloader), self.optimizer, epoch)
                 epoch_loss = self.train_one_epoch(dataloader)
-                self.progress.one_epoch()
+                self.progress.finish_one_epoch()
 
                 logger.info(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}")
                 if (epoch + 1) % 5 == 0:
