@@ -1,5 +1,4 @@
-# YOLOv9-MIT
-An MIT license rewrite of YOLOv9
+# YOLO: Official Implementation of YOLOv{7, 9}
 
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
 > [!IMPORTANT]
@@ -7,44 +6,75 @@ An MIT license rewrite of YOLOv9
 > 
 > Use of this code is at your own risk and discretion. It is advisable to consult with the project owner before deploying or integrating into any critical systems.
 
+Welcome to the official implementation of the YOLOv7 and YOLOv9. This repository will contains the complete codebase, pre-trained models, and detailed instructions for training and deploying YOLOv9.
+
+## TL;DR
+- Official YOLOv9 model implementation.
+- Features real-time detection with state-of-the-art accuracy.
+<!-- - Includes pre-trained models and training scripts. -->
+- Quick train: `python examples/example_train.py`
+
+## Introduction
+- [**YOLOv9**: Learning What You Want to Learn Using Programmable Gradient Information](https://arxiv.org/abs/2402.13616)
+- [**YOLOv7**: Trainable bag-of-freebies sets new state-of-the-art for real-time object detectors](https://arxiv.org/abs/2207.02696)
+
+## Installation
+To get started with YOLOv9, clone this repository and install the required dependencies:
+```shell
+git clone git@github.com:WongKinYiu/yolov9mit.git
+cd yolov9mit
+pip install -r requirements.txt
+```
+
+<!-- 
+```
+pip install git+https://github.com/WongKinYiu/yolov9mit.git
+``` 
+-->
+
+<!-- ### Quick Start
+Run YOLOv9 on a pre-trained model with:
+
+```shell
+python examples/example_train.py hyper.data.batch_size=8
+``` -->
+
+<!-- ## Model Zoo[WIP]
+Find pre-trained models with benchmarks on various datasets in the [Model Zoo](docs/MODELS). -->
+
+## Training
+For training YOLOv9 on your dataset:
+
+Modify the configuration file data/config.yaml to point to your dataset.
+Run the training script:
+
+```shell
+python examples/example_train.py hyper.data.batch_size=8 model=v9-c
+```
+
+More customization details, or ways to modify the model can be found [HOWTO](docs/HOWTO).
+
+## Evaluation [WIP]
+Evaluate the model performance using:
+
+```shell
+python examples/examples_evaluate.py weights=v9-c.pt
+```
+
 ## Contributing
-
-While the project's structure is still being finalized, we ask that potential contributors wait for these foundational decisions to be made. We greatly appreciate your patience and are excited to welcome contributions from the community once we are ready. Alternatively, you are welcome to propose functions that should be implemented based on the original YOLO version or suggest other enhancements! 
-
-If you are interested in contributing, please keep an eye on project updates or contact us directly at [henrytsui000@gmail.com](mailto:henrytsui000@gmail.com) for more information.
+Contributions to the YOLOv9 project are welcome! See [CONTRIBUTING](docs/CONTRIBUTING.md) for how to help out.
 
 ## Star History
-
 [![Star History Chart](https://api.star-history.com/svg?repos=WongKinYiu/yolov9mit&type=Date)](https://star-history.com/#WongKinYiu/yolov9mit&Date)
 
-## To-Do Lists
-- [ ] Project Setup
-    - [X] requirements
-    - [x] LICENSE
-    - [ ] README
-    - [x] pytests
-    - [ ] setup.py/pip install
-    - [x] log format
-    - [ ] hugging face
-- [ ] Data proccess
-    - [ ] Dataset
-        - [x] Download script
-        - [ ] Auto Download
-        - [ ] xywh, xxyy, xcyc
-    - [x] Dataloder
-        - [x] Data arugment
-- [ ] Model
-    - [ ] load model
-        - [ ] from yaml
-        - [ ] from github
-    - [x] trainer
-        - [x] train_one_iter
-        - [x] train_one_epoch
-    - [ ] DDP
-    - [x] EMA, OTA
-- [ ] Loss
-- [ ] Run
-    - [ ] train
-    - [ ] test
-    - [ ] demo
-- [x] Configuration
+## Citations
+```
+@misc{wang2024yolov9,
+      title={YOLOv9: Learning What You Want to Learn Using Programmable Gradient Information}, 
+      author={Chien-Yao Wang and I-Hau Yeh and Hong-Yuan Mark Liao},
+      year={2024},
+      eprint={2402.13616},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```

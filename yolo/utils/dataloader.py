@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from loguru import logger
 from PIL import Image
+from rich.progress import track
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
 from tqdm.rich import tqdm
@@ -74,7 +75,7 @@ class YoloDataset(Dataset):
 
         data = []
         valid_inputs = 0
-        for image_name in tqdm(images_list, desc="Filtering data"):
+        for image_name in track(images_list, description="Filtering data"):
             if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
                 continue
             image_id, _ = path.splitext(image_name)
@@ -159,7 +160,7 @@ class YoloDataLoader(DataLoader):
             dataset,
             batch_size=hyper.batch_size,
             shuffle=hyper.shuffle,
-            num_workers=hyper.num_workers,
+            num_workers=config.hyper.general.cpu_num,
             pin_memory=hyper.pin_memory,
             collate_fn=self.collate_fn,
         )
