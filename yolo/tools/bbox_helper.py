@@ -224,11 +224,9 @@ class BoxMatcher:
         # get cls matrix (cls prob with each gt class and each predict class)
         cls_mat = self.get_cls_matrix(predict_cls.sigmoid(), target_cls)
 
-        # TODO: alpha and beta should be set at hydra
         target_matrix = grid_mask * (iou_mat ** self.factor["iou"]) * (cls_mat ** self.factor["cls"])
 
         # choose topk
-        # TODO: topk should be set at hydra
         topk_targets, topk_mask = self.filter_topk(target_matrix, topk=self.topk)
 
         # delete one anchor pred assign to mutliple gts
