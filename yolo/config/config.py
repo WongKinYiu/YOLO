@@ -25,11 +25,10 @@ class Download:
 @dataclass
 class DataLoaderConfig:
     batch_size: int
-    shuffle: bool
-    num_workers: int
-    pin_memory: bool
-    image_size: List[int]
     class_num: int
+    image_size: List[int]
+    shuffle: bool
+    pin_memory: bool
 
 
 @dataclass
@@ -86,7 +85,21 @@ class TrainConfig:
 
 
 @dataclass
+class GeneralConfig:
+    out_path: str
+    task: str
+    device: Union[str, int, List[int]]
+    cpu_num: int
+    use_wandb: bool
+    lucky_number: 10
+    exist_ok: bool
+    resume_train: bool
+    use_TensorBoard: bool
+
+
+@dataclass
 class HyperConfig:
+    general: GeneralConfig
     data: DataLoaderConfig
     train: TrainConfig
 
