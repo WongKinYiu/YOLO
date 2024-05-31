@@ -13,6 +13,28 @@ While the project's structure is still being finalized, we ask that potential co
 
 If you are interested in contributing, please keep an eye on project updates or contact us directly at [henrytsui000@gmail.com](mailto:henrytsui000@gmail.com) for more information.
 
+# Installing Dependencies
+```
+pip install -r requirements.txt
+```
+
+# Training the Model
+To start training the model, use the following command:
+```bash
+$python examples/example_train.py
+```
+Ensure that you are in the root directory of the project when you run this command.
+
+The training script will automatically utilize the configuration files from the `yolo/config/` directory as specified by the Hydra configuration framework. This setup allows easy management and adjustment of training parameters without modifying the code.
+
+To override any configuration parameters directly from the command line, you can specify them after the script. For example, to change the batch size, you can run:
+
+```bash
+$python examples/example_train.py hyper.data.batch_size=8
+```
+
+
+
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=WongKinYiu/yolov9mit&type=Date)](https://star-history.com/#WongKinYiu/yolov9mit&Date)
