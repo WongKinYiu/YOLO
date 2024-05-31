@@ -64,6 +64,9 @@ python examples/examples_evaluate.py weights=v9-c.pt
 ## Contributing
 Contributions to the YOLOv9 project are welcome! See [CONTRIBUTING](docs/CONTRIBUTING.md) for how to help out.
 
+## Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=WongKinYiu/yolov9mit&type=Date)](https://star-history.com/#WongKinYiu/yolov9mit&Date)
+
 ## Citations
 ```
 @misc{wang2024yolov9,
