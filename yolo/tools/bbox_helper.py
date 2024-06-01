@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange
 from torch import Tensor
+from torchvision.ops import batched_nms
 
 from yolo.config.config import Config, MatcherConfig
 
@@ -288,3 +289,24 @@ class BoxMatcher:
         align_cls = align_cls * normalize_term * valid_mask[:, :, None]
 
         return torch.cat([align_cls, align_bbox], dim=-1), valid_mask.bool()
+
+
+def bbox_nms(predicts: Tensor, min_conf: float = 0, min_iou: float = 0.5):
+    cls_dist, bbox = predicts.split([80, 4], dim=-1)
+
+    # filter class by confidence
+    cls_val, cls_idx = cls_dist.max(dim=-1, keepdim=True)
+    valid_mask = cls_val > min_conf
+    valid_cls = cls_idx[valid_mask]
+    valid_box = bbox[valid_mask.repeat(1, 1, 4)].view(-1, 4)
+
+    batch_idx, *_ = torch.where(valid_mask)
+    nms_idx = batched_nms(valid_box, valid_cls, batch_idx, min_iou)
+    predicts_nms = []
+    for idx in range(batch_idx.max() + 1):
+        instance_idx = nms_idx[idx == batch_idx[nms_idx]]
+
+        predict_nms = torch.cat([valid_cls[instance_idx][:, None], valid_box[instance_idx]], dim=-1)
+
+        predicts_nms.append(predict_nms)
+    return predicts_nms
