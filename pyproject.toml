@@ -1,25 +1,13 @@
 [project]
 name = "yolov9mit"
 version = "0.0.0"
+dynamic = ["dependencies"]
 
-dependencies = [
-    "einops",
-    "hydra-core",
-    "loguru",
-    "numpy",
-    "Pillow",
-    "pyyaml",
-    "requests",
-    "rich",
-    "torch",
-    "torchvision",
-    "tqdm",
-]
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-]
+[tool.setuptools.packages.find]
+where = ["yolo"]
 
 [build-system]
 build-backend = "setuptools.build_meta"
