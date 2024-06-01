@@ -7,7 +7,9 @@ from PIL import Image, ImageDraw, ImageFont
 from torchvision.transforms.functional import to_pil_image
 
 
-def draw_bboxes(img: Union[Image.Image, torch.Tensor], bboxes: List[List[Union[int, float]]]):
+def draw_bboxes(
+    img: Union[Image.Image, torch.Tensor], bboxes: List[List[Union[int, float]]], *, scaled_bbox: bool = True
+):
     """
     Draw bounding boxes on an image.
 
@@ -30,16 +32,18 @@ def draw_bboxes(img: Union[Image.Image, torch.Tensor], bboxes: List[List[Union[i
 
     for bbox in bboxes:
         class_id, x_min, y_min, x_max, y_max = bbox
-        x_min = x_min * width
-        x_max = x_max * width
-        y_min = y_min * height
-        y_max = y_max * height
+        if scaled_bbox:
+            x_min = x_min * width
+            x_max = x_max * width
+            y_min = y_min * height
+            y_max = y_max * height
         shape = [(x_min, y_min), (x_max, y_max)]
         draw.rectangle(shape, outline="red", width=3)
         draw.text((x_min, y_min), str(int(class_id)), font=font, fill="blue")
 
     img.save("visualize.jpg")  # Save the image with annotations
     logger.info("Saved visualize image at visualize.png")
+    return img
 
 
 def draw_model(*, model_cfg=None, model=None, v7_base=False):

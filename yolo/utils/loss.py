@@ -8,12 +8,7 @@ from torch import Tensor, nn
 from torch.nn import BCEWithLogitsLoss
 
 from yolo.config.config import Config
-from yolo.tools.bbox_helper import (
-    BoxMatcher,
-    calculate_iou,
-    make_anchor,
-    transform_bbox,
-)
+from yolo.tools.bbox_helper import Anchor2Box, BoxMatcher, calculate_iou, make_anchor
 from yolo.tools.module_helper import make_chunk
 
 
@@ -90,42 +85,7 @@ class YOLOLoss:
         self.iou = BoxLoss()
 
         self.matcher = BoxMatcher(cfg.hyper.train.loss.matcher, self.class_num, self.anchors)
-
-    def parse_predicts(self, predicts: List[Tensor]) -> Tensor:
-        """
-        args:
-            [B x AnchorClass x h1 x w1, B x AnchorClass x h2 x w2, B x AnchorClass x h3 x w3] // AnchorClass = 4 * 16 + 80
-        return:
-            [B x HW x ClassBbox] // HW = h1*w1 + h2*w2 + h3*w3, ClassBox = 80 + 4 (xyXY)
-        """
-        preds = []
-        for pred in predicts:
-            preds.append(rearrange(pred, "B AC h w -> B (h w) AC"))  # B x AC x h x w-> B x hw x AC
-        preds = torch.concat(preds, dim=1)  # -> B x (H W) x AC
-
-        preds_anc, preds_cls = torch.split(preds, (self.reg_max * 4, self.class_num), dim=-1)
-        preds_anc = rearrange(preds_anc, "B  hw (P R)-> B hw P R", P=4)
-
-        pred_LTRB = preds_anc.softmax(dim=-1) @ self.reverse_reg * self.scaler.view(1, -1, 1)
-
-        lt, rb = pred_LTRB.chunk(2, dim=-1)
-        pred_minXY = self.anchors - lt
-        pred_maxXY = self.anchors + rb
-        predicts = torch.cat([preds_cls, pred_minXY, pred_maxXY], dim=-1)
-
-        return predicts, preds_anc
-
-    def parse_targets(self, targets: Tensor, batch_size: int = 16) -> List[Tensor]:
-        """
-        return List:
-        """
-        targets[:, 2:] = transform_bbox(targets[:, 2:], "xycwh -> xyxy") * self.scale_up
-        bbox_num = targets[:, 0].int().bincount()
-        batch_targets = torch.zeros(batch_size, bbox_num.max(), 5, device=targets.device)
-        for instance_idx, bbox_num in enumerate(bbox_num):
-            instance_targets = targets[targets[:, 0] == instance_idx]
-            batch_targets[instance_idx, :bbox_num] = instance_targets[:, 1:].detach()
-        return batch_targets
+        self.box_converter = Anchor2Box(cfg, device)
 
     def separate_anchor(self, anchors):
         """
@@ -138,10 +98,10 @@ class YOLOLoss:
     def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         # Batch_Size x (Anchor + Class) x H x W
         # TODO: check datatype, why targets has a little bit error with origin version
-        predicts, predicts_anc = self.parse_predicts(predicts)
+        predicts, predicts_anc = self.box_converter(predicts)
 
+        # For each predicted targets, assign a best suitable ground truth box.
         align_targets, valid_masks = self.matcher(targets, predicts)
-        # calculate loss between with instance and predict
 
         targets_cls, targets_bbox = self.separate_anchor(align_targets)
         predicts_cls, predicts_bbox = self.separate_anchor(predicts)

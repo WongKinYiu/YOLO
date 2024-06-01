@@ -3,9 +3,11 @@ from typing import List, Tuple
 
 import torch
 import torch.nn.functional as F
+from einops import rearrange
 from torch import Tensor
+from torchvision.ops import batched_nms
 
-from yolo.config.config import MatcherConfig
+from yolo.config.config import Config, MatcherConfig
 
 
 def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
@@ -122,6 +124,46 @@ def make_anchor(image_size: List[int], strides: List[int], device):
     return all_anchors, all_scalers
 
 
+class Anchor2Box:
+    def __init__(self, cfg: Config, device: torch.device) -> None:
+        self.reg_max = cfg.model.anchor.reg_max
+        self.class_num = cfg.hyper.data.class_num
+        self.image_size = list(cfg.hyper.data.image_size)
+        self.strides = cfg.model.anchor.strides
+
+        self.scale_up = torch.tensor(self.image_size * 2, device=device)
+        self.anchors, self.scaler = make_anchor(self.image_size, self.strides, device)
+        self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
+
+    def __call__(self, predicts: List[Tensor], with_logits=False) -> Tensor:
+        """
+        args:
+            [B x AnchorClass x h1 x w1, B x AnchorClass x h2 x w2, B x AnchorClass x h3 x w3] // AnchorClass = 4 * 16 + 80
+        return:
+            [B x HW x ClassBbox] // HW = h1*w1 + h2*w2 + h3*w3, ClassBox = 80 + 4 (xyXY)
+        """
+        preds = []
+        for pred in predicts:
+            preds.append(rearrange(pred, "B AC h w -> B (h w) AC"))  # B x AC x h x w-> B x hw x AC
+        preds = torch.concat(preds, dim=1)  # -> B x (H W) x AC
+
+        preds_anc, preds_cls = torch.split(preds, (self.reg_max * 4, self.class_num), dim=-1)
+        preds_anc = rearrange(preds_anc, "B  hw (P R)-> B hw P R", P=4)
+        if with_logits:
+            preds_cls = preds_cls.sigmoid()
+
+        pred_LTRB = preds_anc.softmax(dim=-1) @ self.reverse_reg * self.scaler.view(1, -1, 1)
+
+        lt, rb = pred_LTRB.chunk(2, dim=-1)
+        pred_minXY = self.anchors - lt
+        pred_maxXY = self.anchors + rb
+        preds_box = torch.cat([pred_minXY, pred_maxXY], dim=-1)
+
+        predicts = torch.cat([preds_cls, preds_box], dim=-1)
+
+        return predicts, preds_anc
+
+
 class BoxMatcher:
     def __init__(self, cfg: MatcherConfig, class_num: int, anchors: Tensor) -> None:
         self.class_num = class_num
@@ -224,11 +266,9 @@ class BoxMatcher:
         # get cls matrix (cls prob with each gt class and each predict class)
         cls_mat = self.get_cls_matrix(predict_cls.sigmoid(), target_cls)
 
-        # TODO: alpha and beta should be set at hydra
         target_matrix = grid_mask * (iou_mat ** self.factor["iou"]) * (cls_mat ** self.factor["cls"])
 
         # choose topk
-        # TODO: topk should be set at hydra
         topk_targets, topk_mask = self.filter_topk(target_matrix, topk=self.topk)
 
         # delete one anchor pred assign to mutliple gts
@@ -249,3 +289,24 @@ class BoxMatcher:
         align_cls = align_cls * normalize_term * valid_mask[:, :, None]
 
         return torch.cat([align_cls, align_bbox], dim=-1), valid_mask.bool()
+
+
+def bbox_nms(predicts: Tensor, min_conf: float = 0, min_iou: float = 0.5):
+    cls_dist, bbox = predicts.split([80, 4], dim=-1)
+
+    # filter class by confidence
+    cls_val, cls_idx = cls_dist.max(dim=-1, keepdim=True)
+    valid_mask = cls_val > min_conf
+    valid_cls = cls_idx[valid_mask]
+    valid_box = bbox[valid_mask.repeat(1, 1, 4)].view(-1, 4)
+
+    batch_idx, *_ = torch.where(valid_mask)
+    nms_idx = batched_nms(valid_box, valid_cls, batch_idx, min_iou)
+    predicts_nms = []
+    for idx in range(batch_idx.max() + 1):
+        instance_idx = nms_idx[idx == batch_idx[nms_idx]]
+
+        predict_nms = torch.cat([valid_cls[instance_idx][:, None], valid_box[instance_idx]], dim=-1)
+
+        predicts_nms.append(predict_nms)
+    return predicts_nms
