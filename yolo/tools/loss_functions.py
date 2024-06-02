@@ -8,8 +8,13 @@ from torch import Tensor, nn
 from torch.nn import BCEWithLogitsLoss
 
 from yolo.config.config import Config
-from yolo.tools.bbox_helper import Anchor2Box, BoxMatcher, calculate_iou, make_anchor
-from yolo.tools.module_helper import make_chunk
+from yolo.utils.bounding_box_utils import (
+    AnchorBoxConverter,
+    BoxMatcher,
+    calculate_iou,
+    generate_anchors,
+)
+from yolo.utils.module_utils import divide_into_chunks
 
 
 class BCELoss(nn.Module):
@@ -78,14 +83,14 @@ class YOLOLoss:
         self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
         self.scale_up = torch.tensor(self.image_size * 2, device=device)
 
-        self.anchors, self.scaler = make_anchor(self.image_size, self.strides, device)
+        self.anchors, self.scaler = generate_anchors(self.image_size, self.strides, device)
 
         self.cls = BCELoss()
         self.dfl = DFLoss(self.anchors, self.scaler, self.reg_max)
         self.iou = BoxLoss()
 
         self.matcher = BoxMatcher(cfg.hyper.train.loss.matcher, self.class_num, self.anchors)
-        self.box_converter = Anchor2Box(cfg, device)
+        self.box_converter = AnchorBoxConverter(cfg, device)
 
     def separate_anchor(self, anchors):
         """
@@ -132,7 +137,7 @@ class DualLoss:
         targets[:, :, 1:] = targets[:, :, 1:] * self.loss.scale_up
 
         # TODO: Need Refactor this region, make it flexible!
-        predicts = make_chunk(predicts[0], 2)
+        predicts = divide_into_chunks(predicts[0], 2)
         aux_iou, aux_dfl, aux_cls = self.loss(predicts[0], targets)
         main_iou, main_dfl, main_cls = self.loss(predicts[1], targets)
 

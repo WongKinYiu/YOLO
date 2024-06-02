@@ -9,23 +9,23 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
 from yolo.config.config import Config
-from yolo.tools.log_helper import custom_logger, get_valid_folder
-from yolo.tools.trainer import Trainer
-from yolo.utils.dataloader import get_dataloader
-from yolo.utils.get_dataset import prepare_dataset
+from yolo.tools.data_loader import create_dataloader
+from yolo.tools.dataset_preparation import prepare_dataset
+from yolo.tools.trainer import ModelTrainer
+from yolo.utils.logging_utils import custom_logger, validate_log_directory
 
 
 @hydra.main(config_path="../yolo/config", config_name="config", version_base=None)
 def main(cfg: Config):
     custom_logger()
-    save_path = get_valid_folder(cfg.hyper.general, cfg.name)
+    save_path = validate_log_directory(cfg.hyper.general, cfg.name)
     if cfg.download.auto:
         prepare_dataset(cfg.download)
 
-    dataloader = get_dataloader(cfg)
+    dataloader = create_dataloader(cfg)
     # TODO: get_device or rank, for DDP mode
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    trainer = Trainer(cfg, save_path, device)
+    trainer = ModelTrainer(cfg, save_path, device)
     trainer.train(dataloader, cfg.hyper.train.epoch)
 
 

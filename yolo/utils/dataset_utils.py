@@ -6,10 +6,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from yolo.utils.converter_json2txt import discretize_categories
+from yolo.tools.data_conversion import discretize_categories
 
 
-def find_labels_path(dataset_path: str, phase_name: str):
+def locate_label_paths(dataset_path: str, phase_name: str):
     """
     Find the path to label files for a specified dataset and phase(e.g. training).
 
@@ -35,7 +35,7 @@ def find_labels_path(dataset_path: str, phase_name: str):
     raise FileNotFoundError("No labels found in the specified dataset path and phase name.")
 
 
-def create_image_info_dict(labels_path: str) -> Tuple[Dict[str, List], Dict[str, Dict]]:
+def create_image_metadata(labels_path: str) -> Tuple[Dict[str, List], Dict[str, Dict]]:
     """
     Create a dictionary containing image information and annotations indexed by image ID.
 
@@ -49,12 +49,12 @@ def create_image_info_dict(labels_path: str) -> Tuple[Dict[str, List], Dict[str,
     with open(labels_path, "r") as file:
         labels_data = json.load(file)
         id_to_idx = discretize_categories(labels_data.get("categories", [])) if "categories" in labels_data else None
-        annotations_index = index_annotations_by_image(labels_data, id_to_idx)  # check lookup is a good name?
+        annotations_index = organize_annotations_by_image(labels_data, id_to_idx)  # check lookup is a good name?
         image_info_dict = {path.splitext(img["file_name"])[0]: img for img in labels_data["images"]}
         return annotations_index, image_info_dict
 
 
-def index_annotations_by_image(data: Dict[str, Any], id_to_idx: Optional[Dict[int, int]]):
+def organize_annotations_by_image(data: Dict[str, Any], id_to_idx: Optional[Dict[int, int]]):
     """
     Use image index to lookup every annotations
     Args:
@@ -78,7 +78,7 @@ def index_annotations_by_image(data: Dict[str, Any], id_to_idx: Optional[Dict[in
     return annotation_lookup
 
 
-def get_scaled_segmentation(
+def scale_segmentation(
     annotations: List[Dict[str, Any]], image_dimensions: Dict[str, int]
 ) -> Optional[List[List[float]]]:
     """

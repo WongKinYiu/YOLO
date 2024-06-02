@@ -9,7 +9,7 @@ from torchvision.transforms import functional as TF
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 
-from yolo.utils.data_augment import Compose, HorizontalFlip, Mosaic, VerticalFlip
+from yolo.utils.data_augmentation import Compose, HorizontalFlip, Mosaic, VerticalFlip
 
 
 def test_horizontal_flip():

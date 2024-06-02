@@ -8,7 +8,7 @@ from yolo.config.config import OptimizerConfig, SchedulerConfig
 from yolo.model.yolo import YOLO
 
 
-class EMA:
+class ExponentialMovingAverage:
     def __init__(self, model: torch.nn.Module, decay: float):
         self.model = model
         self.decay = decay
@@ -32,7 +32,7 @@ class EMA:
             self.shadow[name].copy_(param.data)
 
 
-def get_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
+def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
     """Create an optimizer for the given model parameters based on the configuration.
 
     Returns:
@@ -52,7 +52,7 @@ def get_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
     return optimizer_class(model_parameters, **optim_cfg.args)
 
 
-def get_scheduler(optimizer: Optimizer, schedule_cfg: SchedulerConfig) -> _LRScheduler:
+def create_scheduler(optimizer: Optimizer, schedule_cfg: SchedulerConfig) -> _LRScheduler:
     """Create a learning rate scheduler for the given optimizer based on the configuration.
 
     Returns:

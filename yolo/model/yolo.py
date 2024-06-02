@@ -5,9 +5,9 @@ from loguru import logger
 from omegaconf import ListConfig, OmegaConf
 
 from yolo.config.config import Config, Model, YOLOLayer
-from yolo.tools.log_helper import log_model
-from yolo.tools.module_helper import get_layer_map
-from yolo.utils.drawer import draw_model
+from yolo.tools.drawer import draw_model
+from yolo.utils.logging_utils import log_model_structure
+from yolo.utils.module_utils import get_layer_map
 
 
 class YOLO(nn.Module):
@@ -125,6 +125,6 @@ def get_model(cfg: Config) -> YOLO:
     OmegaConf.set_struct(cfg.model, False)
     model = YOLO(cfg.model, cfg.hyper.data.class_num)
     logger.info("✅ Success load model")
-    log_model(model.model)
+    log_model_structure(model.model)
     # draw_model(model=model)
     return model

@@ -88,3 +88,61 @@ Custom transformations should be designed to accept an image and its bounding bo
     # ... (Other Transform)
     CustomTransform: 0.5
     ```
+
+
+- **Utils**
+    - **bbox_utils**
+        - `class` Anchor2Box: transform predicted anchor to bounding box
+        - `class` Matcher: given prediction and groudtruth, find the groundtruth for each prediction
+        - `func` calculate_iou: calculate iou for given two list of bbox
+        - `func` transform_bbox: transform bbox from {xywh, xyxy, xcycwh} to {xywh, xyxy, xcycwh}
+        - `func` generate_anchors: given image size, make the anchor point for the given size
+    - **dataset_utils**
+        - `func` locate_label_paths:
+        - `func` create_image_metadata:
+        - `func` organize_annotations_by_image:
+        - `func` scale_segmentation:
+    - **logging_utils**
+        - `func` custom_log: custom loguru, overiding the origin logger
+        - `class` ProgressTracker: A class to handle output for each batch, epoch
+        - `func` log_model_structure: give a torch model, print it as a table
+        - `func` validate_log_directory: for given experiemnt, check if the log folder already existed
+    - **model_utils**
+        - `class` ExponentialMovingAverage: a mirror of model, do ema on model
+        - `func` create_optimizer: return a optimzer, for example SDG, ADAM
+        - `func` create_scheduler: return a scheduler, for example Step, Lambda
+    - **module_utils**
+        - `func` get_layer_map:
+        - `func` auto_pad: given a convolution block, return how many pixel should conv padding
+        - `func` create_activation_function: given a `func` name, return a activation `func`tion
+        - `func` round_up: given number and divider, return a number is mutliplcation of divider
+        - `func` divide_into_chunks: for a given list and n, seperate list to n sub list
+    - **trainer**
+        - `class` Trainer: a class can automatic train the model
+- **Tools**
+    - **converter_json2txt**
+        - `func` discretize_categories: given the dictionary class, turn id from 1: class
+        - `func` process_annotations: handle the whole dataset annotations
+        - `func` process_annotation: handle a annotation(a list of bounding box)
+        - `func` normalize_segmentation: normalize segmentation position to 0~1
+        - `func` convert_annotations: convert json annotations to txt file structure
+    - **data_augment**
+        - `class` AugmentationComposer: Compose a list of data augmentation strategy
+        - `class` VerticalFlip: a custom data augmentation, Random Vertical Flip
+        - `class` Mosaic: a data augmentation strategy, follow YOLOv5
+    - **dataloader**
+        - `class` YoloDataset: a custom dataset for training yolo's model
+        - `class` YoloDataLoader: a dataloader base on torch's dataloader, with custom allocate function
+        - `func` create_dataloader: given a config file, return a YOLO dataloader
+    - **drawer**
+        - `func` draw_bboxes: given a image and list of bbox, draw bbox on the image
+        - `func` draw_model: visualize the given model
+    - **get_dataset**
+        - `func` download_file: for a given link, downlaod the file
+        - `func` unzip_file: unzip the downlaoded zip to data/
+        - `func` check_files: check if the dataset file numbers is correct
+        - `func` prepare_dataset: automatic downlaod the dataset and check if it is correct
+    - **loss**
+        - `class` BoxLoss: a Custom Loss for bounding box
+        - `class` YOLOLoss: a implementation of yolov9 loss
+        - `class` DualLoss: a implementation of yolov9 loss with auxiliary detection head

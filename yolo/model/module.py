@@ -6,7 +6,7 @@ from loguru import logger
 from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
 
-from yolo.tools.module_helper import auto_pad, get_activation, round_up
+from yolo.utils.module_utils import auto_pad, create_activation_function, round_up
 
 
 # ----------- Basic Class ----------- #
@@ -26,7 +26,7 @@ class Conv(nn.Module):
         kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, bias=False, **kwargs)
         self.bn = nn.BatchNorm2d(out_channels, eps=1e-3, momentum=3e-2)
-        self.act = get_activation(activation)
+        self.act = create_activation_function(activation)
 
     def forward(self, x: Tensor) -> Tensor:
         return self.act(self.bn(self.conv(x)))
@@ -109,7 +109,7 @@ class RepConv(nn.Module):
         **kwargs
     ):
         super().__init__()
-        self.act = get_activation(activation)
+        self.act = create_activation_function(activation)
         self.conv1 = Conv(in_channels, out_channels, kernel_size, activation=False, **kwargs)
         self.conv2 = Conv(in_channels, out_channels, 1, activation=False, **kwargs)
 

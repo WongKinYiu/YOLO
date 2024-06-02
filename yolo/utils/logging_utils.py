@@ -35,7 +35,7 @@ def custom_logger():
     )
 
 
-class CustomProgress:
+class ProgressTracker:
     def __init__(self, cfg: Config, save_path: str, use_wandb: bool = False):
         self.progress = Progress(
             TextColumn("[progress.description]{task.description}"),
@@ -87,7 +87,7 @@ def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=Tru
         logger.opt(raw=not newline, colors=True).info("🌐 " + line)
 
 
-def log_model(model: List[YOLOLayer]):
+def log_model_structure(model: List[YOLOLayer]):
     console = Console()
     table = Table(title="Model Layers")
 
@@ -108,7 +108,7 @@ def log_model(model: List[YOLOLayer]):
     console.print(table)
 
 
-def get_valid_folder(general_cfg: GeneralConfig, exp_name):
+def validate_log_directory(general_cfg: GeneralConfig, exp_name):
     base_path = os.path.join(general_cfg.out_path, general_cfg.task)
     save_path = os.path.join(base_path, exp_name)
 

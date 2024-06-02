@@ -4,7 +4,7 @@ from PIL import Image
 from torchvision.transforms import functional as TF
 
 
-class Compose:
+class AugmentationComposer:
     """Composes several transforms together."""
 
     def __init__(self, transforms, image_size: int = 640):

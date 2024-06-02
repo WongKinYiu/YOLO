@@ -13,13 +13,19 @@ from torchvision.transforms import functional as TF
 from tqdm.rich import tqdm
 
 from yolo.config.config import Config
-from yolo.tools.dataset_helper import (
-    create_image_info_dict,
-    find_labels_path,
-    get_scaled_segmentation,
+from yolo.tools.data_augmentation import (
+    AugmentationComposer,
+    HorizontalFlip,
+    MixUp,
+    Mosaic,
+    VerticalFlip,
 )
-from yolo.utils.data_augment import Compose, HorizontalFlip, MixUp, Mosaic, VerticalFlip
-from yolo.utils.drawer import draw_bboxes
+from yolo.tools.drawer import draw_bboxes
+from yolo.utils.dataset_utils import (
+    create_image_metadata,
+    locate_label_paths,
+    scale_segmentation,
+)
 
 
 class YoloDataset(Dataset):
@@ -30,7 +36,7 @@ class YoloDataset(Dataset):
         self.image_size = image_size
 
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
-        self.transform = Compose(transforms, self.image_size)
+        self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
         self.data = self.load_data(dataset_cfg.path, phase_name)
 
@@ -68,10 +74,10 @@ class YoloDataset(Dataset):
             list: A list of tuples, each containing the path to an image file and its associated segmentation as a tensor.
         """
         images_path = path.join(dataset_path, "images", phase_name)
-        labels_path, data_type = find_labels_path(dataset_path, phase_name)
+        labels_path, data_type = locate_label_paths(dataset_path, phase_name)
         images_list = sorted(os.listdir(images_path))
         if data_type == "json":
-            annotations_index, image_info_dict = create_image_info_dict(labels_path)
+            annotations_index, image_info_dict = create_image_metadata(labels_path)
 
         data = []
         valid_inputs = 0
@@ -85,7 +91,7 @@ class YoloDataset(Dataset):
                 if image_info is None:
                     continue
                 annotations = annotations_index.get(image_info["id"], [])
-                image_seg_annotations = get_scaled_segmentation(annotations, image_info)
+                image_seg_annotations = scale_segmentation(annotations, image_info)
                 if not image_seg_annotations:
                     continue
 
@@ -191,13 +197,13 @@ class YoloDataLoader(DataLoader):
         return batch_images, batch_targets
 
 
-def get_dataloader(config):
+def create_dataloader(config):
     return YoloDataLoader(config)
 
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg):
-    dataloader = get_dataloader(cfg)
+    dataloader = create_dataloader(cfg)
     draw_bboxes(*next(iter(dataloader)))
 
 
@@ -205,7 +211,7 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("./")
-    from tools.log_helper import custom_logger
+    from tools.logging_utils import custom_logger
 
     custom_logger()
     main()

@@ -106,7 +106,7 @@ def transform_bbox(bbox: Tensor, indicator="xywh -> xyxy"):
     return bbox.to(dtype=data_type)
 
 
-def make_anchor(image_size: List[int], strides: List[int], device):
+def generate_anchors(image_size: List[int], strides: List[int], device):
     W, H = image_size
     anchors = []
     scaler = []
@@ -124,7 +124,7 @@ def make_anchor(image_size: List[int], strides: List[int], device):
     return all_anchors, all_scalers
 
 
-class Anchor2Box:
+class AnchorBoxConverter:
     def __init__(self, cfg: Config, device: torch.device) -> None:
         self.reg_max = cfg.model.anchor.reg_max
         self.class_num = cfg.hyper.data.class_num
@@ -132,7 +132,7 @@ class Anchor2Box:
         self.strides = cfg.model.anchor.strides
 
         self.scale_up = torch.tensor(self.image_size * 2, device=device)
-        self.anchors, self.scaler = make_anchor(self.image_size, self.strides, device)
+        self.anchors, self.scaler = generate_anchors(self.image_size, self.strides, device)
         self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
 
     def __call__(self, predicts: List[Tensor], with_logits=False) -> Tensor:
