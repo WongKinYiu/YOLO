@@ -9,7 +9,12 @@ from torchvision.transforms import functional as TF
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 
-from yolo.utils.data_augmentation import Compose, HorizontalFlip, Mosaic, VerticalFlip
+from yolo.tools.data_augmentation import (
+    AugmentationComposer,
+    HorizontalFlip,
+    Mosaic,
+    VerticalFlip,
+)
 
 
 def test_horizontal_flip():
@@ -33,7 +38,7 @@ def test_compose():
     def mock_transform(image, boxes):
         return image, boxes
 
-    compose = Compose([mock_transform, mock_transform])
+    compose = AugmentationComposer([mock_transform, mock_transform])
     img = Image.new("RGB", (10, 10), color="blue")
     boxes = torch.tensor([[0, 0.2, 0.2, 0.8, 0.8]])
 

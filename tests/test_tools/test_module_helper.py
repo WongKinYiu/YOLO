@@ -7,7 +7,7 @@ from torch import nn
 
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
-from yolo.tools.module_helper import auto_pad, get_activation
+from yolo.utils.module_utils import auto_pad, create_activation_function
 
 
 @pytest.mark.parametrize(
@@ -29,10 +29,10 @@ def test_auto_pad(kernel_size, dilation, expected):
     [("ReLU", nn.ReLU), ("leakyrelu", nn.LeakyReLU), ("none", nn.Identity), (None, nn.Identity), (False, nn.Identity)],
 )
 def test_get_activation(activation_name, expected_type):
-    result = get_activation(activation_name)
+    result = create_activation_function(activation_name)
     assert isinstance(result, expected_type), f"get_activation does not return correct type for {activation_name}"
 
 
 def test_get_activation_invalid():
     with pytest.raises(ValueError):
-        get_activation("unsupported_activation")
+        create_activation_function("unsupported_activation")
