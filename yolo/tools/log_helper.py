@@ -16,7 +16,7 @@ import sys
 from typing import Dict, List
 
 import wandb
-import wandb.errors
+import wandb.errors.term
 from loguru import logger
 from rich.console import Console
 from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
