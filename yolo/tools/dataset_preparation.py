@@ -61,7 +61,7 @@ def prepare_dataset(cfg):
             extract_to = os.path.join(data_dir, data_type) if data_type != "annotations" else data_dir
             final_place = os.path.join(extract_to, dataset_type)
 
-            os.makedirs(extract_to, exist_ok=True)
+            os.makedirs(final_place, exist_ok=True)
             if check_files(final_place, dataset_args.get("file_num")):
                 logger.info(f"✅ Dataset {dataset_type: <12} already verified.")
                 continue
