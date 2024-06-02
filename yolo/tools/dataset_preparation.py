@@ -78,7 +78,7 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("./")
-    from tools.log_helper import custom_logger
+    from utils.logging_utils import custom_logger
 
     custom_logger()
     prepare_dataset()
