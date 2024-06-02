@@ -1,3 +1,4 @@
+import inspect
 from typing import Tuple, Union
 
 from torch import Tensor, nn
@@ -16,6 +17,21 @@ def auto_pad(kernel_size: _size_2_t, dilation: _size_2_t = 1, **kwargs) -> Tuple
     pad_h = ((kernel_size[0] - 1) * dilation[0]) // 2
     pad_w = ((kernel_size[1] - 1) * dilation[1]) // 2
     return (pad_h, pad_w)
+
+
+def get_layer_map():
+    """
+    Dynamically generates a dictionary mapping class names to classes,
+    filtering to include only those that are subclasses of nn.Module,
+    ensuring they are relevant neural network layers.
+    """
+    layer_map = {}
+    from yolo.model import module
+
+    for name, obj in inspect.getmembers(module, inspect.isclass):
+        if issubclass(obj, nn.Module) and obj is not nn.Module:
+            layer_map[name] = obj
+    return layer_map
 
 
 def get_activation(activation: str) -> nn.Module:
