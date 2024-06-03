@@ -5,6 +5,7 @@ from os import path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+from loguru import logger
 
 from yolo.tools.data_conversion import discretize_categories
 
@@ -32,7 +33,8 @@ def locate_label_paths(dataset_path: str, phase_name: str):
         if txt_files:
             return txt_labels_path, "txt"
 
-    raise FileNotFoundError("No labels found in the specified dataset path and phase name.")
+    logger.warning("No labels found in the specified dataset path and phase name.")
+    return [], None
 
 
 def create_image_metadata(labels_path: str) -> Tuple[Dict[str, List], Dict[str, Dict]]:

@@ -32,8 +32,7 @@ from yolo.utils.dataset_utils import (
 class YoloDataset(Dataset):
     def __init__(self, config: TrainConfig, phase: str = "train2017", image_size: int = 640):
         augment_cfg = config.data.data_augment
-        # TODO: add yaml -> train: train2017
-        phase_name = config.dataset.auto_download.get(phase, phase)
+        phase_name = config.dataset.get(phase, phase)
         self.image_size = image_size
 
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
@@ -102,13 +101,14 @@ class YoloDataset(Dataset):
                     continue
                 with open(label_path, "r") as file:
                     image_seg_annotations = [list(map(float, line.strip().split())) for line in file]
+            else:
+                image_seg_annotations = []
 
             labels = self.load_valid_labels(image_id, image_seg_annotations)
-            if labels is not None:
-                img_path = path.join(images_path, image_name)
-                data.append((img_path, labels))
-                valid_inputs += 1
 
+            img_path = path.join(images_path, image_name)
+            data.append((img_path, labels))
+            valid_inputs += 1
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
 
@@ -135,7 +135,7 @@ class YoloDataset(Dataset):
             return torch.stack(bboxes)
         else:
             logger.warning("No valid BBox in {}", label_path)
-            return None
+            return torch.zeros((0, 5))
 
     def get_data(self, idx):
         img_path, bboxes = self.data[idx]
@@ -161,7 +161,7 @@ class YoloDataLoader(DataLoader):
     def __init__(self, config: Config):
         """Initializes the YoloDataLoader with hydra-config files."""
         data_cfg = config.task.data
-        dataset = YoloDataset(config.task)
+        dataset = YoloDataset(config.task, config.task.task)
 
         super().__init__(
             dataset,
