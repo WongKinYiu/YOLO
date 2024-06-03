@@ -1,10 +1,10 @@
 import os
 import zipfile
+from typing import Optional
 
 import requests
-from hydra import main
 from loguru import logger
-from tqdm import tqdm
+from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 
 from yolo.config.config import DatasetConfig
 
@@ -13,18 +13,24 @@ def download_file(url, destination):
     """
     Downloads a file from the specified URL to the destination path with progress logging.
     """
-    logger.info(f"Downloading {os.path.basename(destination)}...")
     with requests.get(url, stream=True) as response:
         response.raise_for_status()
         total_size = int(response.headers.get("content-length", 0))
-        progress = tqdm(total=total_size, unit="iB", unit_scale=True, desc=os.path.basename(destination), leave=True)
-
-        with open(destination, "wb") as file:
-            for data in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
-                file.write(data)
-                progress.update(len(data))
-        progress.close()
-    logger.info("Download completed.")
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            "[progress.percentage]{task.percentage:>3.1f}%",
+            "•",
+            "{task.completed}/{task.total} bytes",
+            "•",
+            TimeRemainingColumn(),
+        ) as progress:
+            task = progress.add_task(f"📥 Downloading {os.path.basename(destination)}...", total=total_size)
+            with open(destination, "wb") as file:
+                for data in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
+                    file.write(data)
+                    progress.update(task, advance=len(data))
+    logger.info("✅ Download completed.")
 
 
 def unzip_file(source, destination):
@@ -46,7 +52,6 @@ def check_files(directory, expected_count=None):
     return len(files) == expected_count if expected_count is not None else bool(files)
 
 
-@main(config_path="../config/data", config_name="download", version_base=None)
 def prepare_dataset(cfg: DatasetConfig):
     """
     Prepares dataset by downloading and unzipping if necessary.
@@ -76,6 +81,19 @@ def prepare_dataset(cfg: DatasetConfig):
                 logger.error(f"Error verifying the {dataset_type} dataset after extraction.")
 
 
+def prepare_weight(downlaod_link: Optional[str] = None, weight_name: str = "v9-c.pt"):
+    if downlaod_link is None:
+        downlaod_link = "https://github.com/WongKinYiu/yolov9mit/releases/download/v1.0-alpha/"
+    weight_link = f"{downlaod_link}{weight_name}"
+
+    if os.path.exists(weight_name):
+        logger.info(f"Weight file '{weight_name}' already exists.")
+    try:
+        download_file(weight_link, weight_name)
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Failed to download the weight file: {e}")
+
+
 if __name__ == "__main__":
     import sys
 
@@ -83,4 +101,4 @@ if __name__ == "__main__":
     from utils.logging_utils import custom_logger
 
     custom_logger()
-    prepare_dataset()
+    prepare_weight()
