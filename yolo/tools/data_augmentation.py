@@ -38,10 +38,10 @@ class PadAndResize:
 
         resized_img = square_img.resize((self.image_size, self.image_size))
 
-        boxes[:, 1] = (boxes[:, 1] + left) * scale  # xmin
-        boxes[:, 2] = (boxes[:, 2] + top) * scale  # ymin
-        boxes[:, 3] = (boxes[:, 3] + left) * scale  # xmax
-        boxes[:, 4] = (boxes[:, 4] + top) * scale  # ymax
+        boxes[:, 1] = (boxes[:, 1] + left) * scale
+        boxes[:, 2] = (boxes[:, 2] + top) * scale
+        boxes[:, 3] = (boxes[:, 3] + left) * scale
+        boxes[:, 4] = (boxes[:, 4] + top) * scale
 
         return resized_img, boxes
 
