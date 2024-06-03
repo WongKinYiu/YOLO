@@ -113,6 +113,7 @@ class NMSConfig:
 @dataclass
 class InferenceConfig:
     task: str
+    source: Union[str, int]
     nms: NMSConfig
 
 

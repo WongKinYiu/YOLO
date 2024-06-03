@@ -3,6 +3,7 @@ graphviz
 hydra-core
 loguru
 numpy
+opencv-python
 Pillow
 pytest
 pyyaml

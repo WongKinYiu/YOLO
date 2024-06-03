@@ -7,6 +7,7 @@ from torch.cuda.amp import GradScaler, autocast
 
 from yolo.config.config import Config, TrainConfig
 from yolo.model.yolo import YOLO
+from yolo.tools.data_loader import StreamDataLoader
 from yolo.tools.drawer import draw_bboxes
 from yolo.tools.loss_functions import get_loss_function
 from yolo.utils.bounding_box_utils import AnchorBoxConverter, bbox_nms
@@ -103,15 +104,26 @@ class ModelTester:
         self.nms = cfg.task.nms
         self.save_path = save_path
 
-    def solve(self, dataloader):
+    def solve(self, dataloader: StreamDataLoader):
         logger.info("👀 Start Inference!")
 
-        for images, _ in dataloader:
-            images = images.to(self.device)
-            with torch.no_grad():
-                raw_output = self.model(images)
-            predict, _ = self.anchor2box(raw_output[0][3:], with_logits=True)
-
-        nms_out = bbox_nms(predict, self.nms)
-        for image, bbox in zip(images, nms_out):
-            draw_bboxes(image, bbox, scaled_bbox=False, save_path=self.save_path)
+        try:
+            for idx, images in enumerate(dataloader):
+                images = images.to(self.device)
+                with torch.no_grad():
+                    raw_output = self.model(images)
+                predict, _ = self.anchor2box(raw_output[0][3:], with_logits=True)
+                nms_out = bbox_nms(predict, self.nms)
+                draw_bboxes(
+                    images[0], nms_out[0], scaled_bbox=False, save_path=self.save_path, save_name=f"frame{idx:03d}.png"
+                )
+        except KeyboardInterrupt:
+            logger.error("Interrupted by user")
+            dataloader.stop_event.set()
+            dataloader.stop()
+        except Exception as e:
+            logger.error(e)
+            dataloader.stop_event.set()
+            dataloader.stop()
+            raise e
+        dataloader.stop()

@@ -1,16 +1,19 @@
 import os
 from os import path
-from typing import List, Tuple, Union
+from queue import Empty, Queue
+from threading import Event, Thread
+from typing import Generator, List, Optional, Tuple, Union
 
+import cv2
 import hydra
 import numpy as np
 import torch
 from loguru import logger
 from PIL import Image
 from rich.progress import track
+from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
-from tqdm.rich import tqdm
 
 from yolo.config.config import Config, TrainConfig
 from yolo.tools.data_augmentation import (
@@ -199,10 +202,105 @@ class YoloDataLoader(DataLoader):
 
 
 def create_dataloader(config: Config):
+    if config.task.task == "inference":
+        return StreamDataLoader(config)
+
     if config.task.dataset.auto_download:
         prepare_dataset(config.task.dataset)
 
     return YoloDataLoader(config)
+
+
+class StreamDataLoader:
+    def __init__(self, config: Config):
+        self.source = config.task.source
+        self.running = True
+        self.is_stream = isinstance(self.source, int) or self.source.lower().startswith("rtmp://")
+
+        self.transform = AugmentationComposer([], config.image_size[0])
+        self.stop_event = Event()
+
+        if self.is_stream:
+            self.cap = cv2.VideoCapture(self.source)
+        else:
+            self.queue = Queue()
+            self.thread = Thread(target=self.load_source)
+            self.thread.start()
+
+    def load_source(self):
+        if os.path.isdir(self.source):  # image folder
+            self.load_image_folder(self.source)
+        elif any(self.source.lower().endswith(ext) for ext in [".mp4", ".avi", ".mkv"]):  # Video file
+            self.load_video_file(self.source)
+        else:  # Single image
+            self.process_image(self.source)
+
+    def load_image_folder(self, folder):
+        for root, _, files in os.walk(folder):
+            for file in files:
+                if self.stop_event.is_set():
+                    break
+                if any(file.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".bmp"]):
+                    self.process_image(os.path.join(root, file))
+
+    def process_image(self, image_path):
+        image = Image.open(image_path).convert("RGB")
+        if image is None:
+            raise ValueError(f"Error loading image: {image_path}")
+        self.process_frame(image)
+
+    def load_video_file(self, video_path):
+        cap = cv2.VideoCapture(video_path)
+        while self.running:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            self.process_frame(frame)
+        cap.release()
+
+    def cv2_to_tensor(self, frame: np.ndarray) -> Tensor:
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_float = frame_rgb.astype("float32") / 255.0
+        return torch.from_numpy(frame_float).permute(2, 0, 1)[None]
+
+    def process_frame(self, frame):
+        if isinstance(frame, np.ndarray):
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = Image.fromarray(frame)
+        frame, _ = self.transform(frame, torch.zeros(0, 5))
+        frame = TF.to_tensor(frame)[None]
+        if not self.is_stream:
+            self.queue.put(frame)
+        else:
+            self.current_frame = frame
+
+    def __iter__(self) -> Generator[Tensor, None, None]:
+        return self
+
+    def __next__(self) -> Tensor:
+        if self.is_stream:
+            ret, frame = self.cap.read()
+            if not ret:
+                self.stop()
+                raise StopIteration
+            self.process_frame(frame)
+            return self.current_frame
+        else:
+            try:
+                frame = self.queue.get(timeout=1)
+                return frame
+            except Empty:
+                raise StopIteration
+
+    def stop(self):
+        self.running = False
+        if self.is_stream:
+            self.cap.release()
+        else:
+            self.thread.join(timeout=1)
+
+    def __len__(self):
+        return self.queue.qsize() if not self.is_stream else 0
 
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)

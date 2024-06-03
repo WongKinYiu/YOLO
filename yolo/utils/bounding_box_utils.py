@@ -303,7 +303,7 @@ def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
     batch_idx, *_ = torch.where(valid_mask)
     nms_idx = batched_nms(valid_box, valid_cls, batch_idx, nms_cfg.min_iou)
     predicts_nms = []
-    for idx in range(batch_idx.max() + 1):
+    for idx in range(predicts.size(0)):
         instance_idx = nms_idx[idx == batch_idx[nms_idx]]
 
         predict_nms = torch.cat([valid_cls[instance_idx][:, None], valid_box[instance_idx]], dim=-1)

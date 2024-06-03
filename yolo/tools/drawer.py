@@ -14,6 +14,7 @@ def draw_bboxes(
     *,
     scaled_bbox: bool = True,
     save_path: str = "",
+    save_name: str = "visualize.png",
 ):
     """
     Draw bounding boxes on an image.
@@ -46,7 +47,7 @@ def draw_bboxes(
         draw.rectangle(shape, outline="red", width=3)
         draw.text((x_min, y_min), str(int(class_id)), font=font, fill="blue")
 
-    save_image_path = os.path.join(save_path, "visualize.png")
+    save_image_path = os.path.join(save_path, save_name)
     img.save(save_image_path)  # Save the image with annotations
     logger.info(f"💾 Saved visualize image at {save_image_path}")
     return img
