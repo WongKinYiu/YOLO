@@ -28,7 +28,7 @@ def main(cfg: Config):
     model = get_model(cfg).to(device)
 
     tester = ModelTester(cfg, model, save_path, device)
-    tester.solve(dataloader, cfg.task.epoch)
+    tester.solve(dataloader)
 
 
 if __name__ == "__main__":
