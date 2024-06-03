@@ -7,7 +7,7 @@ from einops import rearrange
 from torch import Tensor
 from torchvision.ops import batched_nms
 
-from yolo.config.config import Config, MatcherConfig
+from yolo.config.config import Config, MatcherConfig, NMSConfig
 
 
 def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
@@ -127,8 +127,8 @@ def generate_anchors(image_size: List[int], strides: List[int], device):
 class AnchorBoxConverter:
     def __init__(self, cfg: Config, device: torch.device) -> None:
         self.reg_max = cfg.model.anchor.reg_max
-        self.class_num = cfg.hyper.data.class_num
-        self.image_size = list(cfg.hyper.data.image_size)
+        self.class_num = cfg.class_num
+        self.image_size = list(cfg.image_size)
         self.strides = cfg.model.anchor.strides
 
         self.scale_up = torch.tensor(self.image_size * 2, device=device)
@@ -291,17 +291,17 @@ class BoxMatcher:
         return torch.cat([align_cls, align_bbox], dim=-1), valid_mask.bool()
 
 
-def bbox_nms(predicts: Tensor, min_conf: float = 0, min_iou: float = 0.5):
+def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
     cls_dist, bbox = predicts.split([80, 4], dim=-1)
 
     # filter class by confidence
     cls_val, cls_idx = cls_dist.max(dim=-1, keepdim=True)
-    valid_mask = cls_val > min_conf
+    valid_mask = cls_val > nms_cfg.min_confidence
     valid_cls = cls_idx[valid_mask]
     valid_box = bbox[valid_mask.repeat(1, 1, 4)].view(-1, 4)
 
     batch_idx, *_ = torch.where(valid_mask)
-    nms_idx = batched_nms(valid_box, valid_cls, batch_idx, min_iou)
+    nms_idx = batched_nms(valid_box, valid_cls, batch_idx, nms_cfg.min_iou)
     predicts_nms = []
     for idx in range(batch_idx.max() + 1):
         instance_idx = nms_idx[idx == batch_idx[nms_idx]]

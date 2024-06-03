@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
 from tqdm.rich import tqdm
 
-from yolo.config.config import Config
+from yolo.config.config import Config, TrainConfig
 from yolo.tools.data_augmentation import (
     AugmentationComposer,
     HorizontalFlip,
@@ -20,6 +20,7 @@ from yolo.tools.data_augmentation import (
     Mosaic,
     VerticalFlip,
 )
+from yolo.tools.dataset_preparation import prepare_dataset
 from yolo.tools.drawer import draw_bboxes
 from yolo.utils.dataset_utils import (
     create_image_metadata,
@@ -29,16 +30,16 @@ from yolo.utils.dataset_utils import (
 
 
 class YoloDataset(Dataset):
-    def __init__(self, config: dict, phase: str = "train2017", image_size: int = 640):
-        dataset_cfg = config.data
-        augment_cfg = config.augmentation
-        phase_name = dataset_cfg.get(phase, phase)
+    def __init__(self, config: TrainConfig, phase: str = "train2017", image_size: int = 640):
+        augment_cfg = config.data.data_augment
+        # TODO: add yaml -> train: train2017
+        phase_name = config.dataset.auto_download.get(phase, phase)
         self.image_size = image_size
 
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.data = self.load_data(dataset_cfg.path, phase_name)
+        self.data = self.load_data(config.dataset.path, phase_name)
 
     def load_data(self, dataset_path, phase_name):
         """
@@ -159,15 +160,15 @@ class YoloDataset(Dataset):
 class YoloDataLoader(DataLoader):
     def __init__(self, config: Config):
         """Initializes the YoloDataLoader with hydra-config files."""
-        hyper = config.hyper.data
-        dataset = YoloDataset(config)
+        data_cfg = config.task.data
+        dataset = YoloDataset(config.task)
 
         super().__init__(
             dataset,
-            batch_size=hyper.batch_size,
-            shuffle=hyper.shuffle,
-            num_workers=config.hyper.general.cpu_num,
-            pin_memory=hyper.pin_memory,
+            batch_size=data_cfg.batch_size,
+            shuffle=data_cfg.shuffle,
+            num_workers=config.cpu_num,
+            pin_memory=data_cfg.pin_memory,
             collate_fn=self.collate_fn,
         )
 
@@ -197,7 +198,10 @@ class YoloDataLoader(DataLoader):
         return batch_images, batch_targets
 
 
-def create_dataloader(config):
+def create_dataloader(config: Config):
+    if config.task.dataset.auto_download:
+        prepare_dataset(config.task.dataset)
+
     return YoloDataLoader(config)
 
 
@@ -211,7 +215,7 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("./")
-    from tools.logging_utils import custom_logger
+    from utils.logging_utils import custom_logger
 
     custom_logger()
     main()

@@ -75,8 +75,8 @@ class DFLoss(nn.Module):
 class YOLOLoss:
     def __init__(self, cfg: Config) -> None:
         self.reg_max = cfg.model.anchor.reg_max
-        self.class_num = cfg.hyper.data.class_num
-        self.image_size = list(cfg.hyper.data.image_size)
+        self.class_num = cfg.class_num
+        self.image_size = list(cfg.image_size)
         self.strides = cfg.model.anchor.strides
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -89,7 +89,7 @@ class YOLOLoss:
         self.dfl = DFLoss(self.anchors, self.scaler, self.reg_max)
         self.iou = BoxLoss()
 
-        self.matcher = BoxMatcher(cfg.hyper.train.loss.matcher, self.class_num, self.anchors)
+        self.matcher = BoxMatcher(cfg.task.loss.matcher, self.class_num, self.anchors)
         self.box_converter = AnchorBoxConverter(cfg, device)
 
     def separate_anchor(self, anchors):
@@ -127,11 +127,11 @@ class YOLOLoss:
 class DualLoss:
     def __init__(self, cfg: Config) -> None:
         self.loss = YOLOLoss(cfg)
-        self.aux_rate = cfg.hyper.train.loss.aux
+        self.aux_rate = cfg.task.loss.aux
 
-        self.iou_rate = cfg.hyper.train.loss.objective["BoxLoss"]
-        self.dfl_rate = cfg.hyper.train.loss.objective["DFLoss"]
-        self.cls_rate = cfg.hyper.train.loss.objective["BCELoss"]
+        self.iou_rate = cfg.task.loss.objective["BoxLoss"]
+        self.dfl_rate = cfg.task.loss.objective["DFLoss"]
+        self.cls_rate = cfg.task.loss.objective["BCELoss"]
 
     def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Dict[str, Tensor]]:
         targets[:, :, 1:] = targets[:, :, 1:] * self.loss.scale_up

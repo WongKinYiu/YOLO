@@ -24,7 +24,7 @@ from rich.table import Table
 from torch import Tensor
 from torch.optim import Optimizer
 
-from yolo.config.config import Config, GeneralConfig, YOLOLayer
+from yolo.config.config import Config, YOLOLayer
 
 
 def custom_logger():
@@ -110,11 +110,11 @@ def log_model_structure(model: List[YOLOLayer]):
     console.print(table)
 
 
-def validate_log_directory(general_cfg: GeneralConfig, exp_name):
-    base_path = os.path.join(general_cfg.out_path, general_cfg.task)
+def validate_log_directory(cfg: Config, exp_name: str):
+    base_path = os.path.join(cfg.out_path, cfg.task.task)
     save_path = os.path.join(base_path, exp_name)
 
-    if not general_cfg.exist_ok:
+    if not cfg.exist_ok:
         index = 1
         old_exp_name = exp_name
         while os.path.isdir(save_path):

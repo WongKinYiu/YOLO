@@ -123,7 +123,7 @@ def get_model(cfg: Config) -> YOLO:
         YOLO: An instance of the model defined by the given configuration.
     """
     OmegaConf.set_struct(cfg.model, False)
-    model = YOLO(cfg.model, cfg.hyper.data.class_num)
+    model = YOLO(cfg.model, cfg.class_num)
     logger.info("✅ Success load model")
     log_model_structure(model.model)
     draw_model(model=model)

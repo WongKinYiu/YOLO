@@ -6,6 +6,8 @@ from hydra import main
 from loguru import logger
 from tqdm import tqdm
 
+from yolo.config.config import DatasetConfig
+
 
 def download_file(url, destination):
     """
@@ -45,12 +47,12 @@ def check_files(directory, expected_count=None):
 
 
 @main(config_path="../config/data", config_name="download", version_base=None)
-def prepare_dataset(cfg):
+def prepare_dataset(cfg: DatasetConfig):
     """
     Prepares dataset by downloading and unzipping if necessary.
     """
-    data_dir = cfg.save_path
-    for data_type, settings in cfg.datasets.items():
+    data_dir = cfg.path
+    for data_type, settings in cfg.auto_download.items():
         base_url = settings["base_url"]
         for dataset_type, dataset_args in settings.items():
             if dataset_type == "base_url":

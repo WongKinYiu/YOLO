@@ -18,7 +18,7 @@ from yolo.utils.model_utils import (
 
 class ModelTrainer:
     def __init__(self, cfg: Config, save_path: str, device):
-        train_cfg: TrainConfig = cfg.hyper.train
+        train_cfg: TrainConfig = cfg.task
         model = get_model(cfg)
 
         self.model = model.to(device)
