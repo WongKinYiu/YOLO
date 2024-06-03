@@ -6,8 +6,10 @@ from torch import Tensor
 from torch.cuda.amp import GradScaler, autocast
 
 from yolo.config.config import Config, TrainConfig
-from yolo.model.yolo import get_model
+from yolo.model.yolo import YOLO
+from yolo.tools.drawer import draw_bboxes
 from yolo.tools.loss_functions import get_loss_function
+from yolo.utils.bounding_box_utils import AnchorBoxConverter, bbox_nms
 from yolo.utils.logging_utils import ProgressTracker
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
@@ -17,16 +19,15 @@ from yolo.utils.model_utils import (
 
 
 class ModelTrainer:
-    def __init__(self, cfg: Config, save_path: str, device):
+    def __init__(self, cfg: Config, model: YOLO, save_path: str, device):
         train_cfg: TrainConfig = cfg.task
-        model = get_model(cfg)
-
-        self.model = model.to(device)
+        self.model = model
         self.device = device
         self.optimizer = create_optimizer(model, train_cfg.optimizer)
         self.scheduler = create_scheduler(self.optimizer, train_cfg.scheduler)
         self.loss_fn = get_loss_function(cfg)
-        self.progress = ProgressTracker(cfg, save_path, use_wandb=True)
+        self.progress = ProgressTracker(cfg, save_path, cfg.use_wandb)
+        self.num_epochs = cfg.task.epoch
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
@@ -75,8 +76,9 @@ class ModelTrainer:
             self.ema.restore()
         torch.save(checkpoint, filename)
 
-    def train(self, dataloader, num_epochs):
+    def solve(self, dataloader):
         logger.info("🚄 Start Training!")
+        num_epochs = self.num_epochs
 
         with self.progress.progress:
             self.progress.start_train(num_epochs)
@@ -89,3 +91,27 @@ class ModelTrainer:
                 logger.info(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}")
                 if (epoch + 1) % 5 == 0:
                     self.save_checkpoint(epoch, f"checkpoint_epoch_{epoch+1}.pth")
+
+
+class ModelTester:
+    def __init__(self, cfg: Config, model: YOLO, save_path: str, device):
+        self.model = model
+        self.device = device
+        self.progress = ProgressTracker(cfg, save_path, cfg.use_wandb)
+
+        self.anchor2box = AnchorBoxConverter(cfg, device)
+        self.nms = cfg.task.nms
+        self.save_path = save_path
+
+    def solve(self, dataloader):
+        logger.info("👀 Start Inference!")
+
+        for images, _ in dataloader:
+            images = images.to(self.device)
+            with torch.no_grad():
+                raw_output = self.model(images)
+            predict, _ = self.anchor2box(raw_output[0][3:], with_logits=True)
+
+        nms_out = bbox_nms(predict, self.nms)
+        for image, bbox in zip(images, nms_out):
+            draw_bboxes(image, bbox, scaled_bbox=False, save_path=self.save_path)
