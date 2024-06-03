@@ -1,16 +1,25 @@
 [project]
 name = "yolo"
-version = "0.0.0"
+version = "0.1.0"
 dynamic = ["dependencies"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages.find]
-where = ["yolo"]
+where = ["."]
+include = ["yolo*"]
+
+[tool.setuptools]
+package-data = {"yolo" = ["**/*.yaml"]}
+include-package-data = true
+
 
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = [
     "setuptools",
 ]
+
+[project.scripts]
+yolo = "yolo.lazy:main"
