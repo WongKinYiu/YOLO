@@ -39,7 +39,7 @@ def test_compose():
         return image, boxes
 
     compose = AugmentationComposer([mock_transform, mock_transform])
-    img = Image.new("RGB", (10, 10), color="blue")
+    img = Image.new("RGB", (640, 640), color="blue")
     boxes = torch.tensor([[0, 0.2, 0.2, 0.8, 0.8]])
 
     transformed_img, transformed_boxes = compose(img, boxes)

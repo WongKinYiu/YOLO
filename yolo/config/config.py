@@ -135,6 +135,8 @@ class Config:
     use_wandb: bool
     use_TensorBoard: bool
 
+    weight: Optional[str]
+
 
 @dataclass
 class YOLOLayer(nn.Module):

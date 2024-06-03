@@ -1,4 +1,4 @@
-deivce: [0]
+device: 0
 cpu_num: 16
 
 class_num: 80
@@ -10,3 +10,5 @@ exist_ok: True
 lucky_number: 10
 use_wandb: False
 use_TensorBoard: False
+
+weight: v9-c.pt

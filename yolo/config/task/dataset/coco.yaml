@@ -1,4 +1,6 @@
 path: data/coco
+train: train2017
+
 
 auto_download:
   images:

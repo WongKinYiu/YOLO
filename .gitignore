@@ -42,6 +42,7 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+*.cache
 nosetests.xml
 coverage.xml
 *.cover
@@ -140,3 +141,6 @@ runs
 
 # Ignore npm packages (if using frontend components)
 node_modules/
+
+# Not ignore image for demo
+!demo/images/inference/*

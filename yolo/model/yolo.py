@@ -1,10 +1,13 @@
+import os
 from typing import Any, Dict, List, Union
 
+import torch
 import torch.nn as nn
 from loguru import logger
 from omegaconf import ListConfig, OmegaConf
 
 from yolo.config.config import Config, Model, YOLOLayer
+from yolo.tools.dataset_preparation import prepare_weight
 from yolo.tools.drawer import draw_model
 from yolo.utils.logging_utils import log_model_structure
 from yolo.utils.module_utils import get_layer_map
@@ -125,6 +128,14 @@ def get_model(cfg: Config) -> YOLO:
     OmegaConf.set_struct(cfg.model, False)
     model = YOLO(cfg.model, cfg.class_num)
     logger.info("✅ Success load model")
+    if cfg.weight:
+        if os.path.exists(cfg.weight):
+            model.model.load_state_dict(torch.load(cfg.weight))
+            logger.info("✅ Success load model weight")
+        else:
+            logger.info(f"🌐 Weight {cfg.weight} not found, try downloading")
+            prepare_weight(weight_name=cfg.weight)
+
     log_model_structure(model.model)
     draw_model(model=model)
     return model
