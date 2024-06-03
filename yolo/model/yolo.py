@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Union
 
+import torch
 import torch.nn as nn
 from loguru import logger
 from omegaconf import ListConfig, OmegaConf
@@ -125,6 +126,9 @@ def get_model(cfg: Config) -> YOLO:
     OmegaConf.set_struct(cfg.model, False)
     model = YOLO(cfg.model, cfg.class_num)
     logger.info("✅ Success load model")
+    if cfg.weight:
+        model.model.load_state_dict(torch.load(cfg.weight))
+        logger.info("✅ Success load model weight")
     log_model_structure(model.model)
     draw_model(model=model)
     return model
