@@ -95,6 +95,8 @@ def draw_model(*, model_cfg=None, model=None, v7_base=False):
         for jdx in range(idx, model_size):
             if model_mat[idx, jdx]:
                 dot.edge(str(idx), str(jdx))
-
-    dot.render("Model-arch", format="png", cleanup=True)
+    try:
+        dot.render("Model-arch", format="png", cleanup=True)
+    except:
+        logger.info("Warning: Could not find graphviz backend, continue without drawing the model architecture")
     logger.info("🎨 Drawing Model Architecture at Model-arch.png")
