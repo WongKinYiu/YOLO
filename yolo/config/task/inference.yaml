@@ -1,0 +1,11 @@
+task: inference
+defaults:
+  - dataset: demo
+data:
+  batch_size: 16
+  shuffle: False
+  pin_memory: True
+  data_augment: {}
+nms:
+  min_confidence: 0.5
+  min_iou: 0.5
