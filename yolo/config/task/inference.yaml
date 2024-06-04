@@ -1,0 +1,10 @@
+task: inference
+source: demo/images/inference/image.png
+data:
+  batch_size: 16
+  shuffle: False
+  pin_memory: True
+  data_augment: {}
+nms:
+  min_confidence: 0.1
+  min_iou: 0.5

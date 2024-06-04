@@ -1,0 +1,48 @@
+task: train
+defaults:
+  - dataset: coco
+
+epoch: 500
+
+data:
+  batch_size: 16 
+  shuffle: True
+  pin_memory: True
+  data_augment:
+    Mosaic: 1
+    # MixUp: 1
+    HorizontalFlip: 0.5
+
+optimizer:
+  type: SGD
+  args:
+    lr: 0.01
+    weight_decay: 0.0005
+    momentum: 0.937
+
+loss:
+  objective:
+    BCELoss: 0.5
+    BoxLoss: 7.5  
+    DFLoss: 1.5
+  aux:
+    0.25
+  matcher:
+    iou: CIoU
+    topk: 10
+    factor:
+      iou: 6.0
+      cls: 0.5
+
+scheduler:
+  type: LinearLR
+  warmup:
+    epochs: 3.0
+  args:
+    total_iters: ${task.epoch}
+    start_factor: 1
+    end_factor: 0.01
+
+ema:
+  enabled: true
+  decay: 0.995

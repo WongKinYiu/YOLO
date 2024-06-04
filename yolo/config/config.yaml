@@ -1,13 +1,12 @@
 hydra:
   run:
-    dir: ./runs
+    dir: runs
+
+name: v9-dev
 
 defaults:
- - data: coco
- - download: ../data/download
- - augmentation: ../data/augmentation
- - model: v9-c
- - hyper: default
- - _self_
+  - _self_
+  - task: train
+  - model: v9-c
+  - general
  
-name: v9-dev

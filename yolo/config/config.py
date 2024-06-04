@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from torch import nn
 
@@ -11,24 +11,46 @@ class AnchorConfig:
 
 
 @dataclass
+class LayerConfg:
+    args: Dict
+    source: Union[int, str, List[int]]
+    tags: str
+
+
+@dataclass
+class BlockConfig:
+    block: List[Dict[str, LayerConfg]]
+
+
+@dataclass
 class Model:
     anchor: AnchorConfig
-    model: Dict[str, List[Dict[str, Union[Dict, List, int]]]]
+    model: Dict[str, BlockConfig]
 
 
 @dataclass
-class Download:
-    auto: bool
+class DownloadDetail:
+    url: str
+    file_size: int
+
+
+@dataclass
+class DownloadOptions:
+    details: Dict[str, DownloadDetail]
+
+
+@dataclass
+class DatasetConfig:
     path: str
+    auto_download: Optional[DownloadOptions]
 
 
 @dataclass
-class DataLoaderConfig:
-    batch_size: int
-    class_num: int
-    image_size: List[int]
+class DataConfig:
     shuffle: bool
+    batch_size: int
     pin_memory: bool
+    data_augment: Dict[str, int]
 
 
 @dataclass
@@ -44,16 +66,24 @@ class OptimizerConfig:
 
 
 @dataclass
-class SchedulerArgs:
-    step_size: int
-    gamma: float
+class MatcherConfig:
+    iou: str
+    topk: int
+    factor: Dict[str, int]
+
+
+@dataclass
+class LossConfig:
+    objective: Dict[str, int]
+    aux: Union[bool, float]
+    matcher: MatcherConfig
 
 
 @dataclass
 class SchedulerConfig:
     type: str
-    args: SchedulerArgs
-    warmup: Dict[str, Union[str, int, float]]
+    warmup: Dict[str, Union[int, float]]
+    args: Dict[str, Any]
 
 
 @dataclass
@@ -63,65 +93,50 @@ class EMAConfig:
 
 
 @dataclass
-class MatcherConfig:
-    iou: str
-    topk: int
-    factor: Dict[str, int]
-
-
-@dataclass
-class LossConfig:
-    objective: List[List]
-    aux: Union[bool, float]
-    matcher: MatcherConfig
-
-
-@dataclass
 class TrainConfig:
+    task: str
+    dataset: DatasetConfig
     epoch: int
+    data: DataConfig
     optimizer: OptimizerConfig
+    loss: LossConfig
     scheduler: SchedulerConfig
     ema: EMAConfig
-    loss: LossConfig
 
 
 @dataclass
-class GeneralConfig:
-    out_path: str
+class NMSConfig:
+    min_confidence: int
+    min_iou: int
+
+
+@dataclass
+class InferenceConfig:
     task: str
+    source: Union[str, int]
+    nms: NMSConfig
+
+
+@dataclass
+class Config:
+    task: Union[TrainConfig, InferenceConfig]
+    model: Model
+    name: str
+
     device: Union[str, int, List[int]]
     cpu_num: int
-    use_wandb: bool
-    lucky_number: 10
+
+    class_num: int
+    image_size: List[int]
+
+    out_path: str
     exist_ok: bool
-    resume_train: bool
+
+    lucky_number: 10
+    use_wandb: bool
     use_TensorBoard: bool
 
-
-@dataclass
-class HyperConfig:
-    general: GeneralConfig
-    data: DataLoaderConfig
-    train: TrainConfig
-
-
-@dataclass
-class Dataset:
-    file_name: str
-    num_files: int
-
-
-@dataclass
-class Datasets:
-    base_url: str
-    images: Dict[str, Dataset]
-
-
-@dataclass
-class Download:
-    auto: bool
-    save_path: str
-    datasets: Datasets
+    weight: Optional[str]
 
 
 @dataclass
@@ -134,11 +149,3 @@ class YOLOLayer(nn.Module):
 
     def __post_init__(self):
         super().__init__()
-
-
-@dataclass
-class Config:
-    model: Model
-    download: Download
-    hyper: HyperConfig
-    name: str

@@ -19,6 +19,7 @@ def test_build_model():
         cfg = compose(config_name=config_name)
 
         OmegaConf.set_struct(cfg.model, False)
+        cfg.weight = None
         model = YOLO(cfg.model, 80)
         assert len(model.model) == 38
 
@@ -26,6 +27,7 @@ def test_build_model():
 def test_get_model():
     with initialize(config_path=config_path, version_base=None):
         cfg = compose(config_name=config_name)
+        cfg.weight = None
         model = get_model(cfg)
         assert isinstance(model, YOLO)
 

@@ -20,7 +20,7 @@ class Conv(nn.Module):
         kernel_size: _size_2_t,
         *,
         activation: Optional[str] = "SiLU",
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         kwargs.setdefault("padding", auto_pad(kernel_size, **kwargs))
@@ -106,7 +106,7 @@ class RepConv(nn.Module):
         kernel_size: _size_2_t = 3,
         *,
         activation: Optional[str] = "SiLU",
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.act = create_activation_function(activation)
@@ -128,7 +128,7 @@ class RepNBottleneck(nn.Module):
         kernel_size: Tuple[int, int] = (3, 3),
         residual: bool = True,
         expand: float = 1.0,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         neck_channels = int(out_channels * expand)
@@ -159,7 +159,7 @@ class RepNCSP(nn.Module):
         csp_expand: float = 0.5,
         repeat_num: int = 1,
         neck_args: Dict[str, Any] = {},
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
 
@@ -190,7 +190,7 @@ class RepNCSPELAN(nn.Module):
         process_channels: Optional[int] = None,
         csp_args: Dict[str, Any] = {},
         csp_neck_args: Dict[str, Any] = {},
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
 

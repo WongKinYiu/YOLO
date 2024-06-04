@@ -1,18 +1,21 @@
 import os
 from os import path
-from typing import List, Tuple, Union
+from queue import Empty, Queue
+from threading import Event, Thread
+from typing import Generator, List, Optional, Tuple, Union
 
+import cv2
 import hydra
 import numpy as np
 import torch
 from loguru import logger
 from PIL import Image
 from rich.progress import track
+from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
-from tqdm.rich import tqdm
 
-from yolo.config.config import Config
+from yolo.config.config import Config, TrainConfig
 from yolo.tools.data_augmentation import (
     AugmentationComposer,
     HorizontalFlip,
@@ -20,6 +23,7 @@ from yolo.tools.data_augmentation import (
     Mosaic,
     VerticalFlip,
 )
+from yolo.tools.dataset_preparation import prepare_dataset
 from yolo.tools.drawer import draw_bboxes
 from yolo.utils.dataset_utils import (
     create_image_metadata,
@@ -29,16 +33,15 @@ from yolo.utils.dataset_utils import (
 
 
 class YoloDataset(Dataset):
-    def __init__(self, config: dict, phase: str = "train2017", image_size: int = 640):
-        dataset_cfg = config.data
-        augment_cfg = config.augmentation
-        phase_name = dataset_cfg.get(phase, phase)
+    def __init__(self, config: TrainConfig, phase: str = "train2017", image_size: int = 640):
+        augment_cfg = config.data.data_augment
+        phase_name = config.dataset.get(phase, phase)
         self.image_size = image_size
 
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.data = self.load_data(dataset_cfg.path, phase_name)
+        self.data = self.load_data(config.dataset.path, phase_name)
 
     def load_data(self, dataset_path, phase_name):
         """
@@ -101,13 +104,14 @@ class YoloDataset(Dataset):
                     continue
                 with open(label_path, "r") as file:
                     image_seg_annotations = [list(map(float, line.strip().split())) for line in file]
+            else:
+                image_seg_annotations = []
 
             labels = self.load_valid_labels(image_id, image_seg_annotations)
-            if labels is not None:
-                img_path = path.join(images_path, image_name)
-                data.append((img_path, labels))
-                valid_inputs += 1
 
+            img_path = path.join(images_path, image_name)
+            data.append((img_path, labels))
+            valid_inputs += 1
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
 
@@ -134,7 +138,7 @@ class YoloDataset(Dataset):
             return torch.stack(bboxes)
         else:
             logger.warning("No valid BBox in {}", label_path)
-            return None
+            return torch.zeros((0, 5))
 
     def get_data(self, idx):
         img_path, bboxes = self.data[idx]
@@ -159,15 +163,15 @@ class YoloDataset(Dataset):
 class YoloDataLoader(DataLoader):
     def __init__(self, config: Config):
         """Initializes the YoloDataLoader with hydra-config files."""
-        hyper = config.hyper.data
-        dataset = YoloDataset(config)
+        data_cfg = config.task.data
+        dataset = YoloDataset(config.task, config.task.task)
 
         super().__init__(
             dataset,
-            batch_size=hyper.batch_size,
-            shuffle=hyper.shuffle,
-            num_workers=config.hyper.general.cpu_num,
-            pin_memory=hyper.pin_memory,
+            batch_size=data_cfg.batch_size,
+            shuffle=data_cfg.shuffle,
+            num_workers=config.cpu_num,
+            pin_memory=data_cfg.pin_memory,
             collate_fn=self.collate_fn,
         )
 
@@ -197,8 +201,106 @@ class YoloDataLoader(DataLoader):
         return batch_images, batch_targets
 
 
-def create_dataloader(config):
+def create_dataloader(config: Config):
+    if config.task.task == "inference":
+        return StreamDataLoader(config)
+
+    if config.task.dataset.auto_download:
+        prepare_dataset(config.task.dataset)
+
     return YoloDataLoader(config)
+
+
+class StreamDataLoader:
+    def __init__(self, config: Config):
+        self.source = config.task.source
+        self.running = True
+        self.is_stream = isinstance(self.source, int) or self.source.lower().startswith("rtmp://")
+
+        self.transform = AugmentationComposer([], config.image_size[0])
+        self.stop_event = Event()
+
+        if self.is_stream:
+            self.cap = cv2.VideoCapture(self.source)
+        else:
+            self.queue = Queue()
+            self.thread = Thread(target=self.load_source)
+            self.thread.start()
+
+    def load_source(self):
+        if os.path.isdir(self.source):  # image folder
+            self.load_image_folder(self.source)
+        elif any(self.source.lower().endswith(ext) for ext in [".mp4", ".avi", ".mkv"]):  # Video file
+            self.load_video_file(self.source)
+        else:  # Single image
+            self.process_image(self.source)
+
+    def load_image_folder(self, folder):
+        for root, _, files in os.walk(folder):
+            for file in files:
+                if self.stop_event.is_set():
+                    break
+                if any(file.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".bmp"]):
+                    self.process_image(os.path.join(root, file))
+
+    def process_image(self, image_path):
+        image = Image.open(image_path).convert("RGB")
+        if image is None:
+            raise ValueError(f"Error loading image: {image_path}")
+        self.process_frame(image)
+
+    def load_video_file(self, video_path):
+        cap = cv2.VideoCapture(video_path)
+        while self.running:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            self.process_frame(frame)
+        cap.release()
+
+    def cv2_to_tensor(self, frame: np.ndarray) -> Tensor:
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_float = frame_rgb.astype("float32") / 255.0
+        return torch.from_numpy(frame_float).permute(2, 0, 1)[None]
+
+    def process_frame(self, frame):
+        if isinstance(frame, np.ndarray):
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = Image.fromarray(frame)
+        frame, _ = self.transform(frame, torch.zeros(0, 5))
+        frame = TF.to_tensor(frame)[None]
+        if not self.is_stream:
+            self.queue.put(frame)
+        else:
+            self.current_frame = frame
+
+    def __iter__(self) -> Generator[Tensor, None, None]:
+        return self
+
+    def __next__(self) -> Tensor:
+        if self.is_stream:
+            ret, frame = self.cap.read()
+            if not ret:
+                self.stop()
+                raise StopIteration
+            self.process_frame(frame)
+            return self.current_frame
+        else:
+            try:
+                frame = self.queue.get(timeout=1)
+                return frame
+            except Empty:
+                raise StopIteration
+
+    def stop(self):
+        self.running = False
+        if self.is_stream:
+            self.cap.release()
+        else:
+            self.thread.join(timeout=1)
+
+    def __len__(self):
+        return self.queue.qsize() if not self.is_stream else 0
 
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)
@@ -211,7 +313,7 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("./")
-    from tools.logging_utils import custom_logger
+    from utils.logging_utils import custom_logger
 
     custom_logger()
     main()

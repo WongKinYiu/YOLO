@@ -10,6 +10,7 @@ class AugmentationComposer:
     def __init__(self, transforms, image_size: int = 640):
         self.transforms = transforms
         self.image_size = image_size
+        self.pad_resize = PadAndResize(self.image_size)
 
         for transform in self.transforms:
             if hasattr(transform, "set_parent"):
@@ -18,7 +19,31 @@ class AugmentationComposer:
     def __call__(self, image, boxes):
         for transform in self.transforms:
             image, boxes = transform(image, boxes)
+        image, boxes = self.pad_resize(image, boxes)
         return image, boxes
+
+
+class PadAndResize:
+    def __init__(self, image_size):
+        """Initialize the object with the target image size."""
+        self.image_size = image_size
+
+    def __call__(self, image, boxes):
+        original_size = max(image.size)
+        scale = self.image_size / original_size
+        square_img = Image.new("RGB", (original_size, original_size), (255, 255, 255))
+        left = (original_size - image.width) // 2
+        top = (original_size - image.height) // 2
+        square_img.paste(image, (left, top))
+
+        resized_img = square_img.resize((self.image_size, self.image_size))
+
+        boxes[:, 1] = (boxes[:, 1] + left) * scale
+        boxes[:, 2] = (boxes[:, 2] + top) * scale
+        boxes[:, 3] = (boxes[:, 3] + left) * scale
+        boxes[:, 4] = (boxes[:, 4] + top) * scale
+
+        return resized_img, boxes
 
 
 class HorizontalFlip:

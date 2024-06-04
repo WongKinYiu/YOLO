@@ -1,6 +1,8 @@
-auto: True
-save_path: data/coco
-datasets:
+path: data/coco
+train: train2017
+
+
+auto_download:
   images:
     base_url: http://images.cocodataset.org/zips/
     train2017:
@@ -16,6 +18,3 @@ datasets:
     base_url: http://images.cocodataset.org/annotations/
     annotations:
       file_name: annotations_trainval2017
-hydra:
-  run:
-    dir: ./runs

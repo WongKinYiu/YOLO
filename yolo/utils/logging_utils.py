@@ -22,8 +22,9 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from rich.table import Table
 from torch import Tensor
+from torch.optim import Optimizer
 
-from yolo.config.config import Config, GeneralConfig, YOLOLayer
+from yolo.config.config import Config, YOLOLayer
 
 
 def custom_logger():
@@ -40,7 +41,7 @@ class ProgressTracker:
         self.progress = Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(bar_width=None),
-            TextColumn("{task.completed}/{task.total}"),
+            TextColumn("{task.completed:.0f}/{task.total:.0f}"),
             TimeRemainingColumn(),
         )
         self.use_wandb = use_wandb
@@ -53,7 +54,8 @@ class ProgressTracker:
     def start_train(self, num_epochs: int):
         self.task_epoch = self.progress.add_task("[cyan]Epochs  [white]| Loss | Box  | DFL  | BCE  |", total=num_epochs)
 
-    def start_one_epoch(self, num_batches, optimizer, epoch_idx):
+    def start_one_epoch(self, num_batches: int, optimizer: Optimizer, epoch_idx: int):
+        self.num_batches = num_batches
         if self.use_wandb:
             lr_values = [params["lr"] for params in optimizer.param_groups]
             lr_names = ["bias", "norm", "conv"]
@@ -71,10 +73,10 @@ class ProgressTracker:
             loss_str += f" {loss_val:2.2f} |"
 
         self.progress.update(self.batch_task, advance=1, description=f"[green]Batches [white]{loss_str}")
+        self.progress.update(self.task_epoch, advance=1 / self.num_batches)
 
     def finish_one_epoch(self):
         self.progress.remove_task(self.batch_task)
-        self.progress.update(self.task_epoch, advance=1)
 
     def finish_train(self):
         self.wandb.finish()
@@ -108,11 +110,11 @@ def log_model_structure(model: List[YOLOLayer]):
     console.print(table)
 
 
-def validate_log_directory(general_cfg: GeneralConfig, exp_name):
-    base_path = os.path.join(general_cfg.out_path, general_cfg.task)
+def validate_log_directory(cfg: Config, exp_name: str):
+    base_path = os.path.join(cfg.out_path, cfg.task.task)
     save_path = os.path.join(base_path, exp_name)
 
-    if not general_cfg.exist_ok:
+    if not cfg.exist_ok:
         index = 1
         old_exp_name = exp_name
         while os.path.isdir(save_path):
@@ -126,5 +128,5 @@ def validate_log_directory(general_cfg: GeneralConfig, exp_name):
 
     os.makedirs(save_path, exist_ok=True)
     logger.opt(colors=True).info(f"📄 Created log folder: <u><fg #808080>{save_path}</></>")
-    logger.add(os.path.join(save_path, "output.log"), backtrace=True, diagnose=True)
+    logger.add(os.path.join(save_path, "output.log"), mode="w", backtrace=True, diagnose=True)
     return save_path
