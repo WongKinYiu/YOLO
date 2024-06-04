@@ -27,8 +27,10 @@ from torch.optim import Optimizer
 from yolo.config.config import Config, YOLOLayer
 
 
-def custom_logger():
+def custom_logger(quite: bool = False):
     logger.remove()
+    if quite:
+        return
     logger.add(
         sys.stderr,
         colorize=True,
