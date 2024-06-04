@@ -116,7 +116,7 @@ class YOLO(nn.Module):
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
 
-def get_model(cfg: Config) -> YOLO:
+def create_model(cfg: Config) -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
 
     Args:
