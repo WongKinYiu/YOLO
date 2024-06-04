@@ -2,6 +2,15 @@
 name = "yolo"
 version = "0.1.0"
 dynamic = ["dependencies"]
+description = "Official Implementation of YOLO"
+authors = [
+    { name = "Hao-Tang, Tsui", email = "henrytsui000@gmail.com" },
+]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.6"
+keywords = ["yolo", "object detection", "computer vision"]
+
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
