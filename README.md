@@ -38,7 +38,7 @@ pip install -r requirements.txt
 - [x] Task:
   - [x] Training
   - [x] Inference
-  - [x] Validation
+  - [ ] Validation
 
 ## Task
 These are simple examples. For more customization details, please refer to [Notebooks](examples) and lower-level modifications **[HOWTO](docs/HOWTO)**.
