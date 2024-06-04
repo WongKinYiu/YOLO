@@ -128,5 +128,5 @@ def validate_log_directory(cfg: Config, exp_name: str):
 
     os.makedirs(save_path, exist_ok=True)
     logger.opt(colors=True).info(f"📄 Created log folder: <u><fg #808080>{save_path}</></>")
-    logger.add(os.path.join(save_path, "output.log"), backtrace=True, diagnose=True)
+    logger.add(os.path.join(save_path, "output.log"), mode="w", backtrace=True, diagnose=True)
     return save_path
