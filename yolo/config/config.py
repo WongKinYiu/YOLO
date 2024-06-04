@@ -115,6 +115,7 @@ class InferenceConfig:
     task: str
     source: Union[str, int]
     nms: NMSConfig
+    fast_inference: Optional[None]
 
 
 @dataclass

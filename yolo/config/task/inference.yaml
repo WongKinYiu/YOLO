@@ -1,5 +1,6 @@
 task: inference
 source: demo/images/inference/image.png
+fast_inference:  # onnx, trt or Empty
 data:
   batch_size: 16
   shuffle: False
