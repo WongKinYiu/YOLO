@@ -49,13 +49,13 @@ To train YOLOv9 on your dataset:
 1. Modify the configuration file `data/config.yaml` to point to your dataset.
 2. Run the training script:
 ```shell
-python lazy.py task=train task.batch_size=8 model=v9-c
+python lazy.py task=train task.data.batch_size=8 model=v9-c
 ```
 
 ### Transfer Learning
 To perform transfer learning with YOLOv9:
 ```shell
-python lazy.py task=train task.batch_size=8 model=v9-c task.dataset={dataset_config}
+python lazy.py task=train task.data.batch_size=8 model=v9-c task.dataset={dataset_config}
 ```
 
 ### Inference
