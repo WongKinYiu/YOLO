@@ -117,13 +117,10 @@ class ModelTester:
                 draw_bboxes(
                     images[0], nms_out[0], scaled_bbox=False, save_path=self.save_path, save_name=f"frame{idx:03d}.png"
                 )
-        except KeyboardInterrupt:
-            logger.error("Interrupted by user")
+        except (KeyboardInterrupt, Exception) as e:
+            logger.error(str(e))
             dataloader.stop_event.set()
             dataloader.stop()
-        except Exception as e:
-            logger.error(e)
-            dataloader.stop_event.set()
-            dataloader.stop()
-            raise e
+            if not isinstance(e, KeyboardInterrupt):
+                raise e
         dataloader.stop()
