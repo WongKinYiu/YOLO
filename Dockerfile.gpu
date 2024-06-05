@@ -1,0 +1,128 @@
+FROM nvcr.io/nvidia/tensorrt:24.02-py3
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG USERNAME=user
+ARG WORKDIR=/home/${USERNAME}/workdir
+ARG PYCUDAVER=2022.2.2
+ARG TORCHVER=2.1.0
+ARG TORCHVISIONVER=0.16.0
+ARG ONNXVER=1.16.1
+ARG ONNXRUNTIMEVER=1.18.0
+ARG ONNXSIMVER=0.4.30
+ARG H5PYVER=3.11.0
+ARG PSUTILVER=5.9.8
+ARG CMAKEVER=3.29.3
+ARG FLATBUFFERSVER=23.5.26
+ARG PACKAGINGVER=24.0
+ARG WHEELVER=0.43.0
+
+SHELL ["/bin/bash", "-c"]
+
+COPY requirements.txt /requirements.txt
+
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${PATH}:${CUDA_HOME}/bin
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${CUDA_HOME}/lib64
+
+RUN apt-get update \
+    && apt-get install -y \
+        sudo \
+        curl \
+        gcc \
+        git \
+        make \
+        wget \
+        zlib1g \
+        protobuf-compiler \
+        libgl1-mesa-dev \
+        graphviz \
+    && sudo apt clean \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+# Make user
+RUN echo "root:root" | chpasswd \
+    && useradd \
+        --create-home \
+        --home-dir /home/${USERNAME} \
+        --shell /bin/bash \
+        --user-group \
+        --groups adm,sudo \
+        ${USERNAME} \
+    && echo "${USERNAME}:${USERNAME}" | chpasswd \
+    && cat /dev/null > /etc/sudoers.d/${USERNAME} \
+    && echo "%${USERNAME}    ALL=(ALL)   NOPASSWD:    ALL" >> \
+        /etc/sudoers.d/${USERNAME} \
+    && mkdir -p ${WORKDIR} \
+    && chown ${USERNAME}:${USERNAME} ${WORKDIR}
+
+USER ${USERNAME}
+WORKDIR ${WORKDIR}
+
+# Install Torch
+RUN pip install \
+    --index-url https://download.pytorch.org/whl/cu121 \
+    torch==${TORCHVER} \
+    torchvision==${TORCHVISIONVER}
+
+# Install other pip packages
+RUN pip install \
+        psutil==${PSUTILVER} \
+        onnx==${ONNXVER} \
+        pycuda==${PYCUDAVER} \
+        onnxsim==${ONNXSIMVER} \
+        h5py==${H5PYVER} \
+        flatbuffers==${FLATBUFFERSVER} \
+        cmake==${CMAKEVER} \
+        packaging==${PACKAGINGVER} \
+        wheel==${WHEELVER} \
+    && sudo rm /usr/local/bin/cmake
+
+# Install onnx-tensorrt
+RUN git clone -b release/8.6-GA --recursive https://github.com/onnx/onnx-tensorrt ../onnx-tensorrt \
+    && export PATH=${PATH}:${HOME}/.local/bin \
+    && pushd ../onnx-tensorrt \
+    && mkdir -p build \
+    && pushd build \
+    && cmake .. -DTENSORRT_ROOT=/usr/src/tensorrt \
+    && make -j$(nproc) \
+    && sudo make install \
+    && popd \
+    && popd \
+    && echo 'pushd ../onnx-tensorrt > /dev/null' >> ~/.bashrc \
+    # At docker build time, setup.py fails because NVIDIA's physical GPU device cannot be detected.
+    # Therefore, a workaround is applied to configure setup.py to run on first access.
+    && echo 'python setup.py install --user 1>/dev/null 2>/dev/null' >> ~/.bashrc \
+    && echo 'popd > /dev/null' >> ~/.bashrc \
+    && echo 'export CUDA_MODULE_LOADING=LAZY' >> ~/.bashrc \
+    && echo 'export PATH=${PATH}:/usr/src/tensorrt/bin:${HOME}/onnx-tensorrt/build' >> ~/.bashrc
+
+# Build onnxruntime-gpu / Install onnxruntime-gpu
+RUN git clone -b v${ONNXRUNTIMEVER} https://github.com/microsoft/onnxruntime.git \
+    && pushd onnxruntime \
+    && export PATH=${PATH}:${HOME}/.local/bin \
+    && sudo chmod +x build.sh \
+    && \
+    ./build.sh \
+        --config Release \
+        --cudnn_home /usr/lib/x86_64-linux-gnu/ \
+        --cuda_home /usr/local/cuda \
+        --use_tensorrt \
+        --use_cuda \
+        --tensorrt_home /usr/src/tensorrt/ \
+        --enable_pybind \
+        --build_wheel \
+        --parallel $(nproc) \
+        --skip_tests \
+    && pip install nvidia-pyindex \
+    && pip install onnx-graphsurgeon \
+    && pip install simple_onnx_processing_tools \
+    && pip uninstall onnxruntime onnxruntime-gpu \
+    && pip install --user build/Linux/Release/dist/onnxruntime_gpu-${ONNXRUNTIMEVER}-cp310-cp310-linux_x86_64.whl \
+    && popd \
+    && rm -rf onnxruntime
+
+# Install requirements
+RUN pip install -r /requirements.txt
+
+# Setting pip package path
+RUN echo 'export PATH=${PATH}:${HOME}/.local/bin' >> ~/.bashrc

@@ -3,7 +3,7 @@
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
 > [!IMPORTANT]
 > This project is currently a Work In Progress and may undergo significant changes. It is not recommended for use in production environments until further notice. Please check back regularly for updates.
-> 
+>
 > Use of this code is at your own risk and discretion. It is advisable to consult with the project owner before deploying or integrating into any critical systems.
 
 Welcome to the official implementation of YOLOv7 and YOLOv9. This repository will contains the complete codebase, pre-trained models, and detailed instructions for training and deploying YOLOv9.
@@ -25,8 +25,32 @@ To get started with YOLOv9, clone this repository and install the required depen
 ```shell
 git clone git@github.com:WongKinYiu/yolov9mit.git
 cd yolov9mit
-pip install -r requirements.txt
 ```
+- HostPC
+  ```shell
+  pip install -r requirements.txt
+  ```
+- Docker with CUDA/TensorRT
+  ```shell
+  docker build -t yolov9mit:latest -f Dockerfile.gpu
+  docker run \
+  --rm \
+  -it \
+  --gpus all \
+  -v `pwd`:/home/user/workdir \
+  -w /home/user/workdir \
+  yolov9mit:latest
+  ```
+- Docker with CPU
+  ```shell
+  docker build -t yolov9mit:latest -f Dockerfile.cpu
+  docker run \
+  --rm \
+  -it \
+  -v `pwd`:/home/user/workdir \
+  -w /home/user/workdir \
+  yolov9mit:latest
+  ```
 
 ## Features
 - [x] Autodownload weights/datasets
@@ -80,7 +104,7 @@ Contributions to the YOLOv9 project are welcome! See [CONTRIBUTING](docs/CONTRIB
 ## Citations
 ```
 @misc{wang2024yolov9,
-      title={YOLOv9: Learning What You Want to Learn Using Programmable Gradient Information}, 
+      title={YOLOv9: Learning What You Want to Learn Using Programmable Gradient Information},
       author={Chien-Yao Wang and I-Hau Yeh and Hong-Yuan Mark Liao},
       year={2024},
       eprint={2402.13616},
