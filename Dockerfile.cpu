@@ -58,6 +58,12 @@ RUN echo "root:root" | chpasswd \
 USER ${USERNAME}
 WORKDIR ${WORKDIR}
 
+# Install Torch
+RUN pip install \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch==${TORCHVER} \
+    torchvision==${TORCHVISIONVER}
+
 # Install other pip packages
 RUN pip install \
         psutil==${PSUTILVER} \
