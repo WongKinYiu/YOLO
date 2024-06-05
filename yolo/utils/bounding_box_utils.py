@@ -292,12 +292,13 @@ class BoxMatcher:
 
 
 def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
+    # TODO change function to class or set 80 to class_num instead of a number
     cls_dist, bbox = predicts.split([80, 4], dim=-1)
 
     # filter class by confidence
     cls_val, cls_idx = cls_dist.max(dim=-1, keepdim=True)
     valid_mask = cls_val > nms_cfg.min_confidence
-    valid_cls = cls_idx[valid_mask]
+    valid_cls = cls_idx[valid_mask].float()
     valid_box = bbox[valid_mask.repeat(1, 1, 4)].view(-1, 4)
 
     batch_idx, *_ = torch.where(valid_mask)

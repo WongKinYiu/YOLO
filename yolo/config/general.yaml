@@ -11,4 +11,4 @@ lucky_number: 10
 use_wandb: False
 use_TensorBoard: False
 
-weight: v9-c.pt
+weight: weights/v9-c.pt

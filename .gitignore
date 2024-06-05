@@ -121,6 +121,7 @@ runs
 *.onnx
 *.engine
 *.profile
+*.trt
 
 # Image files
 *.png

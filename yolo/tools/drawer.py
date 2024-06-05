@@ -57,9 +57,9 @@ def draw_model(*, model_cfg=None, model=None, v7_base=False):
     from graphviz import Digraph
 
     if model_cfg:
-        from yolo.model.yolo import get_model
+        from yolo.model.yolo import create_model
 
-        model = get_model(model_cfg)
+        model = create_model(model_cfg)
     elif model is None:
         raise ValueError("Drawing Object is None")
 
