@@ -118,6 +118,8 @@ runs
 # Datasets and model checkpoints
 *.pth
 *.pt
+*.trt
+*.onnx
 
 # Image files
 *.png
