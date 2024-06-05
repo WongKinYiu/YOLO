@@ -1,4 +1,3 @@
-import os
 from typing import List, Union
 
 import numpy as np
@@ -9,12 +8,7 @@ from torchvision.transforms.functional import to_pil_image
 
 
 def draw_bboxes(
-    img: Union[Image.Image, torch.Tensor],
-    bboxes: List[List[Union[int, float]]],
-    *,
-    scaled_bbox: bool = True,
-    save_path: str = "",
-    save_name: str = "visualize.png",
+    img: Union[Image.Image, torch.Tensor], bboxes: List[List[Union[int, float]]], *, scaled_bbox: bool = True
 ):
     """
     Draw bounding boxes on an image.
@@ -47,9 +41,6 @@ def draw_bboxes(
         draw.rectangle(shape, outline="red", width=3)
         draw.text((x_min, y_min), str(int(class_id)), font=font, fill="blue")
 
-    save_image_path = os.path.join(save_path, save_name)
-    img.save(save_image_path)  # Save the image with annotations
-    logger.info(f"💾 Saved visualize image at {save_image_path}")
     return img
 
 

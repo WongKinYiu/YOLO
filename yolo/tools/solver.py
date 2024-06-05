@@ -1,3 +1,5 @@
+import os
+
 import torch
 from loguru import logger
 from torch import Tensor
@@ -102,11 +104,14 @@ class ModelTester:
 
         self.anchor2box = AnchorBoxConverter(cfg, device)
         self.nms = cfg.task.nms
-        self.save_path = save_path
+        self.save_path = save_path if getattr(cfg.task, "save_predict", True) else None
 
     def solve(self, dataloader: StreamDataLoader):
         logger.info("👀 Start Inference!")
 
+        if dataloader.is_stream:
+            import cv2
+            import numpy as np
         try:
             for idx, images in enumerate(dataloader):
                 images = images.to(self.device)
@@ -114,9 +119,20 @@ class ModelTester:
                     raw_output = self.model(images)
                 predict, _ = self.anchor2box(raw_output[0][3:], with_logits=True)
                 nms_out = bbox_nms(predict, self.nms)
-                draw_bboxes(
-                    images[0], nms_out[0], scaled_bbox=False, save_path=self.save_path, save_name=f"frame{idx:03d}.png"
-                )
+                img = draw_bboxes(images[0], nms_out[0], scaled_bbox=False)
+                logger.info(f"img size: {img.shape}")
+                if self.save_path is not None:
+                    save_image_path = os.path.join(self.save_path, f"frame{idx:03d}.png")
+                    img.save(save_image_path)
+                    logger.info(f"💾 Saved visualize image at {save_image_path}")
+
+                if dataloader.is_stream:
+                    img = np.array(img)
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                    cv2.imshow("Result", img)
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
+
         except (KeyboardInterrupt, Exception) as e:
             dataloader.stop_event.set()
             dataloader.stop()

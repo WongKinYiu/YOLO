@@ -116,6 +116,7 @@ class InferenceConfig:
     source: Union[str, int]
     nms: NMSConfig
     fast_inference: Optional[None]
+    save_predict: bool
 
 
 @dataclass
