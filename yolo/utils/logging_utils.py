@@ -56,7 +56,7 @@ class ProgressTracker:
     def start_train(self, num_epochs: int):
         self.task_epoch = self.progress.add_task("[cyan]Epochs  [white]| Loss | Box  | DFL  | BCE  |", total=num_epochs)
 
-    def start_one_epoch(self, num_batches: int, optimizer: Optimizer, epoch_idx: int):
+    def start_one_epoch(self, num_batches: int, optimizer: Optimizer = None, epoch_idx: int = None):
         self.num_batches = num_batches
         if self.use_wandb:
             lr_values = [params["lr"] for params in optimizer.param_groups]
@@ -65,7 +65,10 @@ class ProgressTracker:
                 self.wandb.log({f"Learning Rate/{lr_name}": lr_value}, step=epoch_idx)
         self.batch_task = self.progress.add_task("[green]Batches", total=num_batches)
 
-    def one_batch(self, loss_dict: Dict[str, Tensor]):
+    def one_batch(self, loss_dict: Dict[str, Tensor] = None, mapp=None):
+        if loss_dict is None:
+            self.progress.update(self.batch_task, advance=1, description=f"[green]Batches [white]{mapp:.2%}")
+            return
         if self.use_wandb:
             for loss_name, loss_value in loss_dict.items():
                 self.wandb.log({f"Loss/{loss_name}": loss_value})
