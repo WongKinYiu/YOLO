@@ -35,6 +35,7 @@ RUN apt-get update \
         protobuf-compiler \
         libgl1-mesa-dev \
         graphviz \
+        python-is-python3 \
     && sudo apt clean \
     && sudo rm -rf /var/lib/apt/lists/*
 
