@@ -50,7 +50,7 @@ class ProgressTracker:
         if self.use_wandb:
             wandb.errors.term._log = custom_wandb_log
             self.wandb = wandb.init(
-                project="YOLO", resume="allow", mode="online", dir=save_path, id=None, name=cfg.name
+                project="YOLO", resume="allow", mode="online", dir=save_path, id=None, name=exp_name
             )
 
     def start_train(self, num_epochs: int):
