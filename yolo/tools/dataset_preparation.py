@@ -81,11 +81,11 @@ def prepare_dataset(cfg: DatasetConfig):
                 logger.error(f"Error verifying the {dataset_type} dataset after extraction.")
 
 
-def prepare_weight(downlaod_link: Optional[str] = None, weight_path: str = "v9-c.pt"):
+def prepare_weight(download_link: Optional[str] = None, weight_path: str = "v9-c.pt"):
     weight_name = os.path.basename(weight_path)
-    if downlaod_link is None:
-        downlaod_link = "https://github.com/WongKinYiu/yolov9mit/releases/download/v1.0-alpha/"
-    weight_link = f"{downlaod_link}{weight_name}"
+    if download_link is None:
+        download_link = "https://github.com/WongKinYiu/yolov9mit/releases/download/v1.0-alpha/"
+    weight_link = f"{download_link}{weight_name}"
 
     if not os.path.isdir(os.path.dirname(weight_path)):
         os.makedirs(os.path.dirname(weight_path))
