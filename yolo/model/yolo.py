@@ -134,7 +134,7 @@ def create_model(cfg: Config) -> YOLO:
             logger.info("✅ Success load model weight")
         else:
             logger.info(f"🌐 Weight {cfg.weight} not found, try downloading")
-            prepare_weight(weight_name=cfg.weight)
+            prepare_weight(weight_path=cfg.weight)
 
     log_model_structure(model.model)
     draw_model(model=model)
