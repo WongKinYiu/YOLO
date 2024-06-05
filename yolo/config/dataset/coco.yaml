@@ -1,6 +1,6 @@
 path: data/coco
 train: train2017
-
+validation: val2017
 
 auto_download:
   images:

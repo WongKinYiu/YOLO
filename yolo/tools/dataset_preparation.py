@@ -52,12 +52,12 @@ def check_files(directory, expected_count=None):
     return len(files) == expected_count if expected_count is not None else bool(files)
 
 
-def prepare_dataset(cfg: DatasetConfig):
+def prepare_dataset(dataset_cfg: DatasetConfig):
     """
     Prepares dataset by downloading and unzipping if necessary.
     """
-    data_dir = cfg.path
-    for data_type, settings in cfg.auto_download.items():
+    data_dir = dataset_cfg.path
+    for data_type, settings in dataset_cfg.auto_download.items():
         base_url = settings["base_url"]
         for dataset_type, dataset_args in settings.items():
             if dataset_type == "base_url":

@@ -5,12 +5,12 @@ from torch import Tensor
 # TODO: We may can't use CUDA?
 from torch.cuda.amp import GradScaler, autocast
 
-from yolo.config.config import Config, TrainConfig
+from yolo.config.config import Config, TrainConfig, ValidationConfig
 from yolo.model.yolo import YOLO
-from yolo.tools.data_loader import StreamDataLoader
+from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes
 from yolo.tools.loss_functions import get_loss_function
-from yolo.utils.bounding_box_utils import AnchorBoxConverter, bbox_nms
+from yolo.utils.bounding_box_utils import AnchorBoxConverter, bbox_nms, calculate_map
 from yolo.utils.logging_utils import ProgressTracker
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
@@ -27,7 +27,7 @@ class ModelTrainer:
         self.optimizer = create_optimizer(model, train_cfg.optimizer)
         self.scheduler = create_scheduler(self.optimizer, train_cfg.scheduler)
         self.loss_fn = get_loss_function(cfg)
-        self.progress = ProgressTracker(cfg, save_path, cfg.use_wandb)
+        self.progress = ProgressTracker(cfg.name, save_path, cfg.use_wandb)
         self.num_epochs = cfg.task.epoch
 
         if getattr(train_cfg.ema, "enabled", False):

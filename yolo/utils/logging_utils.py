@@ -39,7 +39,7 @@ def custom_logger(quite: bool = False):
 
 
 class ProgressTracker:
-    def __init__(self, cfg: Config, save_path: str, use_wandb: bool = False):
+    def __init__(self, exp_name: str, save_path: str, use_wandb: bool = False):
         self.progress = Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(bar_width=None),

@@ -75,13 +75,10 @@ class DFLoss(nn.Module):
 class YOLOLoss:
     def __init__(self, cfg: Config) -> None:
         self.reg_max = cfg.model.anchor.reg_max
-        self.class_num = cfg.class_num
+        self.class_num = cfg.model.class_num
         self.image_size = list(cfg.image_size)
         self.strides = cfg.model.anchor.strides
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
-        self.scale_up = torch.tensor(self.image_size * 2, device=device)
 
         self.anchors, self.scaler = generate_anchors(self.image_size, self.strides, device)
 
@@ -90,7 +87,7 @@ class YOLOLoss:
         self.iou = BoxLoss()
 
         self.matcher = BoxMatcher(cfg.task.loss.matcher, self.class_num, self.anchors)
-        self.box_converter = AnchorBoxConverter(cfg, device)
+        self.box_converter = AnchorBoxConverter(cfg.model, self.image_size, device)
 
     def separate_anchor(self, anchors):
         """
@@ -134,7 +131,6 @@ class DualLoss:
         self.cls_rate = cfg.task.loss.objective["BCELoss"]
 
     def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Dict[str, Tensor]]:
-        targets[:, :, 1:] = targets[:, :, 1:] * self.loss.scale_up
 
         # TODO: Need Refactor this region, make it flexible!
         predicts = divide_into_chunks(predicts[0], 2)

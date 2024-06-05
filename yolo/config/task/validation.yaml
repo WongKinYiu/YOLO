@@ -1,0 +1,12 @@
+task: validation
+
+data:
+  batch_size: 16
+  image_size: ${image_size}
+  cpu_num: ${cpu_num}
+  shuffle: False
+  pin_memory: True
+  data_augment: {}
+nms:
+  min_confidence: 0.001
+  min_iou: 0.7

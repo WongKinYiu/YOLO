@@ -7,7 +7,7 @@ from einops import rearrange
 from torch import Tensor
 from torchvision.ops import batched_nms
 
-from yolo.config.config import Config, MatcherConfig, NMSConfig
+from yolo.config.config import MatcherConfig, ModelConfig, NMSConfig
 
 
 def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
@@ -125,14 +125,12 @@ def generate_anchors(image_size: List[int], strides: List[int], device):
 
 
 class AnchorBoxConverter:
-    def __init__(self, cfg: Config, device: torch.device) -> None:
-        self.reg_max = cfg.model.anchor.reg_max
-        self.class_num = cfg.class_num
-        self.image_size = list(cfg.image_size)
-        self.strides = cfg.model.anchor.strides
+    def __init__(self, model_cfg: ModelConfig, image_size: List[int], device: torch.device) -> None:
+        self.reg_max = model_cfg.anchor.reg_max
+        self.class_num = model_cfg.class_num
+        self.strides = model_cfg.anchor.strides
 
-        self.scale_up = torch.tensor(self.image_size * 2, device=device)
-        self.anchors, self.scaler = generate_anchors(self.image_size, self.strides, device)
+        self.anchors, self.scaler = generate_anchors(image_size, self.strides, device)
         self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
 
     def __call__(self, predicts: List[Tensor], with_logits=False) -> Tensor:
@@ -255,7 +253,7 @@ class BoxMatcher:
         """
         predict_cls, predict_bbox = predict.split(self.class_num, dim=-1)  # B, HW x (C B) -> B x HW x C, B x HW x B
         target_cls, target_bbox = target.split([1, 4], dim=-1)  # B x N x (C B) -> B x N x C, B x N x B
-        target_cls = target_cls.long()
+        target_cls = target_cls.long().clamp(0)
 
         # get valid matrix (each gt appear in which anchor grid)
         grid_mask = self.get_valid_matrix(target_bbox)
