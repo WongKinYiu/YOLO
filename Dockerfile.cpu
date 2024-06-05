@@ -36,6 +36,7 @@ RUN apt-get update \
         libgl1-mesa-dev \
         graphviz \
         python-is-python3 \
+        python3-pip \
     && sudo apt clean \
     && sudo rm -rf /var/lib/apt/lists/*
 
@@ -68,14 +69,14 @@ RUN pip install \
 RUN pip install \
         psutil==${PSUTILVER} \
         onnx==${ONNXVER} \
-        onnxruntime=${ONNXRUNTIMEVER} \
+        onnxruntime==${ONNXRUNTIMEVER} \
         onnxsim==${ONNXSIMVER} \
         h5py==${H5PYVER} \
         flatbuffers==${FLATBUFFERSVER} \
         cmake==${CMAKEVER} \
         packaging==${PACKAGINGVER} \
         wheel==${WHEELVER} \
-    && sudo rm /usr/local/bin/cmake
+        cmake==${CMAKEVER}
 
 # Install requirements
 RUN pip install -r /requirements.txt
