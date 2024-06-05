@@ -37,7 +37,7 @@ def draw_bboxes(
     font = ImageFont.load_default(30)
 
     for bbox in bboxes:
-        class_id, x_min, y_min, x_max, y_max = bbox
+        class_id, x_min, y_min, x_max, y_max, *conf = bbox
         if scaled_bbox:
             x_min = x_min * width
             x_max = x_max * width

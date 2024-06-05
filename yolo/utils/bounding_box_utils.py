@@ -297,6 +297,7 @@ def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
     cls_val, cls_idx = cls_dist.max(dim=-1, keepdim=True)
     valid_mask = cls_val > nms_cfg.min_confidence
     valid_cls = cls_idx[valid_mask].float()
+    valid_con = cls_val[valid_mask].float()
     valid_box = bbox[valid_mask.repeat(1, 1, 4)].view(-1, 4)
 
     batch_idx, *_ = torch.where(valid_mask)
@@ -305,7 +306,52 @@ def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
     for idx in range(predicts.size(0)):
         instance_idx = nms_idx[idx == batch_idx[nms_idx]]
 
-        predict_nms = torch.cat([valid_cls[instance_idx][:, None], valid_box[instance_idx]], dim=-1)
+        predict_nms = torch.cat(
+            [valid_cls[instance_idx][:, None], valid_con[instance_idx][:, None], valid_box[instance_idx]], dim=-1
+        )
 
         predicts_nms.append(predict_nms)
     return predicts_nms
+
+
+def calculate_map(predictions, ground_truths, iou_thresholds):
+    # TODO: Refactor this block
+    device = predictions.device
+    n_preds = predictions.size(0)
+    n_gts = (ground_truths[:, 0] != -1).sum()
+    ground_truths = ground_truths[:n_gts]
+    aps = []
+
+    ious = calculate_iou(predictions[:, 2:], ground_truths[:, 1:])  # [n_preds, n_gts]
+
+    for threshold in iou_thresholds:
+        tp = torch.zeros(n_preds, device=device)
+        fp = torch.zeros(n_preds, device=device)
+
+        max_iou, max_indices = torch.max(ious, dim=1)
+        above_threshold = max_iou >= threshold
+        matched_classes = predictions[:, 0] == ground_truths[max_indices, 0]
+        tp[above_threshold & matched_classes] = 1
+        fp[above_threshold & ~matched_classes] = 1
+        fp[max_iou < threshold] = 1
+
+        _, indices = torch.sort(predictions[:, 1], descending=True)
+        tp = tp[indices]
+        fp = fp[indices]
+
+        tp_cumsum = torch.cumsum(tp, dim=0)
+        fp_cumsum = torch.cumsum(fp, dim=0)
+
+        precision = tp_cumsum / (tp_cumsum + fp_cumsum + 1e-6)
+        recall = tp_cumsum / (n_gts + 1e-6)
+
+        recall_thresholds = torch.arange(0, 1, 0.1)
+        precision_at_recall = torch.zeros_like(recall_thresholds)
+        for i, r in enumerate(recall_thresholds):
+            precision_at_recall[i] = precision[recall >= r].max().item() if torch.any(recall >= r) else 0
+
+        ap = precision_at_recall.mean()
+        aps.append(ap)
+
+    mean_ap = torch.mean(torch.stack(aps))
+    return mean_ap, aps

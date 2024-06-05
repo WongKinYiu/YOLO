@@ -30,6 +30,12 @@ class ModelTrainer:
         self.progress = ProgressTracker(cfg.name, save_path, cfg.use_wandb)
         self.num_epochs = cfg.task.epoch
 
+        validation_dataloader = create_dataloader(cfg.task.validation.data, cfg.dataset, cfg.task.validation.task)
+        anchor2box = AnchorBoxConverter(cfg.model, cfg.image_size, device)
+        self.validator = ModelValidator(
+            cfg.task.validation, model, save_path, device, self.progress, anchor2box, validation_dataloader
+        )
+
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
         else:
@@ -89,9 +95,7 @@ class ModelTrainer:
                 epoch_loss = self.train_one_epoch(dataloader)
                 self.progress.finish_one_epoch()
 
-                logger.info(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}")
-                if (epoch + 1) % 5 == 0:
-                    self.save_checkpoint(epoch, f"checkpoint_epoch_{epoch+1}.pth")
+                self.validator.solve()
 
 
 class ModelTester:
@@ -100,7 +104,7 @@ class ModelTester:
         self.device = device
         self.progress = ProgressTracker(cfg, save_path, cfg.use_wandb)
 
-        self.anchor2box = AnchorBoxConverter(cfg, device)
+        self.anchor2box = AnchorBoxConverter(cfg.model, cfg.image_size, device)
         self.nms = cfg.task.nms
         self.save_path = save_path
 
@@ -125,3 +129,45 @@ class ModelTester:
             else:
                 raise e
         dataloader.stop()
+
+
+class ModelValidator:
+    def __init__(
+        self,
+        validation_cfg: ValidationConfig,
+        model: YOLO,
+        save_path: str,
+        device,
+        progress: ProgressTracker,
+        anchor2box,
+        validation_dataloader,
+    ):
+        self.model = model
+        self.device = device
+        self.progress = progress
+        self.save_path = save_path
+
+        self.anchor2box = anchor2box
+        self.nms = validation_cfg.nms
+        self.validdataloader = validation_dataloader
+
+    def solve(self):
+        # logger.info("🧪 Start Validation!")
+        self.model.eval()
+
+        iou_thresholds = torch.arange(0.5, 1.0, 0.05)
+        map_all = []
+        self.progress.start_one_epoch(len(self.validdataloader))
+        for data, targets in self.validdataloader:
+            data, targets = data.to(self.device), targets.to(self.device)
+            with torch.no_grad():
+                raw_output = self.model(data)
+            predict, _ = self.anchor2box(raw_output[0][3:], with_logits=True)
+
+            nms_out = bbox_nms(predict, self.nms)
+            for idx, predict in enumerate(nms_out):
+                map_value = calculate_map(predict, targets[idx], iou_thresholds)
+                map_all.append(map_value[0])
+            self.progress.one_batch(mapp=torch.Tensor(map_all).mean())
+
+        self.progress.finish_one_epoch()
