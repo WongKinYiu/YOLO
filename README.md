@@ -32,7 +32,7 @@ cd yolov9mit
   ```
 - Docker with CUDA/TensorRT
   ```shell
-  docker build -t yolov9mit:latest -f Dockerfile.gpu
+  docker build -t yolov9mit:latest -f Dockerfile.gpu .
   docker run \
   --rm \
   -it \
@@ -43,7 +43,7 @@ cd yolov9mit
   ```
 - Docker with CPU
   ```shell
-  docker build -t yolov9mit:latest -f Dockerfile.cpu
+  docker build -t yolov9mit:latest -f Dockerfile.cpu .
   docker run \
   --rm \
   -it \
