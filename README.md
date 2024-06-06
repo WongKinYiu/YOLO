@@ -23,8 +23,8 @@ $yolo task=inference task.source=0 # source could be a single file, video, image
 ## Installation
 To get started with YOLOv9, clone this repository and install the required dependencies:
 ```shell
-git clone git@github.com:WongKinYiu/yolov9mit.git
-cd yolov9mit
+git clone git@github.com:WongKinYiu/yolo.git
+cd yolo
 ```
 - HostPC
   ```shell
@@ -32,24 +32,24 @@ cd yolov9mit
   ```
 - Docker with CUDA/TensorRT
   ```shell
-  docker build -t yolov9mit:latest -f Dockerfile.gpu .
+  docker build -t yolo:latest -f Dockerfile.gpu .
   docker run \
   --rm \
   -it \
   --gpus all \
   -v `pwd`:/home/user/workdir \
   -w /home/user/workdir \
-  yolov9mit:latest
+  yolo:latest
   ```
 - Docker with CPU
   ```shell
-  docker build -t yolov9mit:latest -f Dockerfile.cpu .
+  docker build -t yolo:latest -f Dockerfile.cpu .
   docker run \
   --rm \
   -it \
   -v `pwd`:/home/user/workdir \
   -w /home/user/workdir \
-  yolov9mit:latest
+  yolo:latest
   ```
 
 ## Features
