@@ -7,7 +7,7 @@ To facilitate easy customization of the YOLO model, we've structured the codebas
 You can change the model architecture simply by modifying the YAML configuration file. Here's how:
 
 1. **Modify Architecture in Config:**
-   
+
    Navigate to your model's configuration file (typically formate like `yolo/config/model/v9-c.yaml`).
    - Adjust the architecture settings under the `architecture` section. Ensure that every module you reference exists in `module.py`, or refer to the next section on how to add new modules.
 
@@ -40,7 +40,7 @@ To add or modify a block in the model:
 1. **Create a New Module:**
 
    Define a new class in `module.py` that inherits from `nn.Module`.
-   
+
    The constructor should accept `in_channels` as a parameter. Make sure to calculate `out_channels` based on your model's requirements or configure it through the YAML file using `args`.
 
     ```python
@@ -49,7 +49,7 @@ To add or modify a block in the model:
             super().__init__()
             self.module = # conv, bool, ...
         def forward(self, x):
-            return self.module(x) 
+            return self.module(x)
     ```
 
 2. **Reference in Config:**
