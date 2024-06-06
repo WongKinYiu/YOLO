@@ -140,6 +140,7 @@ class Config:
     cpu_num: int
 
     class_num: int
+    class_list: List[str]
     image_size: List[int]
 
     out_path: str

@@ -106,6 +106,7 @@ class ModelTester:
 
         self.anchor2box = AnchorBoxConverter(cfg.model, cfg.image_size, device)
         self.nms = cfg.task.nms
+        self.idx2label = cfg.class_list
         self.save_path = save_path
 
     def solve(self, dataloader: StreamDataLoader):
@@ -119,7 +120,12 @@ class ModelTester:
                 predict, _ = self.anchor2box(raw_output[0][3:], with_logits=True)
                 nms_out = bbox_nms(predict, self.nms)
                 draw_bboxes(
-                    images[0], nms_out[0], scaled_bbox=False, save_path=self.save_path, save_name=f"frame{idx:03d}.png"
+                    images[0],
+                    nms_out[0],
+                    scaled_bbox=False,
+                    save_path=self.save_path,
+                    save_name=f"frame{idx:03d}.png",
+                    idx2label=self.idx2label,
                 )
         except (KeyboardInterrupt, Exception) as e:
             dataloader.stop_event.set()

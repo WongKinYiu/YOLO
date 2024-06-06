@@ -307,7 +307,7 @@ def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
         instance_idx = nms_idx[idx == batch_idx[nms_idx]]
 
         predict_nms = torch.cat(
-            [valid_cls[instance_idx][:, None], valid_con[instance_idx][:, None], valid_box[instance_idx]], dim=-1
+            [valid_cls[instance_idx][:, None], valid_box[instance_idx], valid_con[instance_idx][:, None]], dim=-1
         )
 
         predicts_nms.append(predict_nms)
@@ -322,7 +322,7 @@ def calculate_map(predictions, ground_truths, iou_thresholds):
     ground_truths = ground_truths[:n_gts]
     aps = []
 
-    ious = calculate_iou(predictions[:, 2:], ground_truths[:, 1:])  # [n_preds, n_gts]
+    ious = calculate_iou(predictions[:, 1:-1], ground_truths[:, 1:])  # [n_preds, n_gts]
 
     for threshold in iou_thresholds:
         tp = torch.zeros(n_preds, device=device)

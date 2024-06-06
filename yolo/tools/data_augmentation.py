@@ -9,7 +9,7 @@ class AugmentationComposer:
 
     def __init__(self, transforms, image_size: int = 640):
         self.transforms = transforms
-        self.image_size = image_size
+        self.image_size = image_size[0]
         self.pad_resize = PadAndResize(self.image_size)
 
         for transform in self.transforms:
