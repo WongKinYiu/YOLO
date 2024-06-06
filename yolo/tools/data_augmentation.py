@@ -21,6 +21,7 @@ class AugmentationComposer:
         for transform in self.transforms:
             image, boxes = transform(image, boxes)
         image, boxes = self.pad_resize(image, boxes)
+        image = TF.to_tensor(image)
         return image, boxes
 
 
