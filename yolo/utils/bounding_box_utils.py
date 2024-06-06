@@ -106,60 +106,22 @@ def transform_bbox(bbox: Tensor, indicator="xywh -> xyxy"):
     return bbox.to(dtype=data_type)
 
 
-def generate_anchors(image_size: List[int], strides: List[int], device):
+def generate_anchors(image_size: List[int], strides: List[int]):
     W, H = image_size
     anchors = []
     scaler = []
     for stride in strides:
         anchor_num = W // stride * H // stride
-        scaler.append(torch.full((anchor_num,), stride, device=device))
+        scaler.append(torch.full((anchor_num,), stride))
         shift = stride // 2
-        x = torch.arange(0, W, stride, device=device) + shift
-        y = torch.arange(0, H, stride, device=device) + shift
+        x = torch.arange(0, W, stride) + shift
+        y = torch.arange(0, H, stride) + shift
         anchor_x, anchor_y = torch.meshgrid(x, y, indexing="ij")
         anchor = torch.stack([anchor_y.flatten(), anchor_x.flatten()], dim=-1)
         anchors.append(anchor)
     all_anchors = torch.cat(anchors, dim=0)
     all_scalers = torch.cat(scaler, dim=0)
     return all_anchors, all_scalers
-
-
-class AnchorBoxConverter:
-    def __init__(self, model_cfg: ModelConfig, image_size: List[int], device: torch.device) -> None:
-        self.reg_max = model_cfg.anchor.reg_max
-        self.class_num = model_cfg.class_num
-        self.strides = model_cfg.anchor.strides
-
-        self.anchors, self.scaler = generate_anchors(image_size, self.strides, device)
-        self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
-
-    def __call__(self, predicts: List[Tensor], with_logits=False) -> Tensor:
-        """
-        args:
-            [B x AnchorClass x h1 x w1, B x AnchorClass x h2 x w2, B x AnchorClass x h3 x w3] // AnchorClass = 4 * 16 + 80
-        return:
-            [B x HW x ClassBbox] // HW = h1*w1 + h2*w2 + h3*w3, ClassBox = 80 + 4 (xyXY)
-        """
-        preds = []
-        for pred in predicts:
-            preds.append(rearrange(pred, "B AC h w -> B (h w) AC"))  # B x AC x h x w-> B x hw x AC
-        preds = torch.concat(preds, dim=1)  # -> B x (H W) x AC
-
-        preds_anc, preds_cls = torch.split(preds, (self.reg_max * 4, self.class_num), dim=-1)
-        preds_anc = rearrange(preds_anc, "B  hw (P R)-> B hw P R", P=4)
-        if with_logits:
-            preds_cls = preds_cls.sigmoid()
-
-        pred_LTRB = preds_anc.softmax(dim=-1) @ self.reverse_reg * self.scaler.view(1, -1, 1)
-
-        lt, rb = pred_LTRB.chunk(2, dim=-1)
-        pred_minXY = self.anchors - lt
-        pred_maxXY = self.anchors + rb
-        preds_box = torch.cat([pred_minXY, pred_maxXY], dim=-1)
-
-        predicts = torch.cat([preds_cls, preds_box], dim=-1)
-
-        return predicts, preds_anc
 
 
 class BoxMatcher:
@@ -291,7 +253,8 @@ class BoxMatcher:
 
 def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
     # TODO change function to class or set 80 to class_num instead of a number
-    cls_dist, bbox = predicts.split([80, 4], dim=-1)
+    cls_dist, bbox = torch.split(predicts, [80, 4], dim=-1)
+    cls_dist = cls_dist.sigmoid()
 
     # filter class by confidence
     cls_val, cls_idx = cls_dist.max(dim=-1, keepdim=True)

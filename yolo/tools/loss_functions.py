@@ -8,12 +8,7 @@ from torch import Tensor, nn
 from torch.nn import BCEWithLogitsLoss
 
 from yolo.config.config import Config
-from yolo.utils.bounding_box_utils import (
-    AnchorBoxConverter,
-    BoxMatcher,
-    calculate_iou,
-    generate_anchors,
-)
+from yolo.utils.bounding_box_utils import BoxMatcher, calculate_iou, generate_anchors
 from yolo.utils.module_utils import divide_into_chunks
 
 
@@ -80,14 +75,15 @@ class YOLOLoss:
         self.strides = cfg.model.anchor.strides
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.anchors, self.scaler = generate_anchors(self.image_size, self.strides, device)
+        self.anchors, self.scaler = generate_anchors(self.image_size, self.strides)
+        self.anchors = self.anchors.to(device)
+        self.scaler = self.scaler.to(device)
 
         self.cls = BCELoss()
         self.dfl = DFLoss(self.anchors, self.scaler, self.reg_max)
         self.iou = BoxLoss()
 
         self.matcher = BoxMatcher(cfg.task.loss.matcher, self.class_num, self.anchors)
-        self.box_converter = AnchorBoxConverter(cfg.model, self.image_size, device)
 
     def separate_anchor(self, anchors):
         """
@@ -97,16 +93,17 @@ class YOLOLoss:
         anchors_box = anchors_box / self.scaler[None, :, None]
         return anchors_cls, anchors_box
 
-    def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+    def __call__(
+        self, predicts_box: List[Tensor], predicts_anc: Tensor, targets: Tensor
+    ) -> Tuple[Tensor, Tensor, Tensor]:
         # Batch_Size x (Anchor + Class) x H x W
         # TODO: check datatype, why targets has a little bit error with origin version
-        predicts, predicts_anc = self.box_converter(predicts)
 
         # For each predicted targets, assign a best suitable ground truth box.
-        align_targets, valid_masks = self.matcher(targets, predicts)
+        align_targets, valid_masks = self.matcher(targets, predicts_box)
 
         targets_cls, targets_bbox = self.separate_anchor(align_targets)
-        predicts_cls, predicts_bbox = self.separate_anchor(predicts)
+        predicts_cls, predicts_bbox = self.separate_anchor(predicts_box)
 
         cls_norm = targets_cls.sum()
         box_norm = targets_cls.sum(-1)[valid_masks]
@@ -133,9 +130,8 @@ class DualLoss:
     def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Dict[str, Tensor]]:
 
         # TODO: Need Refactor this region, make it flexible!
-        predicts = divide_into_chunks(predicts[0], 2)
-        aux_iou, aux_dfl, aux_cls = self.loss(predicts[0], targets)
-        main_iou, main_dfl, main_cls = self.loss(predicts[1], targets)
+        aux_iou, aux_dfl, aux_cls = self.loss(*predicts[0], targets)
+        main_iou, main_dfl, main_cls = self.loss(*predicts[1], targets)
 
         loss_dict = {
             "BoxLoss": self.iou_rate * (aux_iou * self.aux_rate + main_iou),

@@ -17,13 +17,15 @@ def convert_weight(old_state_dict, new_state_dict, model_size: int = 38):
                     continue
                 _, _, conv_name, conv_idx, *details = weight_name.split(".")
                 if conv_name == "cv4" or conv_name == "cv5":
-                    conv_idx = str(int(conv_idx) + 3)
+                    layer_idx = 39
+                else:
+                    layer_idx = 37
 
                 if conv_name == "cv2" or conv_name == "cv4":
                     conv_task = "anchor_conv"
                 if conv_name == "cv3" or conv_name == "cv5":
                     conv_task = "class_conv"
 
-                weight_name = ".".join(["37", "heads", conv_idx, conv_task, *details])
+                weight_name = ".".join([str(layer_idx), "heads", conv_idx, conv_task, *details])
                 new_state_dict[weight_name] = weight_value
     return new_state_dict

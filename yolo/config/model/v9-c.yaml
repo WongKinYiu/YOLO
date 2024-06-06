@@ -121,5 +121,24 @@ model:
         tags: A5
 
     - MultiheadDetection:
-        source: [A3, A4, A5, P3, P4, P5]
+        source: [A3, A4, A5]
+        tags: aux_head
+    - Anchor2Box:
+        source: aux_head
         output: True
+        args: 
+            reg_max: ${model.anchor.reg_max}
+            strides: ${model.anchor.strides}
+        tags: aux_bbox
+
+  detection:
+    - MultiheadDetection:
+        source: [P3, P4, P5]
+        tags: reg_head
+    - Anchor2Box:
+        source: reg_head
+        output: True
+        args: 
+            reg_max: ${model.anchor.reg_max}
+            strides: ${model.anchor.strides}
+        tags: reg_bbox

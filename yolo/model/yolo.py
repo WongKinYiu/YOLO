@@ -130,7 +130,7 @@ def create_model(cfg: Config) -> YOLO:
     logger.info("✅ Success load model")
     if cfg.weight:
         if os.path.exists(cfg.weight):
-            model.model.load_state_dict(torch.load(cfg.weight))
+            model.model.load_state_dict(torch.load(cfg.weight), strict=False)
             logger.info("✅ Success load model weight")
         else:
             logger.info(f"🌐 Weight {cfg.weight} not found, try downloading")

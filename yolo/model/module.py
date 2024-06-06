@@ -2,10 +2,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
+from einops import rearrange
 from loguru import logger
 from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
 
+from yolo.utils.bounding_box_utils import generate_anchors
 from yolo.utils.module_utils import auto_pad, create_activation_function, round_up
 
 
@@ -56,7 +58,6 @@ class Detection(nn.Module):
         anchor_channels = 4 * reg_max
 
         first_neck, in_channels = in_channels
-        # TODO: round up head[0] channels or each head?
         anchor_neck = max(round_up(first_neck // 4, groups), anchor_channels, 16)
         class_neck = max(first_neck, min(num_classes * 2, 128))
 
@@ -83,16 +84,48 @@ class MultiheadDetection(nn.Module):
 
     def __init__(self, in_channels: List[int], num_classes: int, **head_kwargs):
         super().__init__()
-        # TODO: Refactor these parts
         self.heads = nn.ModuleList(
-            [
-                Detection((in_channels[3 * (idx // 3)], in_channel), num_classes, **head_kwargs)
-                for idx, in_channel in enumerate(in_channels)
-            ]
+            [Detection((in_channels[0], in_channel), num_classes, **head_kwargs) for in_channel in in_channels]
         )
 
     def forward(self, x_list: List[torch.Tensor]) -> List[torch.Tensor]:
         return [head(x) for x, head in zip(x_list, self.heads)]
+
+
+class Anchor2Box(nn.Module):
+    def __init__(self, reg_max, strides) -> None:
+        super().__init__()
+        self.reg_max = reg_max
+        self.strides = strides
+        # TODO: read by cfg!
+        image_size = [640, 640]
+        self.class_num = 80
+        self.anchors, self.scaler = generate_anchors(image_size, self.strides)
+        reverse_reg = torch.arange(self.reg_max, dtype=torch.float32)
+        self.reverse_reg = nn.Parameter(reverse_reg, requires_grad=False)
+        self.anchors = nn.Parameter(self.anchors, requires_grad=False)
+        self.scaler = nn.Parameter(self.scaler, requires_grad=False)
+
+    def forward(self, predicts: List[Tensor]) -> Tensor:
+        """
+        args:
+            [B x AnchorClass x h1 x w1, B x AnchorClass x h2 x w2, B x AnchorClass x h3 x w3] // AnchorClass = 4 * 16 + 80
+        return:
+            [B x HW x ClassBbox] // HW = h1*w1 + h2*w2 + h3*w3, ClassBox = 80 + 4 (xyXY)
+        """
+        preds = []
+        for pred in predicts:
+            preds.append(rearrange(pred, "B AC h w -> B (h w) AC"))  # B x AC x h x w-> B x hw x AC
+        preds = torch.concat(preds, dim=1)  # -> B x (H W) x AC
+        preds_anc, preds_cls = torch.split(preds, (self.reg_max * 4, self.class_num), dim=-1)
+        preds_anc = rearrange(preds_anc, "B  hw (P R)-> B hw P R", P=4)
+
+        pred_LTRB = preds_anc.softmax(dim=-1) @ self.reverse_reg * self.scaler.view(1, -1, 1)
+
+        lt, rb = pred_LTRB.chunk(2, dim=-1)
+        preds_box = torch.cat([self.anchors - lt, self.anchors + rb], dim=-1)
+        predicts = torch.cat([preds_cls, preds_box], dim=-1)
+        return predicts, preds_anc
 
 
 # ----------- Backbone Class ----------- #
