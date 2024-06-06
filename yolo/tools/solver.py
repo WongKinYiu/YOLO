@@ -117,7 +117,6 @@ class ModelTester:
                 draw_bboxes(
                     images[0],
                     nms_out[0],
-                    scaled_bbox=False,
                     save_path=self.save_path,
                     save_name=f"frame{idx:03d}.png",
                     idx2label=self.idx2label,
