@@ -7,7 +7,7 @@ from torchvision.transforms import functional as TF
 class AugmentationComposer:
     """Composes several transforms together."""
 
-    def __init__(self, transforms, image_size: int = 640):
+    def __init__(self, transforms, image_size: int = [640, 640]):
         self.transforms = transforms
         self.image_size = image_size[0]
         self.pad_resize = PadAndResize(self.image_size)
