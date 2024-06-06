@@ -116,7 +116,7 @@ class YOLO(nn.Module):
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
 
-def create_model(cfg: Config) -> YOLO:
+def create_model(model_cfg: ModelConfig, weight_path: str) -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
 
     Args:
@@ -125,16 +125,16 @@ def create_model(cfg: Config) -> YOLO:
     Returns:
         YOLO: An instance of the model defined by the given configuration.
     """
-    OmegaConf.set_struct(cfg.model, False)
-    model = YOLO(cfg.model)
+    OmegaConf.set_struct(model_cfg, False)
+    model = YOLO(model_cfg)
     logger.info("✅ Success load model")
-    if cfg.weight:
-        if os.path.exists(cfg.weight):
-            model.model.load_state_dict(torch.load(cfg.weight), strict=False)
+    if weight_path:
+        if os.path.exists(weight_path):
+            model.model.load_state_dict(torch.load(weight_path), strict=False)
             logger.info("✅ Success load model weight")
         else:
-            logger.info(f"🌐 Weight {cfg.weight} not found, try downloading")
-            prepare_weight(weight_path=cfg.weight)
+            logger.info(f"🌐 Weight {weight_path} not found, try downloading")
+            prepare_weight(weight_path=weight_path)
 
     log_model_structure(model.model)
     draw_model(model=model)

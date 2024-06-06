@@ -25,7 +25,7 @@ def main(cfg: Config):
         model = FastModelLoader(cfg).load_model()
         device = torch.device(cfg.device)
     else:
-        model = create_model(cfg).to(device)
+        model = create_model(cfg.model, cfg.weight).to(device)
 
     if cfg.task.task == "train":
         trainer = ModelTrainer(cfg, model, save_path, device)
