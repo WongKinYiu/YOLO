@@ -70,7 +70,7 @@ class DFLoss(nn.Module):
 class YOLOLoss:
     def __init__(self, cfg: Config) -> None:
         self.reg_max = cfg.model.anchor.reg_max
-        self.class_num = cfg.model.class_num
+        self.class_num = cfg.class_num
         self.image_size = list(cfg.image_size)
         self.strides = cfg.model.anchor.strides
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

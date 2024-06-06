@@ -25,7 +25,6 @@ class BlockConfig:
 @dataclass
 class ModelConfig:
     anchor: AnchorConfig
-    class_num: int
     model: Dict[str, BlockConfig]
 
 

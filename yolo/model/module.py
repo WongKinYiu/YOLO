@@ -93,13 +93,13 @@ class MultiheadDetection(nn.Module):
 
 
 class Anchor2Box(nn.Module):
-    def __init__(self, reg_max, strides) -> None:
+    def __init__(self, reg_max, strides, num_classes: int) -> None:
         super().__init__()
         self.reg_max = reg_max
         self.strides = strides
         # TODO: read by cfg!
         image_size = [640, 640]
-        self.class_num = 80
+        self.num_classes = num_classes
         self.anchors, self.scaler = generate_anchors(image_size, self.strides)
         reverse_reg = torch.arange(self.reg_max, dtype=torch.float32)
         self.reverse_reg = nn.Parameter(reverse_reg, requires_grad=False)
@@ -117,7 +117,7 @@ class Anchor2Box(nn.Module):
         for pred in predicts:
             preds.append(rearrange(pred, "B AC h w -> B (h w) AC"))  # B x AC x h x w-> B x hw x AC
         preds = torch.concat(preds, dim=1)  # -> B x (H W) x AC
-        preds_anc, preds_cls = torch.split(preds, (self.reg_max * 4, self.class_num), dim=-1)
+        preds_anc, preds_cls = torch.split(preds, (self.reg_max * 4, self.num_classes), dim=-1)
         preds_anc = rearrange(preds_anc, "B  hw (P R)-> B hw P R", P=4)
 
         pred_LTRB = preds_anc.softmax(dim=-1) @ self.reverse_reg * self.scaler.view(1, -1, 1)

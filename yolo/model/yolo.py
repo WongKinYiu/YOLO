@@ -22,9 +22,9 @@ class YOLO(nn.Module):
                    parameters, and any other relevant configuration details.
     """
 
-    def __init__(self, model_cfg: ModelConfig):
+    def __init__(self, model_cfg: ModelConfig, class_num: int = 80):
         super(YOLO, self).__init__()
-        self.num_classes = model_cfg.class_num
+        self.num_classes = class_num
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
         self.model: List[YOLOLayer] = nn.ModuleList()
         self.build_model(model_cfg.model)
@@ -47,6 +47,7 @@ class YOLO(nn.Module):
                     layer_args["in_channels"] = output_dim[source]
                 if "Detection" in layer_type:
                     layer_args["in_channels"] = [output_dim[idx] for idx in source]
+                if "Detection" in layer_type or "Anchor2Box" in layer_type:
                     layer_args["num_classes"] = self.num_classes
 
                 # create layers
@@ -116,7 +117,7 @@ class YOLO(nn.Module):
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
 
-def create_model(model_cfg: ModelConfig, weight_path: str) -> YOLO:
+def create_model(model_cfg: ModelConfig, class_num: int = 80, weight_path: str = "weights/v9-c.pt") -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
 
     Args:
@@ -126,7 +127,7 @@ def create_model(model_cfg: ModelConfig, weight_path: str) -> YOLO:
         YOLO: An instance of the model defined by the given configuration.
     """
     OmegaConf.set_struct(model_cfg, False)
-    model = YOLO(model_cfg)
+    model = YOLO(model_cfg, class_num)
     logger.info("✅ Success load model")
     if weight_path:
         if os.path.exists(weight_path):
