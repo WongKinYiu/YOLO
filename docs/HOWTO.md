@@ -138,10 +138,10 @@ Custom transformations should be designed to accept an image and its bounding bo
         - `func` draw_bboxes: given a image and list of bbox, draw bbox on the image
         - `func` draw_model: visualize the given model
     - **get_dataset**
-        - `func` download_file: for a given link, downlaod the file
-        - `func` unzip_file: unzip the downlaoded zip to data/
+        - `func` download_file: for a given link, download the file
+        - `func` unzip_file: unzip the downloaded zip to data/
         - `func` check_files: check if the dataset file numbers is correct
-        - `func` prepare_dataset: automatic downlaod the dataset and check if it is correct
+        - `func` prepare_dataset: automatic download the dataset and check if it is correct
     - **loss**
         - `class` BoxLoss: a Custom Loss for bounding box
         - `class` YOLOLoss: a implementation of yolov9 loss

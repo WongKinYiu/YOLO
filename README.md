@@ -55,14 +55,14 @@ python lazy.py task=train task.batch_size=8 model=v9-c
 ### Transfer Learning
 To perform transfer learning with YOLOv9:
 ```shell
-python lazy.py task=train task.batch_size=8 model=v9-c task.dataset={dataset_config}
+python lazy.py task=train task.batch_size=8 model=v9-c task.data.dataset={dataset_config}
 ```
 
 ### Inference
 To evaluate the model performance, use:
 ```shell
 python lazy.py weights=v9-c.pt # if cloned from GitHub
-yolo task=inference task.source={Any} # if pip installed
+yolo task=inference task.data.source={Any} # if pip installed
 ```
 
 ### Validation [WIP]
