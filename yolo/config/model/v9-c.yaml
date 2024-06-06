@@ -13,7 +13,7 @@ model:
         args: {out_channels: 128, kernel_size: 3, stride: 2}
     - RepNCSPELAN:
         args: {out_channels: 256, part_channels: 128}
-    
+
     - ADown:
         args: {out_channels: 256}
     - RepNCSPELAN:
@@ -25,13 +25,13 @@ model:
     - RepNCSPELAN:
         args: {out_channels: 512, part_channels: 512}
         tags: B4
-    
+
     - ADown:
         args: {out_channels: 512}
     - RepNCSPELAN:
         args: {out_channels: 512, part_channels: 512}
         tags: B5
-  
+
   neck:
     - SPPELAN:
         args: {out_channels: 512}
@@ -49,12 +49,12 @@ model:
         args: {scale_factor: 2, mode: nearest}
     - Concat:
         source: [-1, B3]
-    
+
   head:
     - RepNCSPELAN:
         args: {out_channels: 256, part_channels: 256}
         tags: P3
-    
+
     - ADown:
         args: {out_channels: 256}
     - Concat:
@@ -70,7 +70,7 @@ model:
     - RepNCSPELAN:
         args: {out_channels: 512, part_channels: 512}
         tags: P5
-  
+
   auxiliary:
     - CBLinear:
         source: B3
@@ -84,7 +84,7 @@ model:
         source: B5
         args: {out_channels: [256, 512, 512]}
         tags: R5
-    
+
     - Conv:
         args: {out_channels: 64, kernel_size: 3, stride: 2}
         source: 0
@@ -126,7 +126,7 @@ model:
     - Anchor2Box:
         source: aux_head
         output: True
-        args: 
+        args:
             reg_max: ${model.anchor.reg_max}
             strides: ${model.anchor.strides}
         tags: aux_bbox
@@ -138,7 +138,7 @@ model:
     - Anchor2Box:
         source: reg_head
         output: True
-        args: 
+        args:
             reg_max: ${model.anchor.reg_max}
             strides: ${model.anchor.strides}
         tags: reg_bbox

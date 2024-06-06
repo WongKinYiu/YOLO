@@ -2,4 +2,4 @@ path: data/dev
 train: train
 validation: test
 
-auto_download: 
+auto_download:
