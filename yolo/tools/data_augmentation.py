@@ -9,6 +9,7 @@ class AugmentationComposer:
 
     def __init__(self, transforms, image_size: int = [640, 640]):
         self.transforms = transforms
+        # TODO: handle List of image_size [640, 640]
         self.image_size = image_size[0]
         self.pad_resize = PadAndResize(self.image_size)
 
@@ -38,10 +39,10 @@ class PadAndResize:
 
         resized_img = square_img.resize((self.image_size, self.image_size))
 
-        boxes[:, 1] = (boxes[:, 1] + left) * scale
-        boxes[:, 2] = (boxes[:, 2] + top) * scale
-        boxes[:, 3] = (boxes[:, 3] + left) * scale
-        boxes[:, 4] = (boxes[:, 4] + top) * scale
+        boxes[:, 1] = (boxes[:, 1] * image.width + left) / self.image_size * scale
+        boxes[:, 2] = (boxes[:, 2] * image.height + top) / self.image_size * scale
+        boxes[:, 3] = (boxes[:, 3] * image.width + left) / self.image_size * scale
+        boxes[:, 4] = (boxes[:, 4] * image.height + top) / self.image_size * scale
 
         return resized_img, boxes
 
