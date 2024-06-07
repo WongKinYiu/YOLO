@@ -130,12 +130,11 @@ def create_model(model_cfg: ModelConfig, class_num: int = 80, weight_path: str =
     model = YOLO(model_cfg, class_num)
     logger.info("✅ Success load model")
     if weight_path:
-        if os.path.exists(weight_path):
-            model.model.load_state_dict(torch.load(weight_path))
-            logger.info("✅ Success load model weight")
-        else:
+        if not os.path.exists(weight_path):
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")
             prepare_weight(weight_path=weight_path)
+        model.model.load_state_dict(torch.load(weight_path))
+        logger.info("✅ Success load model weight")
 
     log_model_structure(model.model)
     draw_model(model=model)

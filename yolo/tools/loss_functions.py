@@ -13,6 +13,7 @@ from yolo.utils.bounding_box_utils import BoxMatcher, Vec2Box, calculate_iou
 class BCELoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
+        # TODO: Refactor the device, should be assign by config
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.bce = BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=device), reduction="none")
 
