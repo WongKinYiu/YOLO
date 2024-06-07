@@ -44,10 +44,10 @@ def draw_bboxes(
         bbox = [(x_min, y_min), (x_max, y_max)]
 
         random.seed(int(class_id))
-        color_map = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        color_map = (random.randint(0, 200), random.randint(0, 200), random.randint(0, 200))
 
-        draw.rounded_rectangle(bbox, outline=(*color_map, 170), radius=5)
-        draw.rounded_rectangle(bbox, fill=(*color_map, 50), radius=5)
+        draw.rounded_rectangle(bbox, outline=(*color_map, 200), radius=5, width=2)
+        draw.rounded_rectangle(bbox, fill=(*color_map, 100), radius=5)
 
         class_text = str(idx2label[int(class_id)] if idx2label else class_id)
         label_text = f"{class_text}" + (f" {conf[0]: .0%}" if conf else "")
