@@ -1,4 +1,7 @@
-from typing import List, Union
+import os
+import random
+from typing import List, Optional, Union
+
 
 import numpy as np
 import torch
@@ -8,7 +11,13 @@ from torchvision.transforms.functional import to_pil_image
 
 
 def draw_bboxes(
-    img: Union[Image.Image, torch.Tensor], bboxes: List[List[Union[int, float]]], *, scaled_bbox: bool = True
+    img: Union[Image.Image, torch.Tensor],
+    bboxes: List[List[Union[int, float]]],
+    *,
+    scaled_bbox: bool = True,
+    save_path: str = "",
+    save_name: str = "visualize.png",
+    idx2label: Optional[list],
 ):
     """
     Draw bounding boxes on an image.
@@ -26,20 +35,36 @@ def draw_bboxes(
             bboxes = bboxes[0]
         img = to_pil_image(img)
 
-    draw = ImageDraw.Draw(img)
+    draw = ImageDraw.Draw(img, "RGBA")
     width, height = img.size
-    font = ImageFont.load_default(30)
+    try:
+        font = ImageFont.truetype("arial.ttf", 15)
+    except IOError:
+        font = ImageFont.load_default()
 
     for bbox in bboxes:
-        class_id, x_min, y_min, x_max, y_max = bbox
+        class_id, x_min, y_min, x_max, y_max, *conf = [float(val) for val in bbox]
         if scaled_bbox:
             x_min = x_min * width
             x_max = x_max * width
             y_min = y_min * height
             y_max = y_max * height
         shape = [(x_min, y_min), (x_max, y_max)]
-        draw.rectangle(shape, outline="red", width=3)
-        draw.text((x_min, y_min), str(int(class_id)), font=font, fill="blue")
+        random.seed(int(class_id))
+        color_map = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        draw.rounded_rectangle(shape, outline=(*color_map, 170), radius=5)
+        draw.rounded_rectangle(shape, fill=(*color_map, 50), radius=5)
+
+        text_class = str(idx2label[int(class_id)] if idx2label else class_id)
+        label_text = f"{text_class}" + (f" {conf[0]: .0%}" if conf else "")
+
+        text_bbox = font.getbbox(label_text)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = (text_bbox[3] - text_bbox[1]) * 1.25
+
+        text_background = [(x_min, y_min), (x_min + text_width, y_min + text_height)]
+        draw.rounded_rectangle(text_background, fill=(*color_map, 175), radius=2)
+        draw.text((x_min, y_min), label_text, fill="white", font=font)
 
     return img
 

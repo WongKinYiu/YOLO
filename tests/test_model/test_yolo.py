@@ -20,7 +20,7 @@ def test_build_model():
 
         OmegaConf.set_struct(cfg.model, False)
         cfg.weight = None
-        model = YOLO(cfg.model, 80)
+        model = YOLO(cfg.model)
         assert len(model.model) == 38
 
 

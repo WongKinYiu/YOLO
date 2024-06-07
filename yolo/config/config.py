@@ -23,8 +23,9 @@ class BlockConfig:
 
 
 @dataclass
-class Model:
+class ModelConfig:
     anchor: AnchorConfig
+    class_num: int
     model: Dict[str, BlockConfig]
 
 
@@ -50,7 +51,10 @@ class DataConfig:
     shuffle: bool
     batch_size: int
     pin_memory: bool
+    cpu_num: int
+    image_size: List[int]
     data_augment: Dict[str, int]
+    source: Optional[Union[str, int]]
 
 
 @dataclass
@@ -93,18 +97,6 @@ class EMAConfig:
 
 
 @dataclass
-class TrainConfig:
-    task: str
-    dataset: DatasetConfig
-    epoch: int
-    data: DataConfig
-    optimizer: OptimizerConfig
-    loss: LossConfig
-    scheduler: SchedulerConfig
-    ema: EMAConfig
-
-
-@dataclass
 class NMSConfig:
     min_confidence: int
     min_iou: int
@@ -113,22 +105,43 @@ class NMSConfig:
 @dataclass
 class InferenceConfig:
     task: str
-    source: Union[str, int]
     nms: NMSConfig
+    data: DataConfig
     fast_inference: Optional[None]
     save_predict: bool
 
 
 @dataclass
+class ValidationConfig:
+    task: str
+    nms: NMSConfig
+    data: DataConfig
+
+
+@dataclass
+class TrainConfig:
+    task: str
+    epoch: int
+    data: DataConfig
+    optimizer: OptimizerConfig
+    loss: LossConfig
+    scheduler: SchedulerConfig
+    ema: EMAConfig
+    validation: ValidationConfig
+
+
+@dataclass
 class Config:
-    task: Union[TrainConfig, InferenceConfig]
-    model: Model
+    task: Union[TrainConfig, InferenceConfig, ValidationConfig]
+    dataset: DatasetConfig
+    model: ModelConfig
     name: str
 
     device: Union[str, int, List[int]]
     cpu_num: int
 
     class_num: int
+    class_list: List[str]
     image_size: List[int]
 
     out_path: str

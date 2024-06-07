@@ -18,10 +18,10 @@ from yolo.utils.logging_utils import custom_logger, validate_log_directory
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main(cfg: Config):
     custom_logger()
-    save_path = validate_log_directory(cfg, cfg.name)
-    dataloader = create_dataloader(cfg)
+    save_path = validate_log_directory(cfg, exp_name=cfg.name)
+    dataloader = create_dataloader(cfg.task.data, cfg.dataset, cfg.task.task)
     device = torch.device(cfg.device)
-    if cfg.task.fast_inference:
+    if getattr(cfg.task, "fast_inference", False):
         model = FastModelLoader(cfg).load_model()
         device = torch.device(cfg.device)
     else:

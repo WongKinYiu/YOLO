@@ -2,6 +2,8 @@ anchor:
   reg_max: 16
   strides: [8, 16, 32]
 
+class_num: ${class_num}
+
 model:
   backbone:
     - Conv:
