@@ -1,3 +1,5 @@
+import os
+
 import torch
 from loguru import logger
 from torch import Tensor
@@ -106,13 +108,17 @@ class ModelTester:
         self.progress = ProgressTracker(cfg, save_path, cfg.use_wandb)
 
         self.nms = cfg.task.nms
+        self.save_path = save_path if getattr(cfg.task, "save_predict", True) else None
         self.idx2label = cfg.class_list
-        self.save_path = save_path
 
     def solve(self, dataloader: StreamDataLoader):
         logger.info("👀 Start Inference!")
         if isinstance(self.model, torch.nn.Module):
             self.model.eval()
+
+        if dataloader.is_stream:
+            import cv2
+            import numpy as np
         try:
             for idx, images in enumerate(dataloader):
                 images = images.to(self.device)
@@ -127,6 +133,18 @@ class ModelTester:
                     save_name=f"frame{idx:03d}.png",
                     idx2label=self.idx2label,
                 )
+                logger.info(f"img size: {img.shape}")
+                if self.save_path is not None:
+                    save_image_path = os.path.join(self.save_path, f"frame{idx:03d}.png")
+                    img.save(save_image_path)
+                    logger.info(f"💾 Saved visualize image at {save_image_path}")
+
+                if dataloader.is_stream:
+                    img = np.array(img)
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                    cv2.imshow("Result", img)
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
         except (KeyboardInterrupt, Exception) as e:
             dataloader.stop_event.set()
             dataloader.stop()

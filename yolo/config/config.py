@@ -107,6 +107,7 @@ class InferenceConfig:
     nms: NMSConfig
     data: DataConfig
     fast_inference: Optional[None]
+    save_predict: bool
 
 
 @dataclass
