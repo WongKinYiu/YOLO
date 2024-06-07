@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import pytest
 import torch
 from hydra import compose, initialize
 from omegaconf import OmegaConf
@@ -8,6 +9,7 @@ from omegaconf import OmegaConf
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 
+from yolo.config.config import Config
 from yolo.model.yolo import YOLO, create_model
 
 config_path = "../../yolo/config"
@@ -16,37 +18,44 @@ config_name = "config"
 
 def test_build_model():
     with initialize(config_path=config_path, version_base=None):
-        cfg = compose(config_name=config_name)
+        cfg: Config = compose(config_name=config_name)
 
         OmegaConf.set_struct(cfg.model, False)
         cfg.weight = None
         model = YOLO(cfg.model)
-        assert len(model.model) == 38
+        assert len(model.model) == 39
 
 
-def test_create_model():
-    with initialize(config_path=config_path, version_base=None):
-        cfg = compose(config_name=config_name)
+@pytest.fixture
+def cfg() -> Config:
+    with initialize(config_path="../../yolo/config", version_base=None):
+        cfg: Config = compose(config_name="config")
         cfg.weight = None
-        model = create_model(cfg)
-        assert isinstance(model, YOLO)
+    return cfg
 
 
-def test_yolo_forward_output_shape():
-    with initialize(config_path=config_path, version_base=None):
-        cfg = compose(config_name=config_name)
-        model = create_model(cfg)
-        # 2 - batch size, 3 - number of channels, 640x640 - image dimensions
-        dummy_input = torch.rand(2, 3, 640, 640)
+@pytest.fixture
+def model(cfg: Config):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = create_model(cfg.model)
+    return model.to(device)
 
-        # Forward pass through the model
-        output = model(dummy_input)
-        output_shape = [x.shape for x in output[-1]]
-        assert output_shape == [
-            torch.Size([2, 144, 80, 80]),
-            torch.Size([2, 144, 40, 40]),
-            torch.Size([2, 144, 20, 20]),
-            torch.Size([2, 144, 80, 80]),
-            torch.Size([2, 144, 40, 40]),
-            torch.Size([2, 144, 20, 20]),
-        ]
+
+def test_model_basic_status(model):
+    assert isinstance(model, YOLO)
+    assert len(model.model) == 39
+
+
+def test_yolo_forward_output_shape(model):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # 2 - batch size, 3 - number of channels, 640x640 - image dimensions
+    dummy_input = torch.rand(2, 3, 640, 640, device=device)
+
+    # Forward pass through the model
+    output = model(dummy_input)
+    output_shape = [(cls.shape, anc.shape, box.shape) for cls, anc, box in output["Main"]]
+    assert output_shape == [
+        (torch.Size([2, 80, 80, 80]), torch.Size([2, 16, 4, 80, 80]), torch.Size([2, 4, 80, 80])),
+        (torch.Size([2, 80, 40, 40]), torch.Size([2, 16, 4, 40, 40]), torch.Size([2, 4, 40, 40])),
+        (torch.Size([2, 80, 20, 20]), torch.Size([2, 16, 4, 20, 20]), torch.Size([2, 4, 20, 20])),
+    ]

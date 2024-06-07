@@ -9,7 +9,7 @@ from yolo.config.config import Config, TrainConfig, ValidationConfig
 from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes
-from yolo.tools.loss_functions import get_loss_function
+from yolo.tools.loss_functions import create_loss_function
 from yolo.utils.bounding_box_utils import Vec2Box, bbox_nms, calculate_map
 from yolo.utils.logging_utils import ProgressTracker
 from yolo.utils.model_utils import (
@@ -27,7 +27,7 @@ class ModelTrainer:
         self.device = device
         self.optimizer = create_optimizer(model, train_cfg.optimizer)
         self.scheduler = create_scheduler(self.optimizer, train_cfg.scheduler)
-        self.loss_fn = get_loss_function(cfg, vec2box)
+        self.loss_fn = create_loss_function(cfg, vec2box)
         self.progress = ProgressTracker(cfg.name, save_path, cfg.use_wandb)
         self.num_epochs = cfg.task.epoch
 

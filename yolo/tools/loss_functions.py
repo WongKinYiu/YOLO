@@ -132,7 +132,7 @@ class DualLoss:
         return loss_sum, loss_dict
 
 
-def get_loss_function(cfg: Config, vec2box) -> DualLoss:
+def create_loss_function(cfg: Config, vec2box) -> DualLoss:
     loss_function = DualLoss(cfg, vec2box)
     logger.info("✅ Success load loss function")
     return loss_function
