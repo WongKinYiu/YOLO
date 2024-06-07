@@ -37,7 +37,7 @@ def cfg() -> Config:
 @pytest.fixture
 def model(cfg: Config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = create_model(cfg.model)
+    model = create_model(cfg.model, weight_path=None)
     return model.to(device)
 
 

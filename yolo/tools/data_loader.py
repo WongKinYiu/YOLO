@@ -5,7 +5,6 @@ from threading import Event, Thread
 from typing import Generator, List, Tuple, Union
 
 import cv2
-import hydra
 import numpy as np
 import torch
 from loguru import logger
@@ -256,11 +255,6 @@ class StreamDataLoader:
                 break
             self.process_frame(frame)
         cap.release()
-
-    def cv2_to_tensor(self, frame: np.ndarray) -> Tensor:
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_float = frame_rgb.astype("float32") / 255.0
-        return torch.from_numpy(frame_float).permute(2, 0, 1)[None]
 
     def process_frame(self, frame):
         if isinstance(frame, np.ndarray):
