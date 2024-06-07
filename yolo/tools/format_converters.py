@@ -1,12 +1,13 @@
 def convert_weight(old_state_dict, new_state_dict, model_size: int = 38):
     # TODO: need to refactor
+    shift = 1
     for idx in range(model_size):
         new_list, old_list = [], []
         for weight_name, weight_value in new_state_dict.items():
             if weight_name.split(".")[0] == str(idx):
                 new_list.append((weight_name, None))
         for weight_name, weight_value in old_state_dict.items():
-            if f"model.{idx+1}." in weight_name:
+            if f"model.{idx+shift}." in weight_name:
                 old_list.append((weight_name, weight_value))
         if len(new_list) == len(old_list):
             for (weight_name, _), (_, weight_value) in zip(new_list, old_list):
@@ -17,7 +18,8 @@ def convert_weight(old_state_dict, new_state_dict, model_size: int = 38):
                     continue
                 _, _, conv_name, conv_idx, *details = weight_name.split(".")
                 if conv_name == "cv4" or conv_name == "cv5":
-                    layer_idx = 38
+                    layer_idx = 22
+                    shift = 2
                 else:
                     layer_idx = 37
 

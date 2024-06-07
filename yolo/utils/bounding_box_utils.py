@@ -4,6 +4,7 @@ from typing import List, Tuple
 import torch
 import torch.nn.functional as F
 from einops import rearrange
+from loguru import logger
 from torch import Tensor
 from torchvision.ops import batched_nms
 
@@ -264,6 +265,7 @@ class BoxMatcher:
 
 class Vec2Box:
     def __init__(self, model, image_size, device):
+        logger.info("🧸 Make a dummy test for auto-anchor size")
         dummy_input = torch.zeros(1, 3, *image_size).to(device)
         dummy_output = model(dummy_input)
         anchors_num = []

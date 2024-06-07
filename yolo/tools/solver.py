@@ -32,7 +32,7 @@ class ModelTrainer:
         self.num_epochs = cfg.task.epoch
 
         self.validation_dataloader = create_dataloader(cfg.task.validation.data, cfg.dataset, cfg.task.validation.task)
-        self.validator = ModelValidator(cfg.task.validation, model, save_path, device, self.progress)
+        self.validator = ModelValidator(cfg.task.validation, model, vec2box, save_path, device, self.progress)
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
@@ -40,14 +40,14 @@ class ModelTrainer:
             self.ema = None
         self.scaler = GradScaler()
 
-    def train_one_batch(self, data: Tensor, targets: Tensor):
-        data, targets = data.to(self.device), targets.to(self.device)
+    def train_one_batch(self, images: Tensor, targets: Tensor):
+        images, targets = images.to(self.device), targets.to(self.device)
         self.optimizer.zero_grad()
 
         with autocast():
-            outputs = self.model(data)
-            aux_predicts = self.vec2box(outputs["AUX"])
-            main_predicts = self.vec2box(outputs["Main"])
+            predicts = self.model(images)
+            aux_predicts = self.vec2box(predicts["AUX"])
+            main_predicts = self.vec2box(predicts["Main"])
             loss, loss_item = self.loss_fn(aux_predicts, main_predicts, targets)
 
         self.scaler.scale(loss).backward()
@@ -60,8 +60,8 @@ class ModelTrainer:
         self.model.train()
         total_loss = 0
 
-        for data, targets in dataloader:
-            loss, loss_each = self.train_one_batch(data, targets)
+        for images, targets in dataloader:
+            loss, loss_each = self.train_one_batch(images, targets)
 
             total_loss += loss
             self.progress.one_batch(loss_each)
@@ -111,14 +111,15 @@ class ModelTester:
 
     def solve(self, dataloader: StreamDataLoader):
         logger.info("👀 Start Inference!")
-
+        if isinstance(self.model, torch.nn.Module):
+            self.model.eval()
         try:
             for idx, images in enumerate(dataloader):
                 images = images.to(self.device)
                 with torch.no_grad():
-                    outputs = self.model(images)
-                outputs = self.vec2box(outputs["Main"])
-                nms_out = bbox_nms(outputs[0], outputs[2], self.nms)
+                    predicts = self.model(images)
+                predicts = self.vec2box(predicts["Main"])
+                nms_out = bbox_nms(predicts[0], predicts[2], self.nms)
                 draw_bboxes(
                     images[0],
                     nms_out[0],
@@ -141,15 +142,18 @@ class ModelValidator:
         self,
         validation_cfg: ValidationConfig,
         model: YOLO,
+        vec2box: Vec2Box,
         save_path: str,
         device,
         # TODO: think Progress?
         progress: ProgressTracker,
     ):
         self.model = model
+        self.vec2box = vec2box
         self.device = device
         self.progress = progress
         self.save_path = save_path
+
         self.nms = validation_cfg.nms
 
     def solve(self, dataloader):
@@ -159,11 +163,12 @@ class ModelValidator:
         iou_thresholds = torch.arange(0.5, 1.0, 0.05)
         map_all = []
         self.progress.start_one_epoch(len(dataloader))
-        for data, targets in dataloader:
-            data, targets = data.to(self.device), targets.to(self.device)
+        for images, targets in dataloader:
+            images, targets = images.to(self.device), targets.to(self.device)
             with torch.no_grad():
-                raw_output = self.model(data)
-            nms_out = bbox_nms(raw_output[-1][0], self.nms)
+                predicts = self.model(images)
+            predicts = self.vec2box(predicts["Main"])
+            nms_out = bbox_nms(predicts[0], predicts[2], self.nms)
             for idx, predict in enumerate(nms_out):
                 map_value = calculate_map(predict, targets[idx], iou_thresholds)
                 map_all.append(map_value[0])
