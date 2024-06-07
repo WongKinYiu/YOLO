@@ -10,7 +10,7 @@ from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes
 from yolo.tools.loss_functions import get_loss_function
-from yolo.utils.bounding_box_utils import bbox_nms, calculate_map
+from yolo.utils.bounding_box_utils import Vec2Box, bbox_nms, calculate_map
 from yolo.utils.logging_utils import ProgressTracker
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
@@ -20,13 +20,14 @@ from yolo.utils.model_utils import (
 
 
 class ModelTrainer:
-    def __init__(self, cfg: Config, model: YOLO, save_path: str, device):
+    def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, save_path: str, device):
         train_cfg: TrainConfig = cfg.task
         self.model = model
+        self.vec2box = vec2box
         self.device = device
         self.optimizer = create_optimizer(model, train_cfg.optimizer)
         self.scheduler = create_scheduler(self.optimizer, train_cfg.scheduler)
-        self.loss_fn = get_loss_function(cfg)
+        self.loss_fn = get_loss_function(cfg, vec2box)
         self.progress = ProgressTracker(cfg.name, save_path, cfg.use_wandb)
         self.num_epochs = cfg.task.epoch
 
@@ -45,7 +46,9 @@ class ModelTrainer:
 
         with autocast():
             outputs = self.model(data)
-            loss, loss_item = self.loss_fn(outputs, targets)
+            aux_predicts = self.vec2box(outputs["AUX"])
+            main_predicts = self.vec2box(outputs["Main"])
+            loss, loss_item = self.loss_fn(aux_predicts, main_predicts, targets)
 
         self.scaler.scale(loss).backward()
         self.scaler.step(self.optimizer)
@@ -96,9 +99,10 @@ class ModelTrainer:
 
 
 class ModelTester:
-    def __init__(self, cfg: Config, model: YOLO, save_path: str, device):
+    def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, save_path: str, device):
         self.model = model
         self.device = device
+        self.vec2box = vec2box
         self.progress = ProgressTracker(cfg, save_path, cfg.use_wandb)
 
         self.nms = cfg.task.nms
@@ -112,8 +116,9 @@ class ModelTester:
             for idx, images in enumerate(dataloader):
                 images = images.to(self.device)
                 with torch.no_grad():
-                    raw_output = self.model(images)
-                nms_out = bbox_nms(raw_output[-1][0], self.nms)
+                    outputs = self.model(images)
+                outputs = self.vec2box(outputs["Main"])
+                nms_out = bbox_nms(outputs[0], outputs[2], self.nms)
                 draw_bboxes(
                     images[0],
                     nms_out[0],

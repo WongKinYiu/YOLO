@@ -1,6 +1,5 @@
 anchor:
   reg_max: 16
-  strides: [8, 16, 32]
 
 model:
   backbone:
@@ -120,23 +119,15 @@ model:
 
     - MultiheadDetection:
         source: [A3, A4, A5]
-        tags: aux_head
-    - Anchor2Box:
-        source: aux_head
-        output: True
+        tags: AUX
         args:
             reg_max: ${model.anchor.reg_max}
-            strides: ${model.anchor.strides}
-        tags: aux_bbox
+        output: True
 
   detection:
     - MultiheadDetection:
         source: [P3, P4, P5]
-        tags: reg_head
-    - Anchor2Box:
-        source: reg_head
-        output: True
+        tags: Main
         args:
             reg_max: ${model.anchor.reg_max}
-            strides: ${model.anchor.strides}
-        tags: reg_bbox
+        output: True

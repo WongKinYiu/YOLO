@@ -106,12 +106,23 @@ def transform_bbox(bbox: Tensor, indicator="xywh -> xyxy"):
     return bbox.to(dtype=data_type)
 
 
-def generate_anchors(image_size: List[int], strides: List[int]):
+def generate_anchors(image_size: List[int], anchors_list: List[Tuple[int]]):
+    """
+    Find the anchor maps for each w, h.
+
+    Args:
+        anchors_list List[[w1, h1], [w2, h2], ...]: the anchor num for each predicted anchor
+
+    Returns:
+        all_anchors [HW x 2]:
+        all_scalers [HW]: The index of the best targets for each anchors
+    """
     W, H = image_size
     anchors = []
     scaler = []
-    for stride in strides:
-        anchor_num = W // stride * H // stride
+    for anchor_wh in anchors_list:
+        stride = W // anchor_wh[0]
+        anchor_num = anchor_wh[0] * anchor_wh[1]
         scaler.append(torch.full((anchor_num,), stride))
         shift = stride // 2
         x = torch.arange(0, W, stride) + shift
@@ -207,13 +218,13 @@ class BoxMatcher:
         unique_indices = target_matrix.argmax(dim=1)
         return unique_indices[..., None]
 
-    def __call__(self, target: Tensor, predict: Tensor) -> Tuple[Tensor, Tensor]:
+    def __call__(self, target: Tensor, predict: Tuple[Tensor]) -> Tuple[Tensor, Tensor]:
         """
         1. For each anchor prediction, find the highest suitability targets
         2. Select the targets
         2. Noramlize the class probilities of targets
         """
-        predict_cls, predict_bbox = predict.split(self.class_num, dim=-1)  # B, HW x (C B) -> B x HW x C, B x HW x B
+        predict_cls, predict_bbox = predict
         target_cls, target_bbox = target.split([1, 4], dim=-1)  # B x N x (C B) -> B x N x C, B x N x B
         target_cls = target_cls.long().clamp(0)
 
@@ -251,9 +262,37 @@ class BoxMatcher:
         return torch.cat([align_cls, align_bbox], dim=-1), valid_mask.bool()
 
 
-def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
+class Vec2Box:
+    def __init__(self, model, image_size, device):
+        dummy_input = torch.zeros(1, 3, *image_size).to(device)
+        dummy_output = model(dummy_input)
+        anchors_num = []
+        for predict_head in dummy_output["Main"]:
+            _, _, *anchor_num = predict_head[2].shape
+            anchors_num.append(anchor_num)
+        anchor_grid, scaler = generate_anchors(image_size, anchors_num)
+        self.anchor_grid, self.scaler = anchor_grid.to(device), scaler.to(device)
+        self.anchor_norm = (anchor_grid / scaler[:, None])[None].to(device)
+
+    def __call__(self, predicts):
+        preds_cls, preds_anc, preds_box = [], [], []
+        for layer_output in predicts:
+            pred_cls, pred_anc, pred_box = layer_output
+            preds_cls.append(rearrange(pred_cls, "B C h w -> B (h w) C"))
+            preds_anc.append(rearrange(pred_anc, "B A R h w -> B (h w) R A"))
+            preds_box.append(rearrange(pred_box, "B X h w -> B (h w) X"))
+        preds_cls = torch.concat(preds_cls, dim=1)
+        preds_anc = torch.concat(preds_anc, dim=1)
+        preds_box = torch.concat(preds_box, dim=1)
+
+        pred_LTRB = preds_box * self.scaler.view(1, -1, 1)
+        lt, rb = pred_LTRB.chunk(2, dim=-1)
+        preds_box = torch.cat([self.anchor_grid - lt, self.anchor_grid + rb], dim=-1)
+        return preds_cls, preds_anc, preds_box
+
+
+def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig):
     # TODO change function to class or set 80 to class_num instead of a number
-    cls_dist, bbox = torch.split(predicts, [80, 4], dim=-1)
     cls_dist = cls_dist.sigmoid()
 
     # filter class by confidence
@@ -266,7 +305,7 @@ def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
     batch_idx, *_ = torch.where(valid_mask)
     nms_idx = batched_nms(valid_box, valid_cls, batch_idx, nms_cfg.min_iou)
     predicts_nms = []
-    for idx in range(predicts.size(0)):
+    for idx in range(cls_dist.size(0)):
         instance_idx = nms_idx[idx == batch_idx[nms_idx]]
 
         predict_nms = torch.cat(

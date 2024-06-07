@@ -17,7 +17,7 @@ def convert_weight(old_state_dict, new_state_dict, model_size: int = 38):
                     continue
                 _, _, conv_name, conv_idx, *details = weight_name.split(".")
                 if conv_name == "cv4" or conv_name == "cv5":
-                    layer_idx = 39
+                    layer_idx = 38
                 else:
                     layer_idx = 37
 

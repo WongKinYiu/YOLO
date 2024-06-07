@@ -66,7 +66,7 @@ class YOLO(nn.Module):
 
     def forward(self, x):
         y = {0: x}
-        output = []
+        output = dict()
         for index, layer in enumerate(self.model, start=1):
             if isinstance(layer.source, list):
                 model_input = [y[idx] for idx in layer.source]
@@ -77,7 +77,7 @@ class YOLO(nn.Module):
             if layer.usable:
                 y[index] = x
             if layer.output:
-                output.append(x)
+                output[layer.tags] = x
         return output
 
     def get_out_channels(self, layer_type: str, layer_args: dict, output_dim: list, source: Union[int, list]):
@@ -131,7 +131,7 @@ def create_model(model_cfg: ModelConfig, class_num: int = 80, weight_path: str =
     logger.info("✅ Success load model")
     if weight_path:
         if os.path.exists(weight_path):
-            model.model.load_state_dict(torch.load(weight_path), strict=False)
+            model.model.load_state_dict(torch.load(weight_path))
             logger.info("✅ Success load model weight")
         else:
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")

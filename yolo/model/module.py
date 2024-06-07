@@ -58,7 +58,7 @@ class Detection(nn.Module):
         anchor_channels = 4 * reg_max
 
         first_neck, in_channels = in_channels
-        anchor_neck = max(round_up(first_neck // 4, groups), anchor_channels, 16)
+        anchor_neck = max(round_up(first_neck // 4, groups), anchor_channels, reg_max)
         class_neck = max(first_neck, min(num_classes * 2, 128))
 
         self.anchor_conv = nn.Sequential(
@@ -70,13 +70,16 @@ class Detection(nn.Module):
             Conv(in_channels, class_neck, 3), Conv(class_neck, class_neck, 3), nn.Conv2d(class_neck, num_classes, 1)
         )
 
+        self.anc2vec = Anchor2Vec(reg_max=reg_max)
+
         self.anchor_conv[-1].bias.data.fill_(1.0)
         self.class_conv[-1].bias.data.fill_(-10)
 
-    def forward(self, x: List[Tensor]) -> List[Tensor]:
+    def forward(self, x: Tensor) -> Tuple[Tensor]:
         anchor_x = self.anchor_conv(x)
         class_x = self.class_conv(x)
-        return torch.cat([anchor_x, class_x], dim=1)
+        anchor_x, vector_x = self.anc2vec(anchor_x)
+        return class_x, anchor_x, vector_x
 
 
 class MultiheadDetection(nn.Module):
@@ -92,40 +95,18 @@ class MultiheadDetection(nn.Module):
         return [head(x) for x, head in zip(x_list, self.heads)]
 
 
-class Anchor2Box(nn.Module):
-    def __init__(self, reg_max, strides, num_classes: int) -> None:
+class Anchor2Vec(nn.Module):
+    def __init__(self, reg_max: int = 16) -> None:
         super().__init__()
-        self.reg_max = reg_max
-        self.strides = strides
-        # TODO: read by cfg!
-        image_size = [640, 640]
-        self.num_classes = num_classes
-        self.anchors, self.scaler = generate_anchors(image_size, self.strides)
-        reverse_reg = torch.arange(self.reg_max, dtype=torch.float32)
-        self.reverse_reg = nn.Parameter(reverse_reg, requires_grad=False)
-        self.anchors = nn.Parameter(self.anchors, requires_grad=False)
-        self.scaler = nn.Parameter(self.scaler, requires_grad=False)
+        reverse_reg = torch.arange(reg_max, dtype=torch.float32).view(1, reg_max, 1, 1, 1)
+        self.anc2vec = nn.Conv3d(in_channels=reg_max, out_channels=1, kernel_size=1, bias=False)
+        self.anc2vec.weight = nn.Parameter(reverse_reg, requires_grad=False)
 
-    def forward(self, predicts: List[Tensor]) -> Tensor:
-        """
-        args:
-            [B x AnchorClass x h1 x w1, B x AnchorClass x h2 x w2, B x AnchorClass x h3 x w3] // AnchorClass = 4 * 16 + 80
-        return:
-            [B x HW x ClassBbox] // HW = h1*w1 + h2*w2 + h3*w3, ClassBox = 80 + 4 (xyXY)
-        """
-        preds = []
-        for pred in predicts:
-            preds.append(rearrange(pred, "B AC h w -> B (h w) AC"))  # B x AC x h x w-> B x hw x AC
-        preds = torch.concat(preds, dim=1)  # -> B x (H W) x AC
-        preds_anc, preds_cls = torch.split(preds, (self.reg_max * 4, self.num_classes), dim=-1)
-        preds_anc = rearrange(preds_anc, "B  hw (P R)-> B hw P R", P=4)
-
-        pred_LTRB = preds_anc.softmax(dim=-1) @ self.reverse_reg * self.scaler.view(1, -1, 1)
-
-        lt, rb = pred_LTRB.chunk(2, dim=-1)
-        preds_box = torch.cat([self.anchors - lt, self.anchors + rb], dim=-1)
-        predicts = torch.cat([preds_cls, preds_box], dim=-1)
-        return predicts, preds_anc
+    def forward(self, anchor_x: Tensor) -> Tensor:
+        anchor_x = rearrange(anchor_x, "B (P R) h w -> B R P h w", P=4)
+        vector_x = anchor_x.softmax(dim=1)
+        vector_x = self.anc2vec(vector_x).squeeze(1)
+        return anchor_x, vector_x
 
 
 # ----------- Backbone Class ----------- #
