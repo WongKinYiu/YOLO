@@ -35,8 +35,13 @@ class FastModelLoader:
 
         def onnx_forward(self: InferenceSession, x: Tensor):
             x = {self.get_inputs()[0].name: x.cpu().numpy()}
-            x = [torch.from_numpy(y) for y in self.run(None, x)]
-            return [x]
+            model_outputs, layer_output = [], []
+            for idx, predict in enumerate(self.run(None, x)):
+                layer_output.append(torch.from_numpy(predict))
+                if idx % 3 == 2:
+                    model_outputs.append(layer_output)
+                    layer_output = []
+            return {"Main": model_outputs}
 
         InferenceSession.__call__ = onnx_forward
         try:
