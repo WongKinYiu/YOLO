@@ -26,7 +26,7 @@ def main(cfg: Config):
         model = FastModelLoader(cfg).load_model()
         device = torch.device(cfg.device)
     else:
-        model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight).to(device)
+        model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight, device=device)
 
     vec2box = Vec2Box(model, cfg.image_size, device)
 
