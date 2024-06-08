@@ -1,4 +1,5 @@
 import os
+import time
 
 import torch
 from loguru import logger
@@ -120,6 +121,8 @@ class ModelTester:
         if dataloader.is_stream:
             import cv2
             import numpy as np
+
+            last_time = time.time()
         try:
             for idx, images in enumerate(dataloader):
                 images = images.to(self.device)
@@ -131,6 +134,9 @@ class ModelTester:
 
                 if dataloader.is_stream:
                     img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+                    fps = 1 / (time.time() - last_time)
+                    cv2.putText(img, f"FPS: {fps:.2f}", (0, 15), 0, 0.5, (100, 255, 0), 1, cv2.LINE_AA)
+                    last_time = time.time()
                     cv2.imshow("Prediction", img)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
