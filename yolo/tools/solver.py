@@ -108,7 +108,8 @@ class ModelTester:
         self.progress = ProgressTracker(cfg, save_path, cfg.use_wandb)
 
         self.nms = cfg.task.nms
-        self.save_path = save_path if getattr(cfg.task, "save_predict", True) else None
+        self.save_path = save_path
+        self.save_predict = getattr(cfg.task, "save_predict", None)
         self.idx2label = cfg.class_list
 
     def solve(self, dataloader: StreamDataLoader):
@@ -124,27 +125,23 @@ class ModelTester:
                 images = images.to(self.device)
                 with torch.no_grad():
                     predicts = self.model(images)
-                predicts = self.vec2box(predicts["Main"])
+                    predicts = self.vec2box(predicts["Main"])
                 nms_out = bbox_nms(predicts[0], predicts[2], self.nms)
-                draw_bboxes(
-                    images[0],
-                    nms_out[0],
-                    save_path=self.save_path,
-                    save_name=f"frame{idx:03d}.png",
-                    idx2label=self.idx2label,
-                )
-                logger.info(f"img size: {img.shape}")
-                if self.save_path is not None:
+                img = draw_bboxes(images[0], nms_out[0], idx2label=self.idx2label)
+
+                if dataloader.is_stream:
+                    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+                    cv2.imshow("Prediction", img)
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
+                    if not self.save_predict:
+                        continue
+
+                if self.save_predict == False:
                     save_image_path = os.path.join(self.save_path, f"frame{idx:03d}.png")
                     img.save(save_image_path)
                     logger.info(f"💾 Saved visualize image at {save_image_path}")
 
-                if dataloader.is_stream:
-                    img = np.array(img)
-                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-                    cv2.imshow("Result", img)
-                    if cv2.waitKey(1) & 0xFF == ord("q"):
-                        break
         except (KeyboardInterrupt, Exception) as e:
             dataloader.stop_event.set()
             dataloader.stop()

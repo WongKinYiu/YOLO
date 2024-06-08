@@ -13,8 +13,6 @@ def draw_bboxes(
     img: Union[Image.Image, torch.Tensor],
     bboxes: List[List[Union[int, float]]],
     *,
-    save_path: str = "",
-    save_name: str = "visualize.png",
     idx2label: Optional[list],
 ):
     """
@@ -114,6 +112,6 @@ def draw_model(*, model_cfg=None, model=None, v7_base=False):
                 dot.edge(str(idx), str(jdx))
     try:
         dot.render("Model-arch", format="png", cleanup=True)
+        logger.info("🎨 Drawing Model Architecture at Model-arch.png")
     except:
-        logger.info("Warning: Could not find graphviz backend, continue without drawing the model architecture")
-    logger.info("🎨 Drawing Model Architecture at Model-arch.png")
+        logger.warning("⚠️ Could not find graphviz backend, continue without drawing the model architecture")
