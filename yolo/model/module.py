@@ -2,10 +2,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
+from einops import rearrange
 from loguru import logger
 from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
 
+from yolo.utils.bounding_box_utils import generate_anchors
 from yolo.utils.module_utils import auto_pad, create_activation_function, round_up
 
 
@@ -56,8 +58,7 @@ class Detection(nn.Module):
         anchor_channels = 4 * reg_max
 
         first_neck, in_channels = in_channels
-        # TODO: round up head[0] channels or each head?
-        anchor_neck = max(round_up(first_neck // 4, groups), anchor_channels, 16)
+        anchor_neck = max(round_up(first_neck // 4, groups), anchor_channels, reg_max)
         class_neck = max(first_neck, min(num_classes * 2, 128))
 
         self.anchor_conv = nn.Sequential(
@@ -69,13 +70,16 @@ class Detection(nn.Module):
             Conv(in_channels, class_neck, 3), Conv(class_neck, class_neck, 3), nn.Conv2d(class_neck, num_classes, 1)
         )
 
+        self.anc2vec = Anchor2Vec(reg_max=reg_max)
+
         self.anchor_conv[-1].bias.data.fill_(1.0)
         self.class_conv[-1].bias.data.fill_(-10)
 
-    def forward(self, x: List[Tensor]) -> List[Tensor]:
+    def forward(self, x: Tensor) -> Tuple[Tensor]:
         anchor_x = self.anchor_conv(x)
         class_x = self.class_conv(x)
-        return torch.cat([anchor_x, class_x], dim=1)
+        anchor_x, vector_x = self.anc2vec(anchor_x)
+        return class_x, anchor_x, vector_x
 
 
 class MultiheadDetection(nn.Module):
@@ -83,16 +87,26 @@ class MultiheadDetection(nn.Module):
 
     def __init__(self, in_channels: List[int], num_classes: int, **head_kwargs):
         super().__init__()
-        # TODO: Refactor these parts
         self.heads = nn.ModuleList(
-            [
-                Detection((in_channels[3 * (idx // 3)], in_channel), num_classes, **head_kwargs)
-                for idx, in_channel in enumerate(in_channels)
-            ]
+            [Detection((in_channels[0], in_channel), num_classes, **head_kwargs) for in_channel in in_channels]
         )
 
     def forward(self, x_list: List[torch.Tensor]) -> List[torch.Tensor]:
         return [head(x) for x, head in zip(x_list, self.heads)]
+
+
+class Anchor2Vec(nn.Module):
+    def __init__(self, reg_max: int = 16) -> None:
+        super().__init__()
+        reverse_reg = torch.arange(reg_max, dtype=torch.float32).view(1, reg_max, 1, 1, 1)
+        self.anc2vec = nn.Conv3d(in_channels=reg_max, out_channels=1, kernel_size=1, bias=False)
+        self.anc2vec.weight = nn.Parameter(reverse_reg, requires_grad=False)
+
+    def forward(self, anchor_x: Tensor) -> Tensor:
+        anchor_x = rearrange(anchor_x, "B (P R) h w -> B R P h w", P=4)
+        vector_x = anchor_x.softmax(dim=1)
+        vector_x = self.anc2vec(vector_x).squeeze(1)
+        return anchor_x, vector_x
 
 
 # ----------- Backbone Class ----------- #

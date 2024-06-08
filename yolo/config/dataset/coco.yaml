@@ -1,6 +1,6 @@
 path: data/coco
 train: train2017
-
+validation: val2017
 
 auto_download:
   images:
@@ -8,7 +8,7 @@ auto_download:
     train2017:
       file_name: train2017
       file_num: 118287
-    val2017: 
+    val2017:
       file_name: val2017
       file_num: 5000
     test2017:

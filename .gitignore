@@ -147,4 +147,4 @@ runs
 node_modules/
 
 # Not ignore image for demo
-!demo/images/inference/*
+!demo/images/*/*.png

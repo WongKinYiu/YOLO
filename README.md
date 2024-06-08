@@ -12,8 +12,8 @@ Welcome to the official implementation of YOLOv7 and YOLOv9. This repository wil
 - This is the official YOLO model implementation with an MIT License.
 - For quick deployment: you can enter directly in the terminal:
 ```shell
-$pip install git+https://github.com/WongKinYiu/yolov9mit.git
-$yolo task=inference task.source=0 # source could be a single file, video, image folder, webcam ID
+pip install git+git@github.com:WongKinYiu/YOLO.git
+yolo task=inference task.source=0 # source could be a single file, video, image folder, webcam ID
 ```
 
 ## Introduction
@@ -23,8 +23,8 @@ $yolo task=inference task.source=0 # source could be a single file, video, image
 ## Installation
 To get started with YOLOv9, clone this repository and install the required dependencies:
 ```shell
-git clone git@github.com:WongKinYiu/yolo.git
-cd yolo
+git clone git@github.com:WongKinYiu/YOLO.git
+cd YOLO
 ```
 - HostPC
   ```shell
@@ -73,20 +73,21 @@ To train YOLOv9 on your dataset:
 1. Modify the configuration file `data/config.yaml` to point to your dataset.
 2. Run the training script:
 ```shell
-python lazy.py task=train task.batch_size=8 model=v9-c
+python yolo/lazy.py task=train task.data.batch_size=8 model=v9-c
 ```
 
 ### Transfer Learning
 To perform transfer learning with YOLOv9:
 ```shell
-python lazy.py task=train task.batch_size=8 model=v9-c task.dataset={dataset_config}
+python yolo/lazy.py task=train task.data.batch_size=8 model=v9-c dataset={dataset_config} device={cpu, mps, cuda}
 ```
 
 ### Inference
 To evaluate the model performance, use:
 ```shell
-python lazy.py weights=v9-c.pt # if cloned from GitHub
-yolo task=inference task.source={Any} # if pip installed
+python yolo/lazy.py task=inference weight=weights/v9-c-deploy.pt model=v9-c-deploy # use deploy weight
+python python yolo/lazy.py task=inference # if cloned from GitHub
+yolo task=inference task.data.source={Any} # if pip installed
 ```
 
 ### Validation [WIP]

@@ -1,11 +1,14 @@
 task: train
+
 defaults:
-  - dataset: coco
+  - validation: ../validation
 
 epoch: 500
 
 data:
-  batch_size: 16 
+  batch_size: 16
+  image_size: ${image_size}
+  cpu_num: ${cpu_num}
   shuffle: True
   pin_memory: True
   data_augment:
@@ -23,7 +26,7 @@ optimizer:
 loss:
   objective:
     BCELoss: 0.5
-    BoxLoss: 7.5  
+    BoxLoss: 7.5
     DFLoss: 1.5
   aux:
     0.25

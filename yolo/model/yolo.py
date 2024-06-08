@@ -2,11 +2,11 @@ import os
 from typing import Any, Dict, List, Union
 
 import torch
-import torch.nn as nn
 from loguru import logger
 from omegaconf import ListConfig, OmegaConf
+from torch import device, nn
 
-from yolo.config.config import Config, Model, YOLOLayer
+from yolo.config.config import Config, ModelConfig, YOLOLayer
 from yolo.tools.dataset_preparation import prepare_weight
 from yolo.tools.drawer import draw_model
 from yolo.utils.logging_utils import log_model_structure
@@ -22,9 +22,9 @@ class YOLO(nn.Module):
                    parameters, and any other relevant configuration details.
     """
 
-    def __init__(self, model_cfg: Model, num_classes: int):
+    def __init__(self, model_cfg: ModelConfig, class_num: int = 80):
         super(YOLO, self).__init__()
-        self.num_classes = num_classes
+        self.num_classes = class_num
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
         self.model: List[YOLOLayer] = nn.ModuleList()
         self.build_model(model_cfg.model)
@@ -47,6 +47,7 @@ class YOLO(nn.Module):
                     layer_args["in_channels"] = output_dim[source]
                 if "Detection" in layer_type:
                     layer_args["in_channels"] = [output_dim[idx] for idx in source]
+                if "Detection" in layer_type or "Anchor2Box" in layer_type:
                     layer_args["num_classes"] = self.num_classes
 
                 # create layers
@@ -65,7 +66,7 @@ class YOLO(nn.Module):
 
     def forward(self, x):
         y = {0: x}
-        output = []
+        output = dict()
         for index, layer in enumerate(self.model, start=1):
             if isinstance(layer.source, list):
                 model_input = [y[idx] for idx in layer.source]
@@ -76,7 +77,7 @@ class YOLO(nn.Module):
             if layer.usable:
                 y[index] = x
             if layer.output:
-                output.append(x)
+                output[layer.tags] = x
         return output
 
     def get_out_channels(self, layer_type: str, layer_args: dict, output_dim: list, source: Union[int, list]):
@@ -116,7 +117,9 @@ class YOLO(nn.Module):
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
 
-def create_model(cfg: Config) -> YOLO:
+def create_model(
+    model_cfg: ModelConfig, class_num: int = 80, weight_path: str = "weights/v9-c.pt", device: device = device("cuda")
+) -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
 
     Args:
@@ -125,17 +128,16 @@ def create_model(cfg: Config) -> YOLO:
     Returns:
         YOLO: An instance of the model defined by the given configuration.
     """
-    OmegaConf.set_struct(cfg.model, False)
-    model = YOLO(cfg.model, cfg.class_num)
+    OmegaConf.set_struct(model_cfg, False)
+    model = YOLO(model_cfg, class_num)
     logger.info("✅ Success load model")
-    if cfg.weight:
-        if os.path.exists(cfg.weight):
-            model.model.load_state_dict(torch.load(cfg.weight))
-            logger.info("✅ Success load model weight")
-        else:
-            logger.info(f"🌐 Weight {cfg.weight} not found, try downloading")
-            prepare_weight(weight_path=cfg.weight)
+    if weight_path:
+        if not os.path.exists(weight_path):
+            logger.info(f"🌐 Weight {weight_path} not found, try downloading")
+            prepare_weight(weight_path=weight_path)
+        model.model.load_state_dict(torch.load(weight_path, map_location=device))
+        logger.info("✅ Success load model weight")
 
     log_model_structure(model.model)
     draw_model(model=model)
-    return model
+    return model.to(device)

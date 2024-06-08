@@ -2,10 +2,9 @@ import os
 from os import path
 from queue import Empty, Queue
 from threading import Event, Thread
-from typing import Generator, List, Optional, Tuple, Union
+from typing import Generator, List, Tuple, Union
 
 import cv2
-import hydra
 import numpy as np
 import torch
 from loguru import logger
@@ -15,7 +14,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
 
-from yolo.config.config import Config, TrainConfig
+from yolo.config.config import DataConfig, DatasetConfig
 from yolo.tools.data_augmentation import (
     AugmentationComposer,
     HorizontalFlip,
@@ -33,15 +32,15 @@ from yolo.utils.dataset_utils import (
 
 
 class YoloDataset(Dataset):
-    def __init__(self, config: TrainConfig, phase: str = "train2017", image_size: int = 640):
-        augment_cfg = config.data.data_augment
-        phase_name = config.dataset.get(phase, phase)
-        self.image_size = image_size
+    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, phase: str = "train2017"):
+        augment_cfg = data_cfg.data_augment
+        self.image_size = data_cfg.image_size
+        phase_name = dataset_cfg.get(phase, phase)
 
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.data = self.load_data(config.dataset.path, phase_name)
+        self.data = self.load_data(dataset_cfg.path, phase_name)
 
     def load_data(self, dataset_path, phase_name):
         """
@@ -151,9 +150,7 @@ class YoloDataset(Dataset):
 
     def __getitem__(self, idx) -> Union[Image.Image, torch.Tensor]:
         img, bboxes = self.get_data(idx)
-        if self.transform:
-            img, bboxes = self.transform(img, bboxes)
-        img = TF.to_tensor(img)
+        img, bboxes = self.transform(img, bboxes)
         return img, bboxes
 
     def __len__(self) -> int:
@@ -161,16 +158,15 @@ class YoloDataset(Dataset):
 
 
 class YoloDataLoader(DataLoader):
-    def __init__(self, config: Config):
+    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train"):
         """Initializes the YoloDataLoader with hydra-config files."""
-        data_cfg = config.task.data
-        dataset = YoloDataset(config.task, config.task.task)
-
+        dataset = YoloDataset(data_cfg, dataset_cfg, task)
+        self.image_size = data_cfg.image_size[0]
         super().__init__(
             dataset,
             batch_size=data_cfg.batch_size,
             shuffle=data_cfg.shuffle,
-            num_workers=config.cpu_num,
+            num_workers=data_cfg.cpu_num,
             pin_memory=data_cfg.pin_memory,
             collate_fn=self.collate_fn,
         )
@@ -193,31 +189,33 @@ class YoloDataLoader(DataLoader):
         target_sizes = [item[1].size(0) for item in batch]
         # TODO: Improve readability of these proccess
         batch_targets = torch.zeros(batch_size, max(target_sizes), 5)
+        batch_targets[:, :, 0] = -1
         for idx, target_size in enumerate(target_sizes):
             batch_targets[idx, :target_size] = batch[idx][1]
+        batch_targets[:, :, 1:] *= self.image_size
 
         batch_images = torch.stack([item[0] for item in batch])
 
         return batch_images, batch_targets
 
 
-def create_dataloader(config: Config):
-    if config.task.task == "inference":
-        return StreamDataLoader(config)
+def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train"):
+    if task == "inference":
+        return StreamDataLoader(data_cfg)
 
-    if config.task.dataset.auto_download:
-        prepare_dataset(config.task.dataset)
+    if dataset_cfg.auto_download:
+        prepare_dataset(dataset_cfg)
 
-    return YoloDataLoader(config)
+    return YoloDataLoader(data_cfg, dataset_cfg, task)
 
 
 class StreamDataLoader:
-    def __init__(self, config: Config):
-        self.source = config.task.source
+    def __init__(self, data_cfg: DataConfig):
+        self.source = data_cfg.source
         self.running = True
         self.is_stream = isinstance(self.source, int) or self.source.lower().startswith("rtmp://")
 
-        self.transform = AugmentationComposer([], config.image_size[0])
+        self.transform = AugmentationComposer([], data_cfg.image_size)
         self.stop_event = Event()
 
         if self.is_stream:
@@ -258,17 +256,12 @@ class StreamDataLoader:
             self.process_frame(frame)
         cap.release()
 
-    def cv2_to_tensor(self, frame: np.ndarray) -> Tensor:
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_float = frame_rgb.astype("float32") / 255.0
-        return torch.from_numpy(frame_float).permute(2, 0, 1)[None]
-
     def process_frame(self, frame):
         if isinstance(frame, np.ndarray):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = Image.fromarray(frame)
         frame, _ = self.transform(frame, torch.zeros(0, 5))
-        frame = TF.to_tensor(frame)[None]
+        frame = frame[None]
         if not self.is_stream:
             self.queue.put(frame)
         else:
@@ -301,19 +294,3 @@ class StreamDataLoader:
 
     def __len__(self):
         return self.queue.qsize() if not self.is_stream else 0
-
-
-@hydra.main(config_path="../config", config_name="config", version_base=None)
-def main(cfg):
-    dataloader = create_dataloader(cfg)
-    draw_bboxes(*next(iter(dataloader)))
-
-
-if __name__ == "__main__":
-    import sys
-
-    sys.path.append("./")
-    from utils.logging_utils import custom_logger
-
-    custom_logger()
-    main()

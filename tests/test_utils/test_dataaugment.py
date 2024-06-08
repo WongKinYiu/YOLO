@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 
-import pytest
 import torch
 from PIL import Image
 from torchvision.transforms import functional as TF
@@ -43,8 +42,9 @@ def test_compose():
     boxes = torch.tensor([[0, 0.2, 0.2, 0.8, 0.8]])
 
     transformed_img, transformed_boxes = compose(img, boxes)
+    tensor_img = TF.pil_to_tensor(img).to(torch.float32) / 255
 
-    assert transformed_img == img, "Image should not be altered"
+    assert (transformed_img == tensor_img).all(), "Image should not be altered"
     assert torch.equal(transformed_boxes, boxes), "Boxes should not be altered"
 
 

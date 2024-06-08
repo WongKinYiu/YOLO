@@ -40,5 +40,3 @@ Once you submit a PR, maintainers will review your work, suggest changes if nece
 Your contributions are greatly appreciated and vital to the project's success!
 
 Please feel free to contact [henrytsui000@gmail.com](mailto:henrytsui000@gmail.com)!
-
-

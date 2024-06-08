@@ -1,5 +1,6 @@
 import os
-from typing import List, Union
+import random
+from typing import List, Optional, Union
 
 import numpy as np
 import torch
@@ -12,9 +13,7 @@ def draw_bboxes(
     img: Union[Image.Image, torch.Tensor],
     bboxes: List[List[Union[int, float]]],
     *,
-    scaled_bbox: bool = True,
-    save_path: str = "",
-    save_name: str = "visualize.png",
+    idx2label: Optional[list],
 ):
     """
     Draw bounding boxes on an image.
@@ -27,29 +26,38 @@ def draw_bboxes(
     # Convert tensor image to PIL Image if necessary
     if isinstance(img, torch.Tensor):
         if img.dim() > 3:
-            logger.warning("🔍 Multi-frame tensor detected, using the first image.")
-            img = img[0]
-            bboxes = bboxes[0]
+            logger.warning("🔍 >3 dimension tensor detected, using the 0-idx image.")
+            img, bboxes = img[0], bboxes[0]
         img = to_pil_image(img)
 
-    draw = ImageDraw.Draw(img)
-    width, height = img.size
-    font = ImageFont.load_default(30)
+    draw = ImageDraw.Draw(img, "RGBA")
+
+    try:
+        font = ImageFont.truetype("arial.ttf", 15)
+    except IOError:
+        font = ImageFont.load_default()
 
     for bbox in bboxes:
-        class_id, x_min, y_min, x_max, y_max = bbox
-        if scaled_bbox:
-            x_min = x_min * width
-            x_max = x_max * width
-            y_min = y_min * height
-            y_max = y_max * height
-        shape = [(x_min, y_min), (x_max, y_max)]
-        draw.rectangle(shape, outline="red", width=3)
-        draw.text((x_min, y_min), str(int(class_id)), font=font, fill="blue")
+        class_id, x_min, y_min, x_max, y_max, *conf = [float(val) for val in bbox]
+        bbox = [(x_min, y_min), (x_max, y_max)]
 
-    save_image_path = os.path.join(save_path, save_name)
-    img.save(save_image_path)  # Save the image with annotations
-    logger.info(f"💾 Saved visualize image at {save_image_path}")
+        random.seed(int(class_id))
+        color_map = (random.randint(0, 200), random.randint(0, 200), random.randint(0, 200))
+
+        draw.rounded_rectangle(bbox, outline=(*color_map, 200), radius=5, width=2)
+        draw.rounded_rectangle(bbox, fill=(*color_map, 100), radius=5)
+
+        class_text = str(idx2label[int(class_id)] if idx2label else class_id)
+        label_text = f"{class_text}" + (f" {conf[0]: .0%}" if conf else "")
+
+        text_bbox = font.getbbox(label_text)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = (text_bbox[3] - text_bbox[1]) * 1.25
+
+        text_background = [(x_min, y_min), (x_min + text_width, y_min + text_height)]
+        draw.rounded_rectangle(text_background, fill=(*color_map, 175), radius=2)
+        draw.text((x_min, y_min), label_text, fill="white", font=font)
+
     return img
 
 
@@ -104,6 +112,6 @@ def draw_model(*, model_cfg=None, model=None, v7_base=False):
                 dot.edge(str(idx), str(jdx))
     try:
         dot.render("Model-arch", format="png", cleanup=True)
+        logger.info("🎨 Drawing Model Architecture at Model-arch.png")
     except:
-        logger.info("Warning: Could not find graphviz backend, continue without drawing the model architecture")
-    logger.info("🎨 Drawing Model Architecture at Model-arch.png")
+        logger.warning("⚠️ Could not find graphviz backend, continue without drawing the model architecture")

@@ -7,9 +7,10 @@ from torchvision.transforms import functional as TF
 class AugmentationComposer:
     """Composes several transforms together."""
 
-    def __init__(self, transforms, image_size: int = 640):
+    def __init__(self, transforms, image_size: int = [640, 640]):
         self.transforms = transforms
-        self.image_size = image_size
+        # TODO: handle List of image_size [640, 640]
+        self.image_size = image_size[0]
         self.pad_resize = PadAndResize(self.image_size)
 
         for transform in self.transforms:
@@ -20,6 +21,7 @@ class AugmentationComposer:
         for transform in self.transforms:
             image, boxes = transform(image, boxes)
         image, boxes = self.pad_resize(image, boxes)
+        image = TF.to_tensor(image)
         return image, boxes
 
 
@@ -38,10 +40,10 @@ class PadAndResize:
 
         resized_img = square_img.resize((self.image_size, self.image_size))
 
-        boxes[:, 1] = (boxes[:, 1] + left) * scale
-        boxes[:, 2] = (boxes[:, 2] + top) * scale
-        boxes[:, 3] = (boxes[:, 3] + left) * scale
-        boxes[:, 4] = (boxes[:, 4] + top) * scale
+        boxes[:, 1] = (boxes[:, 1] * image.width + left) / self.image_size * scale
+        boxes[:, 2] = (boxes[:, 2] * image.height + top) / self.image_size * scale
+        boxes[:, 3] = (boxes[:, 3] * image.width + left) / self.image_size * scale
+        boxes[:, 4] = (boxes[:, 4] * image.height + top) / self.image_size * scale
 
         return resized_img, boxes
 

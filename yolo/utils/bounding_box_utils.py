@@ -4,10 +4,11 @@ from typing import List, Tuple
 import torch
 import torch.nn.functional as F
 from einops import rearrange
+from loguru import logger
 from torch import Tensor
 from torchvision.ops import batched_nms
 
-from yolo.config.config import Config, MatcherConfig, NMSConfig
+from yolo.config.config import MatcherConfig, ModelConfig, NMSConfig
 
 
 def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
@@ -106,62 +107,33 @@ def transform_bbox(bbox: Tensor, indicator="xywh -> xyxy"):
     return bbox.to(dtype=data_type)
 
 
-def generate_anchors(image_size: List[int], strides: List[int], device):
+def generate_anchors(image_size: List[int], anchors_list: List[Tuple[int]]):
+    """
+    Find the anchor maps for each w, h.
+
+    Args:
+        anchors_list List[[w1, h1], [w2, h2], ...]: the anchor num for each predicted anchor
+
+    Returns:
+        all_anchors [HW x 2]:
+        all_scalers [HW]: The index of the best targets for each anchors
+    """
     W, H = image_size
     anchors = []
     scaler = []
-    for stride in strides:
-        anchor_num = W // stride * H // stride
-        scaler.append(torch.full((anchor_num,), stride, device=device))
+    for anchor_wh in anchors_list:
+        stride = W // anchor_wh[0]
+        anchor_num = anchor_wh[0] * anchor_wh[1]
+        scaler.append(torch.full((anchor_num,), stride))
         shift = stride // 2
-        x = torch.arange(0, W, stride, device=device) + shift
-        y = torch.arange(0, H, stride, device=device) + shift
+        x = torch.arange(0, W, stride) + shift
+        y = torch.arange(0, H, stride) + shift
         anchor_x, anchor_y = torch.meshgrid(x, y, indexing="ij")
         anchor = torch.stack([anchor_y.flatten(), anchor_x.flatten()], dim=-1)
         anchors.append(anchor)
     all_anchors = torch.cat(anchors, dim=0)
     all_scalers = torch.cat(scaler, dim=0)
     return all_anchors, all_scalers
-
-
-class AnchorBoxConverter:
-    def __init__(self, cfg: Config, device: torch.device) -> None:
-        self.reg_max = cfg.model.anchor.reg_max
-        self.class_num = cfg.class_num
-        self.image_size = list(cfg.image_size)
-        self.strides = cfg.model.anchor.strides
-
-        self.scale_up = torch.tensor(self.image_size * 2, device=device)
-        self.anchors, self.scaler = generate_anchors(self.image_size, self.strides, device)
-        self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
-
-    def __call__(self, predicts: List[Tensor], with_logits=False) -> Tensor:
-        """
-        args:
-            [B x AnchorClass x h1 x w1, B x AnchorClass x h2 x w2, B x AnchorClass x h3 x w3] // AnchorClass = 4 * 16 + 80
-        return:
-            [B x HW x ClassBbox] // HW = h1*w1 + h2*w2 + h3*w3, ClassBox = 80 + 4 (xyXY)
-        """
-        preds = []
-        for pred in predicts:
-            preds.append(rearrange(pred, "B AC h w -> B (h w) AC"))  # B x AC x h x w-> B x hw x AC
-        preds = torch.concat(preds, dim=1)  # -> B x (H W) x AC
-
-        preds_anc, preds_cls = torch.split(preds, (self.reg_max * 4, self.class_num), dim=-1)
-        preds_anc = rearrange(preds_anc, "B  hw (P R)-> B hw P R", P=4)
-        if with_logits:
-            preds_cls = preds_cls.sigmoid()
-
-        pred_LTRB = preds_anc.softmax(dim=-1) @ self.reverse_reg * self.scaler.view(1, -1, 1)
-
-        lt, rb = pred_LTRB.chunk(2, dim=-1)
-        pred_minXY = self.anchors - lt
-        pred_maxXY = self.anchors + rb
-        preds_box = torch.cat([pred_minXY, pred_maxXY], dim=-1)
-
-        predicts = torch.cat([preds_cls, preds_box], dim=-1)
-
-        return predicts, preds_anc
 
 
 class BoxMatcher:
@@ -247,15 +219,15 @@ class BoxMatcher:
         unique_indices = target_matrix.argmax(dim=1)
         return unique_indices[..., None]
 
-    def __call__(self, target: Tensor, predict: Tensor) -> Tuple[Tensor, Tensor]:
+    def __call__(self, target: Tensor, predict: Tuple[Tensor]) -> Tuple[Tensor, Tensor]:
         """
         1. For each anchor prediction, find the highest suitability targets
         2. Select the targets
         2. Noramlize the class probilities of targets
         """
-        predict_cls, predict_bbox = predict.split(self.class_num, dim=-1)  # B, HW x (C B) -> B x HW x C, B x HW x B
+        predict_cls, predict_bbox = predict
         target_cls, target_bbox = target.split([1, 4], dim=-1)  # B x N x (C B) -> B x N x C, B x N x B
-        target_cls = target_cls.long()
+        target_cls = target_cls.long().clamp(0)
 
         # get valid matrix (each gt appear in which anchor grid)
         grid_mask = self.get_valid_matrix(target_bbox)
@@ -291,23 +263,99 @@ class BoxMatcher:
         return torch.cat([align_cls, align_bbox], dim=-1), valid_mask.bool()
 
 
-def bbox_nms(predicts: Tensor, nms_cfg: NMSConfig):
+class Vec2Box:
+    def __init__(self, model, image_size, device):
+        logger.info("🧸 Make a dummy test for auto-anchor size")
+        dummy_input = torch.zeros(1, 3, *image_size).to(device)
+        dummy_output = model(dummy_input)
+        anchors_num = []
+        for predict_head in dummy_output["Main"]:
+            _, _, *anchor_num = predict_head[2].shape
+            anchors_num.append(anchor_num)
+        anchor_grid, scaler = generate_anchors(image_size, anchors_num)
+        self.anchor_grid, self.scaler = anchor_grid.to(device), scaler.to(device)
+        self.anchor_norm = (anchor_grid / scaler[:, None])[None].to(device)
+
+    def __call__(self, predicts):
+        preds_cls, preds_anc, preds_box = [], [], []
+        for layer_output in predicts:
+            pred_cls, pred_anc, pred_box = layer_output
+            preds_cls.append(rearrange(pred_cls, "B C h w -> B (h w) C"))
+            preds_anc.append(rearrange(pred_anc, "B A R h w -> B (h w) R A"))
+            preds_box.append(rearrange(pred_box, "B X h w -> B (h w) X"))
+        preds_cls = torch.concat(preds_cls, dim=1)
+        preds_anc = torch.concat(preds_anc, dim=1)
+        preds_box = torch.concat(preds_box, dim=1)
+
+        pred_LTRB = preds_box * self.scaler.view(1, -1, 1)
+        lt, rb = pred_LTRB.chunk(2, dim=-1)
+        preds_box = torch.cat([self.anchor_grid - lt, self.anchor_grid + rb], dim=-1)
+        return preds_cls, preds_anc, preds_box
+
+
+def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig):
     # TODO change function to class or set 80 to class_num instead of a number
-    cls_dist, bbox = predicts.split([80, 4], dim=-1)
+    cls_dist = cls_dist.sigmoid()
 
     # filter class by confidence
     cls_val, cls_idx = cls_dist.max(dim=-1, keepdim=True)
     valid_mask = cls_val > nms_cfg.min_confidence
     valid_cls = cls_idx[valid_mask].float()
+    valid_con = cls_val[valid_mask].float()
     valid_box = bbox[valid_mask.repeat(1, 1, 4)].view(-1, 4)
 
     batch_idx, *_ = torch.where(valid_mask)
     nms_idx = batched_nms(valid_box, valid_cls, batch_idx, nms_cfg.min_iou)
     predicts_nms = []
-    for idx in range(predicts.size(0)):
+    for idx in range(cls_dist.size(0)):
         instance_idx = nms_idx[idx == batch_idx[nms_idx]]
 
-        predict_nms = torch.cat([valid_cls[instance_idx][:, None], valid_box[instance_idx]], dim=-1)
+        predict_nms = torch.cat(
+            [valid_cls[instance_idx][:, None], valid_box[instance_idx], valid_con[instance_idx][:, None]], dim=-1
+        )
 
         predicts_nms.append(predict_nms)
     return predicts_nms
+
+
+def calculate_map(predictions, ground_truths, iou_thresholds):
+    # TODO: Refactor this block
+    device = predictions.device
+    n_preds = predictions.size(0)
+    n_gts = (ground_truths[:, 0] != -1).sum()
+    ground_truths = ground_truths[:n_gts]
+    aps = []
+
+    ious = calculate_iou(predictions[:, 1:-1], ground_truths[:, 1:])  # [n_preds, n_gts]
+
+    for threshold in iou_thresholds:
+        tp = torch.zeros(n_preds, device=device)
+        fp = torch.zeros(n_preds, device=device)
+
+        max_iou, max_indices = torch.max(ious, dim=1)
+        above_threshold = max_iou >= threshold
+        matched_classes = predictions[:, 0] == ground_truths[max_indices, 0]
+        tp[above_threshold & matched_classes] = 1
+        fp[above_threshold & ~matched_classes] = 1
+        fp[max_iou < threshold] = 1
+
+        _, indices = torch.sort(predictions[:, 1], descending=True)
+        tp = tp[indices]
+        fp = fp[indices]
+
+        tp_cumsum = torch.cumsum(tp, dim=0)
+        fp_cumsum = torch.cumsum(fp, dim=0)
+
+        precision = tp_cumsum / (tp_cumsum + fp_cumsum + 1e-6)
+        recall = tp_cumsum / (n_gts + 1e-6)
+
+        recall_thresholds = torch.arange(0, 1, 0.1)
+        precision_at_recall = torch.zeros_like(recall_thresholds)
+        for i, r in enumerate(recall_thresholds):
+            precision_at_recall[i] = precision[recall >= r].max().item() if torch.any(recall >= r) else 0
+
+        ap = precision_at_recall.mean()
+        aps.append(ap)
+
+    mean_ap = torch.mean(torch.stack(aps))
+    return mean_ap, aps

@@ -2,24 +2,18 @@ from typing import Any, Dict, List, Tuple
 
 import torch
 import torch.nn.functional as F
-from einops import rearrange
 from loguru import logger
 from torch import Tensor, nn
 from torch.nn import BCEWithLogitsLoss
 
-from yolo.config.config import Config
-from yolo.utils.bounding_box_utils import (
-    AnchorBoxConverter,
-    BoxMatcher,
-    calculate_iou,
-    generate_anchors,
-)
-from yolo.utils.module_utils import divide_into_chunks
+from yolo.config.config import Config, LossConfig
+from yolo.utils.bounding_box_utils import BoxMatcher, Vec2Box, calculate_iou
 
 
 class BCELoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
+        # TODO: Refactor the device, should be assign by config
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.bce = BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=device), reduction="none")
 
@@ -45,10 +39,9 @@ class BoxLoss(nn.Module):
 
 
 class DFLoss(nn.Module):
-    def __init__(self, anchors: Tensor, scaler: Tensor, reg_max: int) -> None:
+    def __init__(self, anchors_norm: Tensor, reg_max: int) -> None:
         super().__init__()
-        self.anchors = anchors
-        self.scaler = scaler
+        self.anchors_norm = anchors_norm
         self.reg_max = reg_max
 
     def forward(
@@ -56,8 +49,9 @@ class DFLoss(nn.Module):
     ) -> Any:
         valid_bbox = valid_masks[..., None].expand(-1, -1, 4)
         bbox_lt, bbox_rb = targets_bbox.chunk(2, -1)
-        anchors_norm = (self.anchors / self.scaler[:, None])[None]
-        targets_dist = torch.cat(((anchors_norm - bbox_lt), (bbox_rb - anchors_norm)), -1).clamp(0, self.reg_max - 1.01)
+        targets_dist = torch.cat(((self.anchors_norm - bbox_lt), (bbox_rb - self.anchors_norm)), -1).clamp(
+            0, self.reg_max - 1.01
+        )
         picked_targets = targets_dist[valid_bbox].view(-1)
         picked_predict = predicts_anc[valid_bbox].view(-1, self.reg_max)
 
@@ -73,43 +67,31 @@ class DFLoss(nn.Module):
 
 
 class YOLOLoss:
-    def __init__(self, cfg: Config) -> None:
-        self.reg_max = cfg.model.anchor.reg_max
-        self.class_num = cfg.class_num
-        self.image_size = list(cfg.image_size)
-        self.strides = cfg.model.anchor.strides
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        self.reverse_reg = torch.arange(self.reg_max, dtype=torch.float32, device=device)
-        self.scale_up = torch.tensor(self.image_size * 2, device=device)
-
-        self.anchors, self.scaler = generate_anchors(self.image_size, self.strides, device)
+    def __init__(self, loss_cfg: LossConfig, vec2box: Vec2Box, class_num: int = 80, reg_max: int = 16) -> None:
+        self.class_num = class_num
+        self.vec2box = vec2box
 
         self.cls = BCELoss()
-        self.dfl = DFLoss(self.anchors, self.scaler, self.reg_max)
+        self.dfl = DFLoss(vec2box.anchor_norm, reg_max)
         self.iou = BoxLoss()
 
-        self.matcher = BoxMatcher(cfg.task.loss.matcher, self.class_num, self.anchors)
-        self.box_converter = AnchorBoxConverter(cfg, device)
+        self.matcher = BoxMatcher(loss_cfg.matcher, self.class_num, vec2box.anchor_grid)
 
     def separate_anchor(self, anchors):
         """
         separate anchor and bbouding box
         """
         anchors_cls, anchors_box = torch.split(anchors, (self.class_num, 4), dim=-1)
-        anchors_box = anchors_box / self.scaler[None, :, None]
+        anchors_box = anchors_box / self.vec2box.scaler[None, :, None]
         return anchors_cls, anchors_box
 
     def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
-        # Batch_Size x (Anchor + Class) x H x W
-        # TODO: check datatype, why targets has a little bit error with origin version
-        predicts, predicts_anc = self.box_converter(predicts)
-
+        predicts_cls, predicts_anc, predicts_box = predicts
         # For each predicted targets, assign a best suitable ground truth box.
-        align_targets, valid_masks = self.matcher(targets, predicts)
+        align_targets, valid_masks = self.matcher(targets, (predicts_cls, predicts_box))
 
         targets_cls, targets_bbox = self.separate_anchor(align_targets)
-        predicts_cls, predicts_bbox = self.separate_anchor(predicts)
+        predicts_box = predicts_box / self.vec2box.scaler[None, :, None]
 
         cls_norm = targets_cls.sum()
         box_norm = targets_cls.sum(-1)[valid_masks]
@@ -117,7 +99,7 @@ class YOLOLoss:
         ## -- CLS -- ##
         loss_cls = self.cls(predicts_cls, targets_cls, cls_norm)
         ## -- IOU -- ##
-        loss_iou = self.iou(predicts_bbox, targets_bbox, valid_masks, box_norm, cls_norm)
+        loss_iou = self.iou(predicts_box, targets_bbox, valid_masks, box_norm, cls_norm)
         ## -- DFL -- ##
         loss_dfl = self.dfl(predicts_anc, targets_bbox, valid_masks, box_norm, cls_norm)
 
@@ -125,21 +107,22 @@ class YOLOLoss:
 
 
 class DualLoss:
-    def __init__(self, cfg: Config) -> None:
-        self.loss = YOLOLoss(cfg)
-        self.aux_rate = cfg.task.loss.aux
+    def __init__(self, cfg: Config, vec2box) -> None:
+        loss_cfg = cfg.task.loss
+        self.loss = YOLOLoss(loss_cfg, vec2box, class_num=cfg.class_num, reg_max=cfg.model.anchor.reg_max)
 
-        self.iou_rate = cfg.task.loss.objective["BoxLoss"]
-        self.dfl_rate = cfg.task.loss.objective["DFLoss"]
-        self.cls_rate = cfg.task.loss.objective["BCELoss"]
+        self.aux_rate = loss_cfg.aux
 
-    def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Dict[str, Tensor]]:
-        targets[:, :, 1:] = targets[:, :, 1:] * self.loss.scale_up
+        self.iou_rate = loss_cfg.objective["BoxLoss"]
+        self.dfl_rate = loss_cfg.objective["DFLoss"]
+        self.cls_rate = loss_cfg.objective["BCELoss"]
 
+    def __call__(
+        self, aux_predicts: List[Tensor], main_predicts: List[Tensor], targets: Tensor
+    ) -> Tuple[Tensor, Dict[str, Tensor]]:
         # TODO: Need Refactor this region, make it flexible!
-        predicts = divide_into_chunks(predicts[0], 2)
-        aux_iou, aux_dfl, aux_cls = self.loss(predicts[0], targets)
-        main_iou, main_dfl, main_cls = self.loss(predicts[1], targets)
+        aux_iou, aux_dfl, aux_cls = self.loss(aux_predicts, targets)
+        main_iou, main_dfl, main_cls = self.loss(main_predicts, targets)
 
         loss_dict = {
             "BoxLoss": self.iou_rate * (aux_iou * self.aux_rate + main_iou),
@@ -150,7 +133,7 @@ class DualLoss:
         return loss_sum, loss_dict
 
 
-def get_loss_function(cfg: Config) -> YOLOLoss:
-    loss_function = DualLoss(cfg)
+def create_loss_function(cfg: Config, vec2box) -> DualLoss:
+    loss_function = DualLoss(cfg, vec2box)
     logger.info("✅ Success load loss function")
     return loss_function

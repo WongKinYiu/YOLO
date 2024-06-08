@@ -1,11 +1,11 @@
 task: inference
-source: demo/images/inference/image.png
+
 fast_inference:  # onnx, trt or Empty
 data:
-  batch_size: 16
-  shuffle: False
-  pin_memory: True
+  source: demo/images/inference/image.png
+  image_size: ${image_size}
   data_augment: {}
 nms:
   min_confidence: 0.5
   min_iou: 0.5
+# save_predict: True
