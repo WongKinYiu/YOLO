@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import torch
 from loguru import logger
@@ -117,9 +117,7 @@ class YOLO(nn.Module):
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
 
-def create_model(
-    model_cfg: ModelConfig, class_num: int = 80, weight_path: str = "weights/v9-c.pt", device: device = device("cuda")
-) -> YOLO:
+def create_model(model_cfg: ModelConfig, weight_path: Optional[str], device: device, class_num: int = 80) -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
 
     Args:
@@ -135,8 +133,9 @@ def create_model(
         if not os.path.exists(weight_path):
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")
             prepare_weight(weight_path=weight_path)
-        model.model.load_state_dict(torch.load(weight_path, map_location=device))
-        logger.info("✅ Success load model weight")
+        if os.path.exists(weight_path):
+            model.model.load_state_dict(torch.load(weight_path, map_location=device))
+            logger.info("✅ Success load model weight")
 
     log_model_structure(model.model)
     draw_model(model=model)
