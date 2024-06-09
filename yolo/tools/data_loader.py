@@ -23,7 +23,6 @@ from yolo.tools.data_augmentation import (
     VerticalFlip,
 )
 from yolo.tools.dataset_preparation import prepare_dataset
-from yolo.tools.drawer import draw_bboxes
 from yolo.utils.dataset_utils import (
     create_image_metadata,
     locate_label_paths,
@@ -204,7 +203,7 @@ def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: st
         return StreamDataLoader(data_cfg)
 
     if dataset_cfg.auto_download:
-        prepare_dataset(dataset_cfg)
+        prepare_dataset(dataset_cfg, task)
 
     return YoloDataLoader(data_cfg, dataset_cfg, task)
 
