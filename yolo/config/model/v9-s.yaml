@@ -53,7 +53,7 @@ model:
             part_channels: 192
             csp_args: {repeat_num: 3}
         tags: N4
-
+  head:
     - UpSample:
         args: {scale_factor: 2, mode: nearest}
     - Concat:
@@ -96,7 +96,7 @@ model:
             reg_max: ${model.anchor.reg_max}
         output: True
 
-  head:
+  auxiliary:
     - SPPELAN:
         source: B5
         args: {out_channels: 256}
