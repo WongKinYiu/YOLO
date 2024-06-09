@@ -43,7 +43,7 @@ class YOLO(nn.Module):
                 source = self.get_source_idx(layer_info.get("source", -1), layer_idx)
 
                 # Find in channels
-                if any(module in layer_type for module in ["Conv", "ELAN", "ADown", "CBLinear"]):
+                if any(module in layer_type for module in ["Conv", "ELAN", "ADown", "AConv", "CBLinear"]):
                     layer_args["in_channels"] = output_dim[source]
                 if "Detection" in layer_type:
                     layer_args["in_channels"] = [output_dim[idx] for idx in source]
@@ -81,7 +81,7 @@ class YOLO(nn.Module):
         return output
 
     def get_out_channels(self, layer_type: str, layer_args: dict, output_dim: list, source: Union[int, list]):
-        if any(module in layer_type for module in ["Conv", "ELAN", "ADown"]):
+        if any(module in layer_type for module in ["Conv", "ELAN", "ADown", "AConv"]):
             return layer_args["out_channels"]
         if layer_type == "CBFuse":
             return output_dim[source[-1]]
@@ -134,7 +134,7 @@ def create_model(model_cfg: ModelConfig, weight_path: Optional[str], device: dev
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")
             prepare_weight(weight_path=weight_path)
         if os.path.exists(weight_path):
-            model.model.load_state_dict(torch.load(weight_path, map_location=device))
+            model.model.load_state_dict(torch.load(weight_path, map_location=device), strict=False)
             logger.info("✅ Success load model weight")
 
     log_model_structure(model.model)

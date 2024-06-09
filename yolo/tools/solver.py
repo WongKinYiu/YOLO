@@ -143,8 +143,7 @@ class ModelTester:
                         break
                     if not self.save_predict:
                         continue
-
-                if self.save_predict == False:
+                if self.save_predict != False:
                     save_image_path = os.path.join(self.save_path, f"frame{idx:03d}.png")
                     img.save(save_image_path)
                     logger.info(f"💾 Saved visualize image at {save_image_path}")

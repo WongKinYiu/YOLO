@@ -22,7 +22,7 @@ def main(cfg: Config):
     dataloader = create_dataloader(cfg.task.data, cfg.dataset, cfg.task.task)
     device = torch.device(cfg.device)
     if getattr(cfg.task, "fast_inference", False):
-        model = FastModelLoader(cfg).load_model()
+        model = FastModelLoader(cfg, device).load_model()
         device = torch.device(cfg.device)
     else:
         model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight, device=device)
