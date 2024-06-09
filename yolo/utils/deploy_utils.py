@@ -9,14 +9,15 @@ from yolo.model.yolo import create_model
 
 
 class FastModelLoader:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, device):
         self.cfg = cfg
+        self.device = device
         self.compiler = cfg.task.fast_inference
         self._validate_compiler()
         self.model_path = f"{os.path.splitext(cfg.weight)[0]}.{self.compiler}"
 
     def _validate_compiler(self):
-        if self.compiler not in ["onnx", "trt"]:
+        if self.compiler not in ["onnx", "trt", "deploy"]:
             logger.warning(f"⚠️ Compiler '{self.compiler}' is not supported. Using original model.")
             self.compiler = None
         if self.cfg.device == "mps" and self.compiler == "trt":
@@ -28,7 +29,11 @@ class FastModelLoader:
             return self._load_onnx_model()
         elif self.compiler == "trt":
             return self._load_trt_model()
-        return create_model(self.cfg.model, class_num=self.cfg.class_num, weight_path=self.cfg.weight)
+        elif self.compiler == "deploy":
+            self.cfg.model.model.auxiliary = {}
+        return create_model(
+            self.cfg.model, class_num=self.cfg.class_num, weight_path=self.cfg.weight, device=self.device
+        )
 
     def _load_onnx_model(self):
         from onnxruntime import InferenceSession
