@@ -61,7 +61,7 @@ python yolo/lazy.py task=train task.data.batch_size=8 model=v9-c dataset={datase
 ### Inference
 To evaluate the model performance, use:
 ```shell
-python yolo/lazy.py task=inference weight=weights/v9-c-deploy.pt model=v9-c-deploy # use deploy weight
+python yolo/lazy.py task=inference weight=weights/v9-c.pt model=v9-c task.fast_inference=deploy # use deploy weight
 python python yolo/lazy.py task=inference # if cloned from GitHub
 yolo task=inference task.data.source={Any} # if pip installed
 ```
