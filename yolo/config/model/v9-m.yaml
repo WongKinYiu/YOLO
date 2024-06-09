@@ -1,0 +1,133 @@
+anchor:
+  reg_max: 16
+
+model:
+  backbone:
+    - Conv:
+        args: {out_channels: 32, kernel_size: 3, stride: 2}
+        source: 0
+    - Conv:
+        args: {out_channels: 64, kernel_size: 3, stride: 2}
+    - RepNCSPELAN:
+        args: {out_channels: 128, part_channels: 128}
+
+    - AConv:
+        args: {out_channels: 240}
+    - RepNCSPELAN:
+        args: {out_channels: 240, part_channels: 240}
+        tags: B3
+
+    - AConv:
+        args: {out_channels: 360}
+    - RepNCSPELAN:
+        args: {out_channels: 360, part_channels: 360}
+        tags: B4
+
+    - AConv:
+        args: {out_channels: 480}
+    - RepNCSPELAN:
+        args: {out_channels: 480, part_channels: 480}
+        tags: B5
+
+  neck:
+    - SPPELAN:
+        args: {out_channels: 480}
+        tags: N3
+
+    - UpSample:
+        args: {scale_factor: 2, mode: nearest}
+    - Concat:
+        source: [-1, B4]
+    - RepNCSPELAN:
+        args: {out_channels: 360, part_channels: 360}
+        tags: N4
+
+    - UpSample:
+        args: {scale_factor: 2, mode: nearest}
+    - Concat:
+        source: [-1, B3]
+
+  head:
+    - RepNCSPELAN:
+        args: {out_channels: 240, part_channels: 240}
+        tags: P3
+
+    - AConv:
+        args: {out_channels: 184}
+    - Concat:
+        source: [-1, N4]
+    - RepNCSPELAN:
+        args: {out_channels: 360, part_channels: 360}
+        tags: P4
+
+    - AConv:
+        args: {out_channels: 240}
+    - Concat:
+        source: [-1, N3]
+    - RepNCSPELAN:
+        args: {out_channels: 480, part_channels: 480}
+        tags: P5
+
+  detection:
+    - MultiheadDetection:
+        source: [P3, P4, P5]
+        tags: Main
+        args:
+            reg_max: ${model.anchor.reg_max}
+        output: True
+
+  auxiliary:
+    - CBLinear:
+        source: B3
+        args: {out_channels: [240]}
+        tags: R3
+    - CBLinear:
+        source: B4
+        args: {out_channels: [240, 360]}
+        tags: R4
+    - CBLinear:
+        source: B5
+        args: {out_channels: [240, 360, 480]}
+        tags: R5
+
+    - Conv:
+        args: {out_channels: 32, kernel_size: 3, stride: 2}
+        source: 0
+    - Conv:
+        args: {out_channels: 64, kernel_size: 3, stride: 2}
+    - RepNCSPELAN:
+        args: {out_channels: 128, part_channels: 128}
+
+    - AConv:
+        args: {out_channels: 240}
+    - CBFuse:
+        source: [R3, R4, R5, -1]
+        args: {index: [0, 0, 0]}
+    - RepNCSPELAN:
+        args: {out_channels: 240, part_channels: 240}
+        tags: A3
+
+    - AConv:
+        args: {out_channels: 360}
+    - CBFuse:
+        source: [R4, R5, -1]
+        args: {index: [1, 1]}
+    - RepNCSPELAN:
+        args: {out_channels: 360, part_channels: 360}
+        tags: A4
+
+    - AConv:
+        args: {out_channels: 480}
+    - CBFuse:
+        source: [R5, -1]
+        args: {index: [2]}
+    - RepNCSPELAN:
+        args: {out_channels: 480, part_channels: 480}
+        tags: A5
+
+    - MultiheadDetection:
+        source: [A3, A4, A5]
+        tags: AUX
+        args:
+            reg_max: ${model.anchor.reg_max}
+        output: True

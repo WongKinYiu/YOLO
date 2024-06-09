@@ -192,6 +192,36 @@ class RepNCSP(nn.Module):
         return self.conv3(torch.cat((x1, x2), dim=1))
 
 
+class ELAN(nn.Module):
+    """ELAN  structure."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        part_channels: int,
+        *,
+        process_channels: Optional[int] = None,
+        **kwargs,
+    ):
+        super().__init__()
+
+        if process_channels is None:
+            process_channels = part_channels // 2
+
+        self.conv1 = Conv(in_channels, part_channels, 1, **kwargs)
+        self.conv2 = Conv(part_channels // 2, process_channels, 3, padding=1, **kwargs)
+        self.conv3 = Conv(process_channels, process_channels, 3, padding=1, **kwargs)
+        self.conv4 = Conv(part_channels + 2 * process_channels, out_channels, 1, **kwargs)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x1, x2 = self.conv1(x).chunk(2, 1)
+        x3 = self.conv2(x2)
+        x4 = self.conv3(x3)
+        x5 = self.conv4(torch.cat([x1, x2, x3, x4], dim=1))
+        return x5
+
+
 class RepNCSPELAN(nn.Module):
     """RepNCSPELAN block combining RepNCSP blocks with ELAN structure."""
 
@@ -228,6 +258,21 @@ class RepNCSPELAN(nn.Module):
         x4 = self.conv3(x3)
         x5 = self.conv4(torch.cat([x1, x2, x3, x4], dim=1))
         return x5
+
+
+class AConv(nn.Module):
+    """Downsampling module combining average and max pooling with convolution for feature reduction."""
+
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        mid_layer = {"kernel_size": 3, "stride": 2}
+        self.avg_pool = Pool("avg", kernel_size=2, stride=1)
+        self.conv = Conv(in_channels, out_channels, **mid_layer)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.avg_pool(x)
+        x = self.conv(x)
+        return x
 
 
 class ADown(nn.Module):
@@ -496,26 +541,6 @@ class CSPDark(nn.Module):
         y = list(self.cv1(x).chunk(2, 1))
 
         return self.cv2(torch.cat((self.cb(y[0]), y[1]), 1))
-
-
-# ELAN
-class ELAN(nn.Module):
-    # ELAN
-    def __init__(self, in_channels, out_channels, med_channels, elan_repeat=2, cb_repeat=2, ratio=1.0):
-
-        super().__init__()
-
-        h_channels = med_channels // 2
-        self.cv1 = Conv(in_channels, med_channels, 1, 1)
-        self.cb = nn.ModuleList(ConvBlock(h_channels, repeat=cb_repeat, ratio=ratio) for _ in range(elan_repeat))
-        self.cv2 = Conv((2 + elan_repeat) * h_channels, out_channels, 1, 1)
-
-    def forward(self, x):
-
-        y = list(self.cv1(x).chunk(2, 1))
-        y.extend((m(y[-1])) for m in self.cb)
-
-        return self.cv2(torch.cat(y, 1))
 
 
 class CSPELAN(nn.Module):
