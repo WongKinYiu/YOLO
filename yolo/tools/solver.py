@@ -14,7 +14,7 @@ from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes
 from yolo.tools.loss_functions import create_loss_function
 from yolo.utils.bounding_box_utils import Vec2Box, bbox_nms, calculate_map
-from yolo.utils.logging_utils import ProgressTracker
+from yolo.utils.logging_utils import ProgressLogger
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
     create_optimizer,
@@ -23,7 +23,7 @@ from yolo.utils.model_utils import (
 
 
 class ModelTrainer:
-    def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, save_path: str, device):
+    def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, progress: ProgressLogger, device):
         train_cfg: TrainConfig = cfg.task
         self.model = model
         self.vec2box = vec2box
@@ -31,11 +31,11 @@ class ModelTrainer:
         self.optimizer = create_optimizer(model, train_cfg.optimizer)
         self.scheduler = create_scheduler(self.optimizer, train_cfg.scheduler)
         self.loss_fn = create_loss_function(cfg, vec2box)
-        self.progress = ProgressTracker(cfg.name, save_path, cfg.use_wandb)
+        self.progress = progress
         self.num_epochs = cfg.task.epoch
 
         self.validation_dataloader = create_dataloader(cfg.task.validation.data, cfg.dataset, cfg.task.validation.task)
-        self.validator = ModelValidator(cfg.task.validation, model, vec2box, save_path, device, self.progress)
+        self.validator = ModelValidator(cfg.task.validation, model, vec2box, progress, device, self.progress)
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
@@ -102,14 +102,15 @@ class ModelTrainer:
 
 
 class ModelTester:
-    def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, save_path: str, device):
+    def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, progress: ProgressLogger, device):
         self.model = model
         self.device = device
         self.vec2box = vec2box
-        self.progress = ProgressTracker(cfg, save_path, cfg.use_wandb)
+        self.progress = progress
 
         self.nms = cfg.task.nms
-        self.save_path = save_path
+        self.save_path = os.path.join(progress.save_path, "images")
+        os.makedirs(self.save_path, exist_ok=True)
         self.save_predict = getattr(cfg.task, "save_predict", None)
         self.idx2label = cfg.class_list
 
@@ -164,16 +165,13 @@ class ModelValidator:
         validation_cfg: ValidationConfig,
         model: YOLO,
         vec2box: Vec2Box,
-        save_path: str,
         device,
-        # TODO: think Progress?
-        progress: ProgressTracker,
+        progress: ProgressLogger,
     ):
         self.model = model
         self.vec2box = vec2box
         self.device = device
         self.progress = progress
-        self.save_path = save_path
 
         self.nms = validation_cfg.nms
 

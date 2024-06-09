@@ -38,15 +38,18 @@ def custom_logger(quite: bool = False):
     )
 
 
-class ProgressTracker:
-    def __init__(self, exp_name: str, save_path: str, use_wandb: bool = False):
+class ProgressLogger:
+    def __init__(self, cfg: Config, exp_name: str):
+        custom_logger(getattr(cfg, "quite", False))
+        self.save_path = validate_log_directory(cfg, exp_name=cfg.name)
+
         self.progress = Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(bar_width=None),
             TextColumn("{task.completed:.0f}/{task.total:.0f}"),
             TimeRemainingColumn(),
         )
-        self.use_wandb = use_wandb
+        self.use_wandb = cfg.use_wandb
         if self.use_wandb:
             wandb.errors.term._log = custom_wandb_log
             self.wandb = wandb.init(
