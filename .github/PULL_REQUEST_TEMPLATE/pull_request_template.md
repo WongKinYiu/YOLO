@@ -1,3 +1,12 @@
+---
+name: Pull Request
+about: Suggest an idea for this project
+title: ''
+labels: ''
+assignees: ''
+
+---
+
 ## Description
 
 [Please include a summary of the changes and the related issue. (Just overwrite this session directly)]
@@ -22,3 +31,6 @@ Please delete options that are not relevant.
 ## Additional Information
 
 Add any other information about the PR here.
+
+**Note:**
+We hope that the pull request is mainly for the implementation or modification of the project function. If it is a documentation error or a small typo, we are very welcome to send it to henrytsui000@gmail.com. Alternatively, you may open an issue to report these. Thank you for your understanding and cooperation!
