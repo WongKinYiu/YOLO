@@ -35,7 +35,7 @@ class ModelTrainer:
         self.num_epochs = cfg.task.epoch
 
         self.validation_dataloader = create_dataloader(cfg.task.validation.data, cfg.dataset, cfg.task.validation.task)
-        self.validator = ModelValidator(cfg.task.validation, model, vec2box, progress, device, self.progress)
+        self.validator = ModelValidator(cfg.task.validation, model, vec2box, progress, device)
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)

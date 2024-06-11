@@ -264,14 +264,17 @@ class BoxMatcher:
 
 
 class Vec2Box:
-    def __init__(self, model, image_size, device):
-        logger.info("🧸 Make a dummy test for auto-anchor size")
-        dummy_input = torch.zeros(1, 3, *image_size).to(device)
-        dummy_output = model(dummy_input)
-        anchors_num = []
-        for predict_head in dummy_output["Main"]:
-            _, _, *anchor_num = predict_head[2].shape
-            anchors_num.append(anchor_num)
+    def __init__(self, model, image_size, device, anchors: list = None):
+        if anchors is None:
+            logger.info("🧸 Found no anchor, Make a dummy test for auto-anchor size")
+            dummy_input = torch.zeros(1, 3, *image_size).to(device)
+            dummy_output = model(dummy_input)
+            anchors_num = []
+            for predict_head in dummy_output["Main"]:
+                _, _, *anchor_num = predict_head[2].shape
+                anchors_num.append(anchor_num)
+        else:
+            anchors_num = [[image_size[0] / anchor, image_size[0] / anchor] for anchor in anchors]
         anchor_grid, scaler = generate_anchors(image_size, anchors_num)
         self.anchor_grid, self.scaler = anchor_grid.to(device), scaler.to(device)
         self.anchor_norm = (anchor_grid / scaler[:, None])[None].to(device)
