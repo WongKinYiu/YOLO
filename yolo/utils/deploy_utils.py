@@ -9,9 +9,8 @@ from yolo.model.yolo import create_model
 
 
 class FastModelLoader:
-    def __init__(self, cfg: Config, device):
+    def __init__(self, cfg: Config):
         self.cfg = cfg
-        self.device = device
         self.compiler = cfg.task.fast_inference
         self._validate_compiler()
         self.model_path = f"{os.path.splitext(cfg.weight)[0]}.{self.compiler}"

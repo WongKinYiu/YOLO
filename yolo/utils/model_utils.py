@@ -1,6 +1,10 @@
-from typing import Any, Dict, Type
+from typing import Any, Dict, List, Type, Union
 
 import torch
+import torch.distributed as dist
+from omegaconf import ListConfig
+from torch import nn
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR, SequentialLR, _LRScheduler
 
@@ -67,3 +71,31 @@ def create_scheduler(optimizer: Optimizer, schedule_cfg: SchedulerConfig) -> _LR
         warmup_schedule = LambdaLR(optimizer, lr_lambda=[lambda1, lambda2, lambda1])
         schedule = SequentialLR(optimizer, schedulers=[warmup_schedule, schedule], milestones=[2])
     return schedule
+
+
+def get_device():
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
+
+
+def send_to_device(model: nn.Module, device: Union[str, int, List[int]]):
+    if not isinstance(device, (List, ListConfig)):
+        device = torch.device(device)
+        print("runing man")
+        return device, model.to(device)
+
+    device = torch.device("cuda")
+    world_size = dist.get_world_size()
+    print("runing man")
+    dist.init_process_group(
+        backend="gloo" if torch.cuda.is_available() else "gloo", rank=dist.get_rank(), world_size=world_size
+    )
+    print(f"Initialized process group; rank: {dist.get_rank()}, size: {world_size}")
+
+    model = model.cuda(device)
+    model = DDP(model, device_ids=[device])
+    return device, model.to(device)

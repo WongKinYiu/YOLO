@@ -14,19 +14,18 @@ from yolo.tools.solver import ModelTester, ModelTrainer
 from yolo.utils.bounding_box_utils import Vec2Box
 from yolo.utils.deploy_utils import FastModelLoader
 from yolo.utils.logging_utils import ProgressLogger
+from yolo.utils.model_utils import send_to_device
 
 
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main(cfg: Config):
     progress = ProgressLogger(cfg, exp_name=cfg.name)
     dataloader = create_dataloader(cfg.task.data, cfg.dataset, cfg.task.task)
-    device = torch.device(cfg.device)
     if getattr(cfg.task, "fast_inference", False):
-        model = FastModelLoader(cfg, device).load_model()
-        device = torch.device(cfg.device)
+        model = FastModelLoader(cfg).load_model()
     else:
-        model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight, device=device)
-
+        model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight)
+    device, model = send_to_device(model, cfg.device)
     vec2box = Vec2Box(model, cfg.image_size, device)
 
     if cfg.task.task == "train":

@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Union
 import torch
 from loguru import logger
 from omegaconf import ListConfig, OmegaConf
-from torch import device, nn
+from torch import nn
 
 from yolo.config.config import Config, ModelConfig, YOLOLayer
 from yolo.tools.dataset_preparation import prepare_weight
@@ -117,7 +117,7 @@ class YOLO(nn.Module):
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
 
-def create_model(model_cfg: ModelConfig, weight_path: Optional[str], device: device, class_num: int = 80) -> YOLO:
+def create_model(model_cfg: ModelConfig, weight_path: Optional[str], class_num: int = 80) -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
 
     Args:
@@ -134,9 +134,10 @@ def create_model(model_cfg: ModelConfig, weight_path: Optional[str], device: dev
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")
             prepare_weight(weight_path=weight_path)
         if os.path.exists(weight_path):
-            model.model.load_state_dict(torch.load(weight_path, map_location=device), strict=False)
+            # TODO: fix map_location
+            model.model.load_state_dict(torch.load(weight_path), strict=False)
             logger.info("✅ Success load model weight")
 
     log_model_structure(model.model)
     draw_model(model=model)
-    return model.to(device)
+    return model
