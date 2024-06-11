@@ -1,4 +1,4 @@
-# YOLO: Official Implementation of YOLOv{7, 9}
+# YOLO: Official Implementation of YOLOv9, YOLOv7
 
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
 > [!IMPORTANT]
@@ -29,22 +29,36 @@ pip install -r requirements.txt
 ```
 
 ## Features
-- [x] Autodownload weights/datasets
-- [x] Pip installable
-- [x] Support for devices:
-  - [x] CUDA
-  - [x] MPS (PyTorch 2.3+)
-  - [x] CPU
-- [x] Task:
-  - [x] Training
-  - [x] Inference
-  - [ ] Validation
+
+<table>
+<tr><td>
+
+| Features Supported | pip 🐍 | Hugging Face 🤗 | Docker 🐳 |
+| -------------------- | :----: | :--------------: | :-------: |
+| Compatibility       | ✅     | ❔               | 🧪        |
+
+| Processing Phase    | Training | Validation | Inference |
+| ------------------- | :------: | :---------: | :-------: |
+| Supported           | ✅       | ✅          | ✅        |
+
+</td><td>
+
+| Supporting Device | CUDA       | CPU       | MPS       |
+| ------------------ | :---------: | :-------: | :-------: |
+| PyTorch            | v1.12      | v2.3+     | v1.12     |
+| ONNX               | ✅         | ✅        | -         |
+| TensorRT           | 🧪         | 🧪        | -         |
+| OpenVINO           | -          | 🧪        | ❔        |
+
+</td></tr> </table>
+
+
 
 ## Task
-These are simple examples. For more customization details, please refer to [Notebooks](examples) and lower-level modifications **[HOWTO](docs/HOWTO)**.
+These are simple examples. For more customization details, please refer to [Notebooks](examples) and lower-level modifications **[HOWTO](docs/HOWTO.md)**.
 
 ## Training
-To train YOLOv9 on your dataset:
+To train YOLO on your dataset:
 
 1. Modify the configuration file `data/config.yaml` to point to your dataset.
 2. Run the training script:
@@ -62,7 +76,7 @@ python yolo/lazy.py task=train task.data.batch_size=8 model=v9-c dataset={datase
 To evaluate the model performance, use:
 ```shell
 python yolo/lazy.py task=inference weight=weights/v9-c.pt model=v9-c task.fast_inference=deploy # use deploy weight
-python python yolo/lazy.py task=inference # if cloned from GitHub
+python yolo/lazy.py task=inference # if cloned from GitHub
 yolo task=inference task.data.source={Any} # if pip installed
 ```
 
@@ -76,7 +90,7 @@ To validate the model performance, use:
 Contributions to the YOLOv9 project are welcome! See [CONTRIBUTING](docs/CONTRIBUTING.md) for guidelines on how to contribute.
 
 ## Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=WongKinYiu/yolov9mit&type=Date)](https://star-history.com/#WongKinYiu/yolov9mit&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=WongKinYiu/YOLO&type=Date)](https://star-history.com/#WongKinYiu/YOLO&Date)
 
 ## Citations
 ```
