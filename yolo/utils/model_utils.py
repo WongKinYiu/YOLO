@@ -1,7 +1,9 @@
-from typing import Any, Dict, List, Type, Union
+import os
+from typing import List, Type, Union
 
 import torch
 import torch.distributed as dist
+from loguru import logger
 from omegaconf import ListConfig
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -73,29 +75,21 @@ def create_scheduler(optimizer: Optimizer, schedule_cfg: SchedulerConfig) -> _LR
     return schedule
 
 
-def get_device():
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        return torch.device("mps")
-    else:
-        return torch.device("cpu")
+def initialize_distributed() -> None:
+    rank = int(os.getenv("RANK", "0"))
+    local_rank = int(os.getenv("LOCAL_RANK", "0"))
+    world_size = int(os.getenv("WORLD_SIZE", "1"))
+
+    torch.cuda.set_device(local_rank)
+    dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
+    logger.info(f"Initialized process group; rank: {rank}, size: {world_size}")
+    return local_rank
 
 
-def send_to_device(model: nn.Module, device: Union[str, int, List[int]]):
-    if not isinstance(device, (List, ListConfig)):
-        device = torch.device(device)
-        print("runing man")
-        return device, model.to(device)
-
-    device = torch.device("cuda")
-    world_size = dist.get_world_size()
-    print("runing man")
-    dist.init_process_group(
-        backend="gloo" if torch.cuda.is_available() else "gloo", rank=dist.get_rank(), world_size=world_size
-    )
-    print(f"Initialized process group; rank: {dist.get_rank()}, size: {world_size}")
-
-    model = model.cuda(device)
-    model = DDP(model, device_ids=[device])
-    return device, model.to(device)
+def get_device(device_spec: Union[str, int, List[int]]) -> torch.device:
+    ddp_flag = False
+    if isinstance(device_spec, (list, ListConfig)):
+        ddp_flag = True
+        device_spec = initialize_distributed()
+    device = torch.device(device_spec)
+    return device, ddp_flag

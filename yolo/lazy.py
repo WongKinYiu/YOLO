@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 
 import hydra
-import torch
 
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
@@ -14,22 +13,24 @@ from yolo.tools.solver import ModelTester, ModelTrainer
 from yolo.utils.bounding_box_utils import Vec2Box
 from yolo.utils.deploy_utils import FastModelLoader
 from yolo.utils.logging_utils import ProgressLogger
-from yolo.utils.model_utils import send_to_device
+from yolo.utils.model_utils import get_device
 
 
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main(cfg: Config):
     progress = ProgressLogger(cfg, exp_name=cfg.name)
-    dataloader = create_dataloader(cfg.task.data, cfg.dataset, cfg.task.task)
+    device, use_ddp = get_device(cfg.device)
+    dataloader = create_dataloader(cfg.task.data, cfg.dataset, cfg.task.task, use_ddp)
     if getattr(cfg.task, "fast_inference", False):
         model = FastModelLoader(cfg).load_model()
     else:
         model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight)
-    device, model = send_to_device(model, cfg.device)
+        model = model.to(device)
+
     vec2box = Vec2Box(model, cfg.image_size, device)
 
     if cfg.task.task == "train":
-        trainer = ModelTrainer(cfg, model, vec2box, progress, device)
+        trainer = ModelTrainer(cfg, model, vec2box, progress, device, use_ddp)
         trainer.solve(dataloader)
 
     if cfg.task.task == "inference":

@@ -7,6 +7,8 @@ from torch import Tensor
 
 # TODO: We may can't use CUDA?
 from torch.cuda.amp import GradScaler, autocast
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader
 
 from yolo.config.config import Config, TrainConfig, ValidationConfig
 from yolo.model.yolo import YOLO
@@ -25,7 +27,8 @@ from yolo.utils.model_utils import (
 class ModelTrainer:
     def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, progress: ProgressLogger, device):
         train_cfg: TrainConfig = cfg.task
-        self.model = model
+        self.model = model if not use_ddp else DDP(model, device_ids=[device])
+        self.use_ddp = use_ddp
         self.vec2box = vec2box
         self.device = device
         self.optimizer = create_optimizer(model, train_cfg.optimizer)
@@ -86,13 +89,15 @@ class ModelTrainer:
             self.ema.restore()
         torch.save(checkpoint, filename)
 
-    def solve(self, dataloader):
+    def solve(self, dataloader: DataLoader):
         logger.info("🚄 Start Training!")
         num_epochs = self.num_epochs
 
         with self.progress.progress:
             self.progress.start_train(num_epochs)
             for epoch in range(num_epochs):
+                if self.use_ddp:
+                    dataloader.sampler.set_epoch(epoch)
 
                 self.progress.start_one_epoch(len(dataloader), self.optimizer, epoch)
                 epoch_loss = self.train_one_epoch(dataloader)
