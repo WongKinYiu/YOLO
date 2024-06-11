@@ -13,10 +13,10 @@ from torch.utils.data import DataLoader
 from yolo.config.config import Config, TrainConfig, ValidationConfig
 from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, create_dataloader
-from yolo.tools.drawer import draw_bboxes
+from yolo.tools.drawer import draw_bboxes, draw_model
 from yolo.tools.loss_functions import create_loss_function
 from yolo.utils.bounding_box_utils import Vec2Box, bbox_nms, calculate_map
-from yolo.utils.logging_utils import ProgressLogger
+from yolo.utils.logging_utils import ProgressLogger, log_model_structure
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
     create_optimizer,
@@ -25,7 +25,7 @@ from yolo.utils.model_utils import (
 
 
 class ModelTrainer:
-    def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, progress: ProgressLogger, device):
+    def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, progress: ProgressLogger, device, use_ddp: bool):
         train_cfg: TrainConfig = cfg.task
         self.model = model if not use_ddp else DDP(model, device_ids=[device])
         self.use_ddp = use_ddp
@@ -37,7 +37,13 @@ class ModelTrainer:
         self.progress = progress
         self.num_epochs = cfg.task.epoch
 
-        self.validation_dataloader = create_dataloader(cfg.task.validation.data, cfg.dataset, cfg.task.validation.task)
+        if not progress.quite_mode:
+            log_model_structure(model.model)
+            draw_model(model=model)
+
+        self.validation_dataloader = create_dataloader(
+            cfg.task.validation.data, cfg.dataset, cfg.task.validation.task, use_ddp
+        )
         self.validator = ModelValidator(cfg.task.validation, model, vec2box, progress, device)
 
         if getattr(train_cfg.ema, "enabled", False):

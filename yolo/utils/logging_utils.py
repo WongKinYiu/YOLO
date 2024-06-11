@@ -40,7 +40,9 @@ def custom_logger(quite: bool = False):
 
 class ProgressLogger:
     def __init__(self, cfg: Config, exp_name: str):
-        custom_logger(getattr(cfg, "quite", False))
+        local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        self.quite_mode = local_rank or getattr(cfg, "quite", False)
+        custom_logger(self.quite_mode)
         self.save_path = validate_log_directory(cfg, exp_name=cfg.name)
 
         self.progress = Progress(
@@ -53,7 +55,7 @@ class ProgressLogger:
         if self.use_wandb:
             wandb.errors.term._log = custom_wandb_log
             self.wandb = wandb.init(
-                project="YOLO", resume="allow", mode="online", dir=save_path, id=None, name=exp_name
+                project="YOLO", resume="allow", mode="online", dir=self.save_path, id=None, name=exp_name
             )
 
     def start_train(self, num_epochs: int):

@@ -6,10 +6,8 @@ from loguru import logger
 from omegaconf import ListConfig, OmegaConf
 from torch import nn
 
-from yolo.config.config import Config, ModelConfig, YOLOLayer
+from yolo.config.config import ModelConfig, YOLOLayer
 from yolo.tools.dataset_preparation import prepare_weight
-from yolo.tools.drawer import draw_model
-from yolo.utils.logging_utils import log_model_structure
 from yolo.utils.module_utils import get_layer_map
 
 
@@ -138,6 +136,4 @@ def create_model(model_cfg: ModelConfig, weight_path: Optional[str], class_num: 
             model.model.load_state_dict(torch.load(weight_path), strict=False)
             logger.info("✅ Success load model weight")
 
-    log_model_structure(model.model)
-    draw_model(model=model)
     return model
