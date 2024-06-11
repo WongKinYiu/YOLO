@@ -28,6 +28,10 @@ Please delete options that are not relevant.
 - [ ] New code is covered by tests.
 - [ ] [Optional] We would be very happy if gitmoji :technologist: could be used to assist the commit message :speech_balloon:!
 
+## Licensing:
+
+By submitting this pull request, I confirm that my contribution is made under the MIT License.
+
 ## Additional Information
 
 Add any other information about the PR here.
