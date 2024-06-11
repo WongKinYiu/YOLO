@@ -33,17 +33,17 @@ pip install -r requirements.txt
 <table>
 <tr><td>
 
-| Features Supported | pip 🐍 | Hugging Face 🤗 | Docker 🐳 |
+| Tools | pip 🐍 | HuggingFace 🤗 | Docker 🐳 |
 | -------------------- | :----: | :--------------: | :-------: |
 | Compatibility       | ✅     | ❔               | 🧪        |
 
-| Processing Phase    | Training | Validation | Inference |
+|  Phase    | Training | Validation | Inference |
 | ------------------- | :------: | :---------: | :-------: |
 | Supported           | ✅       | ✅          | ✅        |
 
 </td><td>
 
-| Supporting Device | CUDA       | CPU       | MPS       |
+| Device | CUDA       | CPU       | MPS       |
 | ------------------ | :---------: | :-------: | :-------: |
 | PyTorch            | v1.12      | v2.3+     | v1.12     |
 | ONNX               | ✅         | ✅        | -         |
