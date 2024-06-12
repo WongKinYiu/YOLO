@@ -47,7 +47,7 @@ pip install -r requirements.txt
 | ------------------ | :---------: | :-------: | :-------: |
 | PyTorch            | v1.12      | v2.3+     | v1.12     |
 | ONNX               | ✅         | ✅        | -         |
-| TensorRT           | 🧪         | 🧪        | -         |
+| TensorRT           | ✅         | -        | -         |
 | OpenVINO           | -          | 🧪        | ❔        |
 
 </td></tr> </table>
