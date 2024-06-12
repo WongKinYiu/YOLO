@@ -25,7 +25,7 @@ def main(cfg: Config):
         model = FastModelLoader(cfg).load_model()
     else:
         model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight)
-        model = model.to(device)
+    model = model.to(device)
 
     vec2box = Vec2Box(model, cfg.image_size, device)
 

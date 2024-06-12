@@ -1,6 +1,6 @@
 anchor:
   reg_max: 16
-  anchors: [8, 16, 32]
+  strides: [8, 16, 32]
 
 model:
   backbone:
