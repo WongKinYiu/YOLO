@@ -30,9 +30,7 @@ class FastModelLoader:
             return self._load_trt_model()
         elif self.compiler == "deploy":
             self.cfg.model.model.auxiliary = {}
-        return create_model(
-            self.cfg.model, class_num=self.cfg.class_num, weight_path=self.cfg.weight, device=self.device
-        )
+        return create_model(self.cfg.model, class_num=self.cfg.class_num, weight_path=self.cfg.weight)
 
     def _load_onnx_model(self):
         from onnxruntime import InferenceSession
@@ -91,9 +89,9 @@ class FastModelLoader:
         from torch2trt import torch2trt
 
         model = create_model(self.cfg.model, class_num=self.cfg.class_num, weight_path=self.cfg.weight).eval()
-        dummy_input = torch.ones((1, 3, *self.cfg.image_size))
+        dummy_input = torch.ones((1, 3, *self.cfg.image_size)).cuda()
         logger.info(f"♻️ Creating TensorRT model")
-        model_trt = torch2trt(model, [dummy_input])
+        model_trt = torch2trt(model.cuda(), [dummy_input])
         torch.save(model_trt.state_dict(), self.model_path)
         logger.info(f"📥 TensorRT model saved to {self.model_path}")
         return model_trt

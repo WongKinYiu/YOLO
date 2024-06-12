@@ -13,7 +13,7 @@ def draw_bboxes(
     img: Union[Image.Image, torch.Tensor],
     bboxes: List[List[Union[int, float]]],
     *,
-    idx2label: Optional[list],
+    idx2label: Optional[list] = None,
 ):
     """
     Draw bounding boxes on an image.
@@ -47,7 +47,7 @@ def draw_bboxes(
         draw.rounded_rectangle(bbox, outline=(*color_map, 200), radius=5, width=2)
         draw.rounded_rectangle(bbox, fill=(*color_map, 100), radius=5)
 
-        class_text = str(idx2label[int(class_id)] if idx2label else class_id)
+        class_text = str(idx2label[int(class_id)] if idx2label else int(class_id))
         label_text = f"{class_text}" + (f" {conf[0]: .0%}" if conf else "")
 
         text_bbox = font.getbbox(label_text)

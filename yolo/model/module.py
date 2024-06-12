@@ -105,7 +105,7 @@ class Anchor2Vec(nn.Module):
     def forward(self, anchor_x: Tensor) -> Tensor:
         anchor_x = rearrange(anchor_x, "B (P R) h w -> B R P h w", P=4)
         vector_x = anchor_x.softmax(dim=1)
-        vector_x = self.anc2vec(vector_x).squeeze(1)
+        vector_x = self.anc2vec(vector_x)[:, 0]
         return anchor_x, vector_x
 
 

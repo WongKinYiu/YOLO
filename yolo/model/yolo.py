@@ -26,13 +26,15 @@ class YOLO(nn.Module):
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
         self.model: List[YOLOLayer] = nn.ModuleList()
         self.build_model(model_cfg.model)
+        self.strides = getattr(model_cfg.anchor, "strides", None)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
         self.layer_index = {}
         output_dim, layer_idx = [3], 1
         logger.info(f"🚜 Building YOLO")
         for arch_name in model_arch:
-            logger.info(f"  🏗️  Building {arch_name}")
+            if model_arch[arch_name]:
+                logger.info(f"  🏗️  Building {arch_name}")
             for layer_idx, layer_spec in enumerate(model_arch[arch_name], start=layer_idx):
                 layer_type, layer_info = next(iter(layer_spec.items()))
                 layer_args = layer_info.get("args", {})
@@ -45,7 +47,6 @@ class YOLO(nn.Module):
                     layer_args["in_channels"] = output_dim[source]
                 if "Detection" in layer_type:
                     layer_args["in_channels"] = [output_dim[idx] for idx in source]
-                if "Detection" in layer_type or "Anchor2Box" in layer_type:
                     layer_args["num_classes"] = self.num_classes
 
                 # create layers
@@ -134,6 +135,7 @@ def create_model(model_cfg: ModelConfig, weight_path: Optional[str], class_num: 
         if os.path.exists(weight_path):
             # TODO: fix map_location
             model.model.load_state_dict(torch.load(weight_path), strict=False)
-            logger.info("✅ Success load model weight")
-
+            logger.info("✅ Success load model & weight")
+    else:
+        logger.info("✅ Success load model")
     return model
