@@ -56,6 +56,7 @@ def prepare_dataset(dataset_cfg: DatasetConfig, task: str):
     """
     Prepares dataset by downloading and unzipping if necessary.
     """
+    # TODO: do EDA of dataset
     data_dir = dataset_cfg.path
     for data_type, settings in dataset_cfg.auto_download.items():
         base_url = settings["base_url"]

@@ -79,6 +79,7 @@ class YOLO(nn.Module):
         return output
 
     def get_out_channels(self, layer_type: str, layer_args: dict, output_dim: list, source: Union[int, list]):
+        # TODO refactor, check out_channels in layer_args, next check source is list, CBFuse|Concat
         if any(module in layer_type for module in ["Conv", "ELAN", "ADown", "AConv"]):
             return layer_args["out_channels"]
         if layer_type == "CBFuse":
@@ -124,9 +125,9 @@ def create_model(model_cfg: ModelConfig, weight_path: Optional[str], class_num: 
     Returns:
         YOLO: An instance of the model defined by the given configuration.
     """
+    # TODO: "weight_path -> weight = [True|None-False|Path]: True should be default of model name?"
     OmegaConf.set_struct(model_cfg, False)
     model = YOLO(model_cfg, class_num)
-    logger.info("✅ Success load model")
     if weight_path:
         if not os.path.exists(weight_path):
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")

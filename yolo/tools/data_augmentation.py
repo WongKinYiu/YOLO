@@ -25,6 +25,9 @@ class AugmentationComposer:
         return image, boxes
 
 
+# TODO: RandomCrop, Resize, ... etc.
+
+
 class PadAndResize:
     def __init__(self, image_size):
         """Initialize the object with the target image size."""
