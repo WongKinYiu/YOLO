@@ -1,6 +1,8 @@
 # YOLO: Official Implementation of YOLOv9, YOLOv7
 
+![GitHub License](https://img.shields.io/github/license/WongKinYiu/YOLO)
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/henry000/YOLO)
 > [!IMPORTANT]
 > This project is currently a Work In Progress and may undergo significant changes. It is not recommended for use in production environments until further notice. Please check back regularly for updates.
 >
@@ -35,7 +37,7 @@ pip install -r requirements.txt
 
 | Tools | pip 🐍 | HuggingFace 🤗 | Docker 🐳 |
 | -------------------- | :----: | :--------------: | :-------: |
-| Compatibility       | ✅     | ❔               | 🧪        |
+| Compatibility       | ✅     | ✅               | 🧪        |
 
 |  Phase    | Training | Validation | Inference |
 | ------------------- | :------: | :---------: | :-------: |

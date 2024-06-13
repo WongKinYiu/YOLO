@@ -1,4 +1,4 @@
-from yolo.config.config import Config
+from yolo.config.config import Config, NMSConfig
 from yolo.model.yolo import create_model
 from yolo.tools.data_loader import AugmentationComposer, create_dataloader
 from yolo.tools.drawer import draw_bboxes
@@ -10,6 +10,7 @@ from yolo.utils.logging_utils import custom_logger
 all = [
     "create_model",
     "Config",
+    "NMSConfig",
     "custom_logger",
     "validate_log_directory",
     "draw_bboxes",
