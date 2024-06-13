@@ -24,6 +24,7 @@ class BlockConfig:
 
 @dataclass
 class ModelConfig:
+    name: Optional[str]
     anchor: AnchorConfig
     model: Dict[str, BlockConfig]
 

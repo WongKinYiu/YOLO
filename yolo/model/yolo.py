@@ -25,8 +25,9 @@ class YOLO(nn.Module):
         self.num_classes = class_num
         self.layer_map = get_layer_map()  # Get the map Dict[str: Module]
         self.model: List[YOLOLayer] = nn.ModuleList()
-        self.build_model(model_cfg.model)
+        self.reg_max = getattr(model_cfg.anchor, "reg_max", 16)
         self.strides = getattr(model_cfg.anchor, "strides", None)
+        self.build_model(model_cfg.model)
 
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
         self.layer_index = {}
@@ -48,6 +49,7 @@ class YOLO(nn.Module):
                 if "Detection" in layer_type:
                     layer_args["in_channels"] = [output_dim[idx] for idx in source]
                     layer_args["num_classes"] = self.num_classes
+                    layer_args["reg_max"] = self.reg_max
 
                 # create layers
                 layer = self.create_layer(layer_type, source, layer_info, **layer_args)

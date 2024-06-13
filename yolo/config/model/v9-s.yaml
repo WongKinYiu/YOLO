@@ -1,3 +1,5 @@
+name: v9-s
+
 anchor:
   reg_max: 16
 
@@ -92,8 +94,6 @@ model:
     - MultiheadDetection:
         source: [P3, P4, P5]
         tags: Main
-        args:
-            reg_max: ${model.anchor.reg_max}
         output: True
 
   auxiliary:
@@ -129,6 +129,4 @@ model:
     - MultiheadDetection:
         source: [A3, A4, A5]
         tags: AUX
-        args:
-            reg_max: ${model.anchor.reg_max}
         output: True
