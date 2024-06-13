@@ -41,7 +41,7 @@ def test_compose():
     img = Image.new("RGB", (640, 640), color="blue")
     boxes = torch.tensor([[0, 0.2, 0.2, 0.8, 0.8]])
 
-    transformed_img, transformed_boxes = compose(img, boxes)
+    transformed_img, transformed_boxes, rev_tensor = compose(img, boxes)
     tensor_img = TF.pil_to_tensor(img).to(torch.float32) / 255
 
     assert (transformed_img == tensor_img).all(), "Image should not be altered"
