@@ -149,7 +149,7 @@ class YoloDataset(Dataset):
 
     def __getitem__(self, idx) -> Union[Image.Image, torch.Tensor]:
         img, bboxes = self.get_data(idx)
-        img, bboxes = self.transform(img, bboxes)
+        img, bboxes, _ = self.transform(img, bboxes)
         return img, bboxes
 
     def __len__(self) -> int:
@@ -261,7 +261,7 @@ class StreamDataLoader:
         if isinstance(frame, np.ndarray):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = Image.fromarray(frame)
-        frame, _ = self.transform(frame, torch.zeros(0, 5))
+        frame, _, rev_tensor = self.transform(frame, torch.zeros(0, 5))
         frame = frame[None]
         if not self.is_stream:
             self.queue.put(frame)

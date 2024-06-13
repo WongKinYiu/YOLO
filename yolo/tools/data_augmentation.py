@@ -17,12 +17,12 @@ class AugmentationComposer:
             if hasattr(transform, "set_parent"):
                 transform.set_parent(self)
 
-    def __call__(self, image, boxes):
+    def __call__(self, image, boxes=torch.zeros(0, 5)):
         for transform in self.transforms:
             image, boxes = transform(image, boxes)
-        image, boxes = self.pad_resize(image, boxes)
+        image, boxes, rev_tensor = self.pad_resize(image, boxes)
         image = TF.to_tensor(image)
-        return image, boxes
+        return image, boxes, rev_tensor
 
 
 # TODO: RandomCrop, Resize, ... etc.
@@ -36,7 +36,7 @@ class PadAndResize:
     def __call__(self, image, boxes):
         original_size = max(image.size)
         scale = self.image_size / original_size
-        square_img = Image.new("RGB", (original_size, original_size), (255, 255, 255))
+        square_img = Image.new("RGB", (original_size, original_size), (128, 128, 128))
         left = (original_size - image.width) // 2
         top = (original_size - image.height) // 2
         square_img.paste(image, (left, top))
@@ -48,7 +48,8 @@ class PadAndResize:
         boxes[:, 3] = (boxes[:, 3] * image.width + left) / self.image_size * scale
         boxes[:, 4] = (boxes[:, 4] * image.height + top) / self.image_size * scale
 
-        return resized_img, boxes
+        rev_tensor = torch.tensor([scale, left, top, left, top])
+        return resized_img, boxes, rev_tensor
 
 
 class HorizontalFlip:
