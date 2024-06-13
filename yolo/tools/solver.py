@@ -142,7 +142,7 @@ class ModelTester:
                     predicts = self.model(images)
                     predicts = self.vec2box(predicts["Main"])
                 nms_out = bbox_nms(predicts[0], predicts[2], self.nms)
-                img = draw_bboxes(images[0], nms_out[0], idx2label=self.idx2label)
+                img = draw_bboxes(images, nms_out, idx2label=self.idx2label)
 
                 if dataloader.is_stream:
                     img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)

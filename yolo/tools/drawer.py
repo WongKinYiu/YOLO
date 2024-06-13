@@ -27,15 +27,17 @@ def draw_bboxes(
     if isinstance(img, torch.Tensor):
         if img.dim() > 3:
             logger.warning("🔍 >3 dimension tensor detected, using the 0-idx image.")
-            img, bboxes = img[0], bboxes[0]
+            img = img[0]
         img = to_pil_image(img)
 
+    img, bboxes = img.copy(), bboxes[0]
+    label_size = img.size[1] / 30
     draw = ImageDraw.Draw(img, "RGBA")
 
     try:
-        font = ImageFont.truetype("arial.ttf", 15)
+        font = ImageFont.truetype("arial.ttf", label_size)
     except IOError:
-        font = ImageFont.load_default()
+        font = ImageFont.load_default(label_size)
 
     for bbox in bboxes:
         class_id, x_min, y_min, x_max, y_max, *conf = [float(val) for val in bbox]
@@ -52,7 +54,7 @@ def draw_bboxes(
 
         text_bbox = font.getbbox(label_text)
         text_width = text_bbox[2] - text_bbox[0]
-        text_height = (text_bbox[3] - text_bbox[1]) * 1.25
+        text_height = (text_bbox[3] - text_bbox[1]) * 1.5
 
         text_background = [(x_min, y_min), (x_min + text_width, y_min + text_height)]
         draw.rounded_rectangle(text_background, fill=(*color_map, 175), radius=2)
