@@ -119,7 +119,7 @@ class YOLO(nn.Module):
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
 
-def create_model(model_cfg: ModelConfig, weight_path: Union[bool, str], class_num: int = 80) -> YOLO:
+def create_model(model_cfg: ModelConfig, weight_path: Union[bool, str] = True, class_num: int = 80) -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
 
     Args:
