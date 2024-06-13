@@ -266,7 +266,7 @@ class BoxMatcher:
 
 class Vec2Box:
     def __init__(self, model: YOLO, image_size, device):
-        if model.strides is None:
+        if getattr(model, "strides", None) is None:
             logger.info("🧸 Found no anchor, Make a dummy test for auto-anchor size")
             dummy_input = torch.zeros(1, 3, *image_size).to(device)
             dummy_output = model(dummy_input)
@@ -277,6 +277,10 @@ class Vec2Box:
         else:
             logger.info(f"🈶 Found anchor {model.strides}")
             anchors_num = [[image_size[0] // stride, image_size[0] // stride] for stride in model.strides]
+
+        if not isinstance(model, YOLO):
+            device = torch.device("cpu")
+
         anchor_grid, scaler = generate_anchors(image_size, anchors_num)
         self.anchor_grid, self.scaler = anchor_grid.to(device), scaler.to(device)
         self.anchor_norm = (anchor_grid / scaler[:, None])[None].to(device)
