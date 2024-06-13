@@ -12,4 +12,4 @@ lucky_number: 10
 use_wandb: False
 use_TensorBoard: False
 
-weight: weights/v9-c.pt
+weight: True # Path to weight or True for auto, False for no pretrained weight

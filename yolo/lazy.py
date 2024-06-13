@@ -22,10 +22,10 @@ def main(cfg: Config):
     device, use_ddp = get_device(cfg.device)
     dataloader = create_dataloader(cfg.task.data, cfg.dataset, cfg.task.task, use_ddp)
     if getattr(cfg.task, "fast_inference", False):
-        model = FastModelLoader(cfg).load_model()
+        model = FastModelLoader(cfg).load_model(device)
     else:
         model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight)
-    model = model.to(device)
+        model = model.to(device)
 
     vec2box = Vec2Box(model, cfg.image_size, device)
 

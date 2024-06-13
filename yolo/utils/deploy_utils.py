@@ -13,6 +13,8 @@ class FastModelLoader:
         self.cfg = cfg
         self.compiler = cfg.task.fast_inference
         self._validate_compiler()
+        if cfg.weight == True:
+            cfg.weight = os.path.join("weights", f"{cfg.model.name}.pt")
         self.model_path = f"{os.path.splitext(cfg.weight)[0]}.{self.compiler}"
 
     def _validate_compiler(self):
@@ -23,14 +25,14 @@ class FastModelLoader:
             logger.warning("🍎 TensorRT does not support MPS devices. Using original model.")
             self.compiler = None
 
-    def load_model(self):
+    def load_model(self, device):
         if self.compiler == "onnx":
             return self._load_onnx_model()
         elif self.compiler == "trt":
-            return self._load_trt_model()
+            return self._load_trt_model().to(device)
         elif self.compiler == "deploy":
             self.cfg.model.model.auxiliary = {}
-        return create_model(self.cfg.model, class_num=self.cfg.class_num, weight_path=self.cfg.weight)
+        return create_model(self.cfg.model, class_num=self.cfg.class_num, weight_path=self.cfg.weight).to(device)
 
     def _load_onnx_model(self):
         from onnxruntime import InferenceSession

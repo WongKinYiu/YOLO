@@ -119,7 +119,7 @@ class YOLO(nn.Module):
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
 
-def create_model(model_cfg: ModelConfig, weight_path: Optional[str], class_num: int = 80) -> YOLO:
+def create_model(model_cfg: ModelConfig, weight_path: Union[bool, str], class_num: int = 80) -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
 
     Args:
@@ -132,12 +132,14 @@ def create_model(model_cfg: ModelConfig, weight_path: Optional[str], class_num: 
     OmegaConf.set_struct(model_cfg, False)
     model = YOLO(model_cfg, class_num)
     if weight_path:
+        if weight_path == True:
+            weight_path = os.path.join("weights", f"{model_cfg.name}.pt")
         if not os.path.exists(weight_path):
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")
             prepare_weight(weight_path=weight_path)
         if os.path.exists(weight_path):
             # TODO: fix map_location
-            model.model.load_state_dict(torch.load(weight_path), strict=False)
+            model.model.load_state_dict(torch.load(weight_path, map_location=torch.device("cpu")), strict=False)
             logger.info("✅ Success load model & weight")
     else:
         logger.info("✅ Success load model")
