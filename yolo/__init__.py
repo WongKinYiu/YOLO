@@ -6,6 +6,7 @@ from yolo.tools.solver import ModelTester, ModelTrainer, ModelValidator
 from yolo.utils.bounding_box_utils import Vec2Box, bbox_nms
 from yolo.utils.deploy_utils import FastModelLoader
 from yolo.utils.logging_utils import custom_logger
+from yolo.utils.model_utils import PostProccess
 
 all = [
     "create_model",
@@ -22,4 +23,5 @@ all = [
     "ModelTester",
     "ModelTrainer",
     "ModelValidator",
+    "PostProccess",
 ]
