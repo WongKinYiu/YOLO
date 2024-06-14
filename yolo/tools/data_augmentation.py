@@ -10,7 +10,7 @@ class AugmentationComposer:
     def __init__(self, transforms, image_size: int = [640, 640]):
         self.transforms = transforms
         # TODO: handle List of image_size [640, 640]
-        self.image_size = image_size[0]
+        self.image_size = image_size
         self.pad_resize = PadAndResize(self.image_size)
 
         for transform in self.transforms:
@@ -29,27 +29,32 @@ class AugmentationComposer:
 
 
 class PadAndResize:
-    def __init__(self, image_size):
+    def __init__(self, image_size, background_color=(128, 128, 128)):
         """Initialize the object with the target image size."""
-        self.image_size = image_size
+        self.target_width, self.target_height = image_size
+        self.background_color = background_color
 
-    def __call__(self, image, boxes):
-        original_size = max(image.size)
-        scale = self.image_size / original_size
-        square_img = Image.new("RGB", (original_size, original_size), (128, 128, 128))
-        left = (original_size - image.width) // 2
-        top = (original_size - image.height) // 2
-        square_img.paste(image, (left, top))
+    def __call__(self, image: Image, boxes):
+        img_width, img_height = image.size
+        scale = min(self.target_width / img_width, self.target_height / img_height)
+        new_width, new_height = int(img_width * scale), int(img_height * scale)
 
-        resized_img = square_img.resize((self.image_size, self.image_size))
+        resized_image = image.resize((new_width, new_height), Image.LANCZOS)
 
-        boxes[:, 1] = (boxes[:, 1] * image.width + left) / self.image_size * scale
-        boxes[:, 2] = (boxes[:, 2] * image.height + top) / self.image_size * scale
-        boxes[:, 3] = (boxes[:, 3] * image.width + left) / self.image_size * scale
-        boxes[:, 4] = (boxes[:, 4] * image.height + top) / self.image_size * scale
+        pad_left = (self.target_width - new_width) // 2
+        pad_top = (self.target_height - new_height) // 2
+        padded_image = Image.new("RGB", (self.target_width, self.target_height), self.background_color)
+        padded_image.paste(resized_image, (pad_left, pad_top))
 
-        rev_tensor = torch.tensor([scale, left, top, left, top])
-        return resized_img, boxes, rev_tensor
+        boxes[:, 1] *= scale  # xmin
+        boxes[:, 2] *= scale  # ymin
+        boxes[:, 3] *= scale  # xmax
+        boxes[:, 4] *= scale  # ymax
+        boxes[:, [1, 3]] += pad_left
+        boxes[:, [2, 4]] += pad_top
+
+        transform_info = torch.tensor([scale, pad_left, pad_top, pad_left, pad_top])
+        return padded_image, boxes, transform_info
 
 
 class HorizontalFlip:
@@ -94,7 +99,7 @@ class Mosaic:
 
         assert self.parent is not None, "Parent is not set. Mosaic cannot retrieve image size."
 
-        img_sz = self.parent.image_size  # Assuming `image_size` is defined in parent
+        img_sz = self.parent.image_size[0]  # Assuming `image_size` is defined in parent
         more_data = self.parent.get_more_data(3)  # get 3 more images randomly
 
         data = [(image, boxes)] + more_data

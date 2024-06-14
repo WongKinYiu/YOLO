@@ -72,7 +72,7 @@ class ModelTrainer:
         self.model.train()
         total_loss = 0
 
-        for images, targets in dataloader:
+        for images, targets, *_ in dataloader:
             loss, loss_each = self.train_one_batch(images, targets)
 
             total_loss += loss
@@ -136,8 +136,9 @@ class ModelTester:
 
             last_time = time.time()
         try:
-            for idx, images in enumerate(dataloader):
+            for idx, (images, rev_tensor, origin_frame) in enumerate(dataloader):
                 images = images.to(self.device)
+                rev_tensor = rev_tensor.to(self.device)
                 with torch.no_grad():
                     predicts = self.model(images)
                     predicts = self.vec2box(predicts["Main"])
@@ -192,8 +193,8 @@ class ModelValidator:
         iou_thresholds = torch.arange(0.5, 1.0, 0.05)
         map_all = []
         self.progress.start_one_epoch(len(dataloader))
-        for images, targets in dataloader:
-            images, targets = images.to(self.device), targets.to(self.device)
+        for images, targets, rev_tensor, img_paths in dataloader:
+            images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
                 predicts = self.model(images)
             predicts = self.vec2box(predicts["Main"])
