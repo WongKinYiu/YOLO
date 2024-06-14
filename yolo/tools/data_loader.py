@@ -141,16 +141,16 @@ class YoloDataset(Dataset):
     def get_data(self, idx):
         img_path, bboxes = self.data[idx]
         img = Image.open(img_path).convert("RGB")
-        return img, bboxes
+        return img, bboxes, img_path
 
     def get_more_data(self, num: int = 1):
         indices = torch.randint(0, len(self), (num,))
-        return [self.get_data(idx) for idx in indices]
+        return [self.get_data(idx)[:2] for idx in indices]
 
     def __getitem__(self, idx) -> Union[Image.Image, torch.Tensor]:
-        img, bboxes = self.get_data(idx)
-        img, bboxes, _ = self.transform(img, bboxes)
-        return img, bboxes
+        img, bboxes, img_path = self.get_data(idx)
+        img, bboxes, rev_tensor = self.transform(img, bboxes)
+        return img, bboxes, rev_tensor, img_path
 
     def __len__(self) -> int:
         return len(self.data)
@@ -195,9 +195,11 @@ class YoloDataLoader(DataLoader):
             batch_targets[idx, :target_size] = batch[idx][1]
         batch_targets[:, :, 1:] *= self.image_size
 
-        batch_images = torch.stack([item[0] for item in batch])
+        batch_images, _, batch_reverse, batch_path = zip(*batch)
+        batch_images = torch.stack(batch_images)
+        batch_reverse = torch.stack(batch_reverse)
 
-        return batch_images, batch_targets
+        return batch_images, batch_targets, batch_reverse, batch_path
 
 
 def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
@@ -261,12 +263,14 @@ class StreamDataLoader:
         if isinstance(frame, np.ndarray):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = Image.fromarray(frame)
+        origin_frame = frame
         frame, _, rev_tensor = self.transform(frame, torch.zeros(0, 5))
         frame = frame[None]
+        rev_tensor = rev_tensor[None]
         if not self.is_stream:
-            self.queue.put(frame)
+            self.queue.put((frame, rev_tensor, origin_frame))
         else:
-            self.current_frame = frame
+            self.current_frame = (frame, rev_tensor, origin_frame)
 
     def __iter__(self) -> Generator[Tensor, None, None]:
         return self

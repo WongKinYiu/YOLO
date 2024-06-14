@@ -1,3 +1,4 @@
+import json
 import os
 import time
 
@@ -15,12 +16,14 @@ from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes, draw_model
 from yolo.tools.loss_functions import create_loss_function
-from yolo.utils.bounding_box_utils import Vec2Box, bbox_nms, calculate_map
+from yolo.utils.bounding_box_utils import Vec2Box
 from yolo.utils.logging_utils import ProgressLogger, log_model_structure
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
+    PostProccess,
     create_optimizer,
     create_scheduler,
+    predicts_to_json,
 )
 
 
@@ -72,7 +75,7 @@ class ModelTrainer:
         self.model.train()
         total_loss = 0
 
-        for images, targets in dataloader:
+        for images, targets, *_ in dataloader:
             loss, loss_each = self.train_one_batch(images, targets)
 
             total_loss += loss
@@ -136,8 +139,9 @@ class ModelTester:
 
             last_time = time.time()
         try:
-            for idx, images in enumerate(dataloader):
+            for idx, (images, rev_tensor, origin_frame) in enumerate(dataloader):
                 images = images.to(self.device)
+                rev_tensor = rev_tensor.to(self.device)
                 with torch.no_grad():
                     predicts = self.model(images)
                     predicts = self.vec2box(predicts["Main"])
@@ -175,32 +179,29 @@ class ModelValidator:
         validation_cfg: ValidationConfig,
         model: YOLO,
         vec2box: Vec2Box,
-        device,
         progress: ProgressLogger,
+        device,
     ):
         self.model = model
-        self.vec2box = vec2box
         self.device = device
         self.progress = progress
 
-        self.nms = validation_cfg.nms
+        self.post_proccess = PostProccess(vec2box, validation_cfg.nms)
+        self.json_path = os.path.join(self.progress.save_path, f"predict.json")
 
     def solve(self, dataloader):
         # logger.info("🧪 Start Validation!")
         self.model.eval()
-        # TODO: choice mAP metrics?
-        iou_thresholds = torch.arange(0.5, 1.0, 0.05)
-        map_all = []
+        predict_json = []
         self.progress.start_one_epoch(len(dataloader))
-        for images, targets in dataloader:
-            images, targets = images.to(self.device), targets.to(self.device)
+        for images, targets, rev_tensor, img_paths in dataloader:
+            images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
                 predicts = self.model(images)
-            predicts = self.vec2box(predicts["Main"])
-            nms_out = bbox_nms(predicts[0], predicts[2], self.nms)
-            for idx, predict in enumerate(nms_out):
-                map_value = calculate_map(predict, targets[idx], iou_thresholds)
-                map_all.append(map_value[0])
-            self.progress.one_batch(mapp=torch.Tensor(map_all).mean())
+                predicts = self.post_proccess(predicts, rev_tensor)
+            self.progress.one_batch()
 
+            predict_json.extend(predicts_to_json(img_paths, predicts))
         self.progress.finish_one_epoch()
+        with open(self.json_path, "w") as f:
+            json.dump(predict_json, f)
