@@ -39,9 +39,9 @@ class BoxLoss(nn.Module):
 
 
 class DFLoss(nn.Module):
-    def __init__(self, anchors_norm: Tensor, reg_max: int) -> None:
+    def __init__(self, vec2box: Vec2Box, reg_max: int) -> None:
         super().__init__()
-        self.anchors_norm = anchors_norm
+        self.anchors_norm = (vec2box.anchor_grid / vec2box.scaler[:, None])[None]
         self.reg_max = reg_max
 
     def forward(
@@ -72,7 +72,7 @@ class YOLOLoss:
         self.vec2box = vec2box
 
         self.cls = BCELoss()
-        self.dfl = DFLoss(vec2box.anchor_norm, reg_max)
+        self.dfl = DFLoss(vec2box, reg_max)
         self.iou = BoxLoss()
 
         self.matcher = BoxMatcher(loss_cfg.matcher, self.class_num, vec2box.anchor_grid)
