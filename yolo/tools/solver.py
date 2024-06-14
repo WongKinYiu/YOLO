@@ -119,10 +119,9 @@ class ModelTester:
     def __init__(self, cfg: Config, model: YOLO, vec2box: Vec2Box, progress: ProgressLogger, device):
         self.model = model
         self.device = device
-        self.vec2box = vec2box
         self.progress = progress
 
-        self.nms = cfg.task.nms
+        self.post_proccess = PostProccess(vec2box, cfg.task.nms)
         self.save_path = os.path.join(progress.save_path, "images")
         os.makedirs(self.save_path, exist_ok=True)
         self.save_predict = getattr(cfg.task, "save_predict", None)
@@ -144,9 +143,8 @@ class ModelTester:
                 rev_tensor = rev_tensor.to(self.device)
                 with torch.no_grad():
                     predicts = self.model(images)
-                    predicts = self.vec2box(predicts["Main"])
-                nms_out = bbox_nms(predicts[0], predicts[2], self.nms)
-                img = draw_bboxes(images, nms_out, idx2label=self.idx2label)
+                    predicts = self.post_proccess(predicts, rev_tensor)
+                img = draw_bboxes(origin_frame, predicts, idx2label=self.idx2label)
 
                 if dataloader.is_stream:
                     img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
