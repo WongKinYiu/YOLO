@@ -1,17 +1,18 @@
 import os
-from typing import List, Type, Union
+from pathlib import Path
+from typing import List, Optional, Type, Union
 
 import torch
 import torch.distributed as dist
 from loguru import logger
 from omegaconf import ListConfig
-from torch import nn
-from torch.nn.parallel import DistributedDataParallel as DDP
+from torch import Tensor
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR, SequentialLR, _LRScheduler
 
-from yolo.config.config import OptimizerConfig, SchedulerConfig
+from yolo.config.config import IDX_TO_ID, NMSConfig, OptimizerConfig, SchedulerConfig
 from yolo.model.yolo import YOLO
+from yolo.utils.bounding_box_utils import bbox_nms, transform_bbox
 
 
 class ExponentialMovingAverage:
@@ -93,3 +94,40 @@ def get_device(device_spec: Union[str, int, List[int]]) -> torch.device:
         device_spec = initialize_distributed()
     device = torch.device(device_spec)
     return device, ddp_flag
+
+
+class PostProccess:
+    """
+    TODO: function document
+    scale back the prediction and do nms for pred_bbox
+    """
+
+    def __init__(self, vec2box, nms_cfg: NMSConfig) -> None:
+        self.vec2box = vec2box
+        self.nms = nms_cfg
+
+    def __call__(self, predict, rev_tensor: Optional[Tensor]):
+        pred_class, _, pred_bbox = self.vec2box(predict["Main"])
+        if rev_tensor is not None:
+            pred_bbox = (pred_bbox - rev_tensor[:, None, 1:]) / rev_tensor[:, 0:1, None]
+        pred_bbox = bbox_nms(pred_class, pred_bbox, self.nms)
+        return pred_bbox
+
+
+def predicts_to_json(img_paths, predicts):
+    """
+    TODO: function document
+    turn a batch of imagepath and predicts(n x 6 for each image) to a List of diction(Detection output)
+    """
+    batch_json = []
+    for img_path, bboxes in zip(img_paths, predicts):
+        bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
+        for cls, *pos, conf in bboxes:
+            bbox = {
+                "image_id": int(Path(img_path).stem),
+                "category_id": IDX_TO_ID[int(cls)],
+                "bbox": [float(p) for p in pos],
+                "score": float(conf),
+            }
+            batch_json.append(bbox)
+    return batch_json
