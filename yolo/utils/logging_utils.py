@@ -51,6 +51,8 @@ class ProgressLogger:
             TextColumn("{task.completed:.0f}/{task.total:.0f}"),
             TimeRemainingColumn(),
         )
+        self.progress.start()
+
         self.use_wandb = cfg.use_wandb
         if self.use_wandb:
             wandb.errors.term._log = custom_wandb_log
