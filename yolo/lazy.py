@@ -9,7 +9,7 @@ sys.path.append(str(project_root))
 from yolo.config.config import Config
 from yolo.model.yolo import create_model
 from yolo.tools.data_loader import create_dataloader
-from yolo.tools.solver import ModelTester, ModelTrainer
+from yolo.tools.solver import ModelTester, ModelTrainer, ModelValidator
 from yolo.utils.bounding_box_utils import Vec2Box
 from yolo.utils.deploy_utils import FastModelLoader
 from yolo.utils.logging_utils import ProgressLogger
@@ -36,6 +36,10 @@ def main(cfg: Config):
     if cfg.task.task == "inference":
         tester = ModelTester(cfg, model, vec2box, progress, device)
         tester.solve(dataloader)
+
+    if cfg.task.task == "validation":
+        valider = ModelValidator(cfg.task, model, vec2box, progress, device)
+        valider.solve(dataloader)
 
 
 if __name__ == "__main__":
