@@ -70,9 +70,9 @@ class ProgressLogger:
                 self.wandb.log({f"Learning Rate/{lr_name}": lr_value}, step=epoch_idx)
         self.batch_task = self.progress.add_task("[green]Batches", total=num_batches)
 
-    def one_batch(self, loss_dict: Dict[str, Tensor] = None, mapp=None):
+    def one_batch(self, loss_dict: Dict[str, Tensor] = None):
         if loss_dict is None:
-            self.progress.update(self.batch_task, advance=1, description=f"[green]Batches [white]{mapp:.2%}")
+            self.progress.update(self.batch_task, advance=1, description=f"[green]Validating")
             return
         if self.use_wandb:
             for loss_name, loss_value in loss_dict.items():
