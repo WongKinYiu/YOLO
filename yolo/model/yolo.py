@@ -82,17 +82,14 @@ class YOLO(nn.Module):
         return output
 
     def get_out_channels(self, layer_type: str, layer_args: dict, output_dim: list, source: Union[int, list]):
-        # TODO refactor, check out_channels in layer_args, next check source is list, CBFuse|Concat
-        if any(module in layer_type for module in ["Conv", "ELAN", "ADown", "AConv"]):
+        if hasattr(layer_args, "out_channels"):
             return layer_args["out_channels"]
         if layer_type == "CBFuse":
             return output_dim[source[-1]]
-        if layer_type in ["Pool", "UpSample"]:
+        if isinstance(source, int):
             return output_dim[source]
-        if layer_type == "Concat":
+        if isinstance(source, list):
             return sum(output_dim[idx] for idx in source)
-        if layer_type == "IDetect":
-            return None
 
     def get_source_idx(self, source: Union[ListConfig, str, int], layer_idx: int):
         if isinstance(source, ListConfig):
@@ -128,7 +125,6 @@ def create_model(model_cfg: ModelConfig, weight_path: Union[bool, str] = True, c
     Returns:
         YOLO: An instance of the model defined by the given configuration.
     """
-    # TODO: "weight_path -> weight = [True|None-False|Path]: True should be default of model name?"
     OmegaConf.set_struct(model_cfg, False)
     model = YOLO(model_cfg, class_num)
     if weight_path:
@@ -138,7 +134,6 @@ def create_model(model_cfg: ModelConfig, weight_path: Union[bool, str] = True, c
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")
             prepare_weight(weight_path=weight_path)
         if os.path.exists(weight_path):
-            # TODO: fix map_location
             model.model.load_state_dict(torch.load(weight_path, map_location=torch.device("cpu")), strict=False)
             logger.info("✅ Success load model & weight")
     else:
