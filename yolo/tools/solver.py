@@ -1,9 +1,11 @@
 import json
 import os
+import sys
 import time
 
 import torch
 from loguru import logger
+from pycocotools.coco import COCO
 from torch import Tensor
 
 # TODO: We may can't use CUDA?
@@ -25,6 +27,7 @@ from yolo.utils.model_utils import (
     create_scheduler,
     predicts_to_json,
 )
+from yolo.utils.solver_utils import calculate_ap
 
 
 class ModelTrainer:
@@ -112,7 +115,7 @@ class ModelTrainer:
             epoch_loss = self.train_one_epoch(dataloader)
             self.progress.finish_one_epoch()
 
-            self.validator.solve(self.validation_dataloader)
+            self.validator.solve(self.validation_dataloader, epoch_idx=epoch)
 
 
 class ModelTester:
@@ -187,7 +190,12 @@ class ModelValidator:
         self.post_proccess = PostProccess(vec2box, validation_cfg.nms)
         self.json_path = os.path.join(self.progress.save_path, f"predict.json")
 
-    def solve(self, dataloader):
+        sys.stdout = open(os.devnull, "w")
+        # TODO: load with config file
+        self.coco_gt = COCO("data/coco/annotations/instances_val2017.json")
+        sys.stdout = sys.__stdout__
+
+    def solve(self, dataloader, epoch_idx=-1):
         # logger.info("🧪 Start Validation!")
         self.model.eval()
         predict_json = []
@@ -203,3 +211,7 @@ class ModelValidator:
         self.progress.finish_one_epoch()
         with open(self.json_path, "w") as f:
             json.dump(predict_json, f)
+
+        self.progress.run_coco()
+        result = calculate_ap(self.coco_gt, predict_json)
+        self.progress.finish_coco(result, epoch_idx)
