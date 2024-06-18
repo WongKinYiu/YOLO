@@ -54,7 +54,7 @@ def test_mosaic():
 
     # Mock parent with image_size and get_more_data method
     class MockParent:
-        image_size = 100
+        image_size = (100, 100)
 
         def get_more_data(self, num_images):
             return [(img, boxes) for _ in range(num_images)]

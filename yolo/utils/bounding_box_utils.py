@@ -108,12 +108,13 @@ def transform_bbox(bbox: Tensor, indicator="xywh -> xyxy"):
     return bbox.to(dtype=data_type)
 
 
-def generate_anchors(image_size: List[int], anchors_list: List[Tuple[int]]):
+def generate_anchors(image_size: List[int], strides: List[int]):
     """
     Find the anchor maps for each w, h.
 
     Args:
-        anchors_list List[[w1, h1], [w2, h2], ...]: the anchor num for each predicted anchor
+        image_size List: the image size of augmented image size
+        strides List[8, 16, 32, ...]: the stride size for each predicted layer
 
     Returns:
         all_anchors [HW x 2]:
@@ -122,15 +123,14 @@ def generate_anchors(image_size: List[int], anchors_list: List[Tuple[int]]):
     W, H = image_size
     anchors = []
     scaler = []
-    for anchor_wh in anchors_list:
-        stride = W // anchor_wh[0]
-        anchor_num = anchor_wh[0] * anchor_wh[1]
+    for stride in strides:
+        anchor_num = W // stride * H // stride
         scaler.append(torch.full((anchor_num,), stride))
         shift = stride // 2
-        x = torch.arange(0, W, stride) + shift
-        y = torch.arange(0, H, stride) + shift
-        anchor_x, anchor_y = torch.meshgrid(x, y, indexing="ij")
-        anchor = torch.stack([anchor_y.flatten(), anchor_x.flatten()], dim=-1)
+        h = torch.arange(0, H, stride) + shift
+        w = torch.arange(0, W, stride) + shift
+        anchor_h, anchor_w = torch.meshgrid(h, w, indexing="ij")
+        anchor = torch.stack([anchor_w.flatten(), anchor_h.flatten()], dim=-1)
         anchors.append(anchor)
     all_anchors = torch.cat(anchors, dim=0)
     all_scalers = torch.cat(scaler, dim=0)
@@ -172,6 +172,7 @@ class BoxMatcher:
         Returns:
             [batch x targets x anchors]: The probabilities from `pred_cls` corresponding to the class indices specified in `target_cls`.
         """
+        # TODO: Turn 8400 to HW
         target_cls = target_cls.expand(-1, -1, 8400)
         predict_cls = predict_cls.transpose(1, 2)
         cls_probabilities = torch.gather(predict_cls, 1, target_cls)
@@ -266,24 +267,34 @@ class BoxMatcher:
 
 class Vec2Box:
     def __init__(self, model: YOLO, image_size, device):
-        if getattr(model, "strides", None) is None:
-            logger.info("🧸 Found no anchor, Make a dummy test for auto-anchor size")
-            dummy_input = torch.zeros(1, 3, *image_size).to(device)
-            dummy_output = model(dummy_input)
-            anchors_num = []
-            for predict_head in dummy_output["Main"]:
-                _, _, *anchor_num = predict_head[2].shape
-                anchors_num.append(anchor_num)
-        else:
-            logger.info(f"🈶 Found anchor {model.strides}")
-            anchors_num = [[image_size[0] // stride, image_size[0] // stride] for stride in model.strides]
+        self.device = device
 
+        if getattr(model, "strides"):
+            logger.info(f"🈶 Found stride of model {model.strides}")
+            self.strides = model.strides
+        else:
+            logger.info("🧸 Found no stride of model, performed a dummy test for auto-anchor size")
+            self.strides = self.create_auto_anchor(model, image_size)
+
+        # TODO: this is a exception of onnx, remove it when onnx device if fixed
         if not isinstance(model, YOLO):
             device = torch.device("cpu")
 
-        anchor_grid, scaler = generate_anchors(image_size, anchors_num)
+        anchor_grid, scaler = generate_anchors(image_size, self.strides)
         self.anchor_grid, self.scaler = anchor_grid.to(device), scaler.to(device)
-        self.anchor_norm = (anchor_grid / scaler[:, None])[None].to(device)
+
+    def create_auto_anchor(self, model: YOLO, image_size):
+        dummy_input = torch.zeros(1, 3, *image_size).to(self.device)
+        dummy_output = model(dummy_input)
+        strides = []
+        for predict_head in dummy_output["Main"]:
+            _, _, *anchor_num = predict_head[2].shape
+            strides.append(image_size[1] // anchor_num[1])
+        return strides
+
+    def update(self, image_size):
+        anchor_grid, scaler = generate_anchors(image_size, self.strides)
+        self.anchor_grid, self.scaler = anchor_grid.to(self.device), scaler.to(self.device)
 
     def __call__(self, predicts):
         preds_cls, preds_anc, preds_box = [], [], []

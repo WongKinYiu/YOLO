@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 
 import pytest
-import torch
 from torch import nn
 
 project_root = Path(__file__).resolve().parent.parent.parent

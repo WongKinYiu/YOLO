@@ -10,8 +10,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from yolo import (
     AugmentationComposer,
     NMSConfig,
+    PostProccess,
     Vec2Box,
-    bbox_nms,
     create_model,
     draw_bboxes,
 )
@@ -37,7 +37,7 @@ transform = AugmentationComposer([])
 
 
 def predict(model_name, image, nms_confidence, nms_iou):
-    global DEFAULT_MODEL, model, device, v2b, class_list
+    global DEFAULT_MODEL, model, device, v2b, class_list, post_proccess
     if model_name != DEFAULT_MODEL:
         model = load_model(model_name, device)
         v2b = Vec2Box(model, IMAGE_SIZE, device)
@@ -46,16 +46,15 @@ def predict(model_name, image, nms_confidence, nms_iou):
     image_tensor, _, rev_tensor = transform(image)
 
     image_tensor = image_tensor.to(device)[None]
-    rev_tensor = rev_tensor.to(device)
+    rev_tensor = rev_tensor.to(device)[None]
+
+    nms_config = NMSConfig(nms_confidence, nms_iou)
+    post_proccess = PostProccess(v2b, nms_config)
 
     with torch.no_grad():
         predict = model(image_tensor)
-        pred_class, _, pred_bbox = v2b(predict["Main"])
+        pred_bbox = post_proccess(predict, rev_tensor)
 
-    nms_config = NMSConfig(nms_confidence, nms_iou)
-
-    pred_bbox = pred_bbox / rev_tensor[0] - rev_tensor[None, None, 1:]
-    pred_bbox = bbox_nms(pred_class, pred_bbox, nms_config)
     result_image = draw_bboxes(image, pred_bbox, idx2label=class_list)
 
     return result_image
