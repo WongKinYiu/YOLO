@@ -99,17 +99,17 @@ class ModelTrainer:
         logger.info("🚄 Start Training!")
         num_epochs = self.num_epochs
 
-        with self.progress.progress:
-            self.progress.start_train(num_epochs)
-            for epoch in range(num_epochs):
-                if self.use_ddp:
-                    dataloader.sampler.set_epoch(epoch)
+        self.progress.start_train(num_epochs)
+        for epoch in range(num_epochs):
+            if self.use_ddp:
+                dataloader.sampler.set_epoch(epoch)
 
-                self.progress.start_one_epoch(len(dataloader), self.optimizer, epoch)
-                epoch_loss = self.train_one_epoch(dataloader)
-                self.progress.finish_one_epoch()
+            self.progress.start_one_epoch(len(dataloader), self.optimizer, epoch)
+            # TODO: calculate epoch loss
+            epoch_loss = self.train_one_epoch(dataloader)
+            self.progress.finish_one_epoch()
 
-                self.validator.solve(self.validation_dataloader)
+            self.validator.solve(self.validation_dataloader)
 
 
 class ModelTester:
