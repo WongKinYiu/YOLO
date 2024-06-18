@@ -46,12 +46,8 @@ class PadAndResize:
         padded_image = Image.new("RGB", (self.target_width, self.target_height), self.background_color)
         padded_image.paste(resized_image, (pad_left, pad_top))
 
-        boxes[:, 1] *= scale  # xmin
-        boxes[:, 2] *= scale  # ymin
-        boxes[:, 3] *= scale  # xmax
-        boxes[:, 4] *= scale  # ymax
-        boxes[:, [1, 3]] += pad_left
-        boxes[:, [2, 4]] += pad_top
+        boxes[:, [1, 3]] = (boxes[:, [1, 3]] * new_width + pad_left) / self.target_width
+        boxes[:, [2, 4]] = (boxes[:, [2, 4]] * new_height + pad_top) / self.target_height
 
         transform_info = torch.tensor([scale, pad_left, pad_top, pad_left, pad_top])
         return padded_image, boxes, transform_info
