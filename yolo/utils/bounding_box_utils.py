@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange
 from loguru import logger
-from torch import Tensor
+from torch import Tensor, arange
 from torchvision.ops import batched_nms
 
 from yolo.config.config import MatcherConfig, ModelConfig, NMSConfig
@@ -338,8 +338,8 @@ def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig):
     return predicts_nms
 
 
-def calculate_map(predictions, ground_truths, iou_thresholds):
-    # TODO: Refactor this block
+def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05)):
+    # TODO: Refactor this block, Flexible for calculate different mAP condition?
     device = predictions.device
     n_preds = predictions.size(0)
     n_gts = (ground_truths[:, 0] != -1).sum()
@@ -369,13 +369,16 @@ def calculate_map(predictions, ground_truths, iou_thresholds):
         precision = tp_cumsum / (tp_cumsum + fp_cumsum + 1e-6)
         recall = tp_cumsum / (n_gts + 1e-6)
 
-        recall_thresholds = torch.arange(0, 1, 0.1)
-        precision_at_recall = torch.zeros_like(recall_thresholds)
-        for i, r in enumerate(recall_thresholds):
-            precision_at_recall[i] = precision[recall >= r].max().item() if torch.any(recall >= r) else 0
+        precision = torch.cat([torch.ones(1, device=device), precision, torch.zeros(1, device=device)])
+        recall = torch.cat([torch.zeros(1, device=device), recall, torch.ones(1, device=device)])
 
-        ap = precision_at_recall.mean()
+        precision, _ = torch.cummax(precision.flip(0), dim=0)
+        precision = precision.flip(0)
+
+        indices = (recall[1:] != recall[:-1]).nonzero(as_tuple=True)[0]
+        ap = torch.sum((recall[indices + 1] - recall[indices]) * precision[indices + 1])
+
         aps.append(ap)
 
     mean_ap = torch.mean(torch.stack(aps))
-    return mean_ap, aps
+    return mean_ap, aps[0]

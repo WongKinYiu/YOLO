@@ -18,7 +18,7 @@ from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes, draw_model
 from yolo.tools.loss_functions import create_loss_function
-from yolo.utils.bounding_box_utils import Vec2Box
+from yolo.utils.bounding_box_utils import Vec2Box, calculate_map
 from yolo.utils.logging_utils import ProgressLogger, log_model_structure
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
@@ -198,16 +198,18 @@ class ModelValidator:
     def solve(self, dataloader, epoch_idx=-1):
         # logger.info("🧪 Start Validation!")
         self.model.eval()
-        predict_json = []
+        mAPs, predict_json = [], []
         self.progress.start_one_epoch(len(dataloader))
         for images, targets, rev_tensor, img_paths in dataloader:
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
                 predicts = self.model(images)
-                predicts = self.post_proccess(predicts, rev_tensor)
-            self.progress.one_batch()
+                predicts = self.post_proccess(predicts)
+                for idx, predict in enumerate(predicts):
+                    mAPs.append(calculate_map(predict, targets[idx]))
+            self.progress.one_batch(mAP=Tensor(mAPs))
 
-            predict_json.extend(predicts_to_json(img_paths, predicts))
+            predict_json.extend(predicts_to_json(img_paths, predicts, rev_tensor))
         self.progress.finish_one_epoch()
         with open(self.json_path, "w") as f:
             json.dump(predict_json, f)
