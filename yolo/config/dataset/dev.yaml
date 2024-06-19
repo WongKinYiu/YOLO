@@ -1,5 +1,5 @@
 path: data/dev
 train: train
-validation: test
+validation: val
 
 auto_download:

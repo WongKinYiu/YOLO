@@ -106,7 +106,7 @@ class PostProccess:
         self.vec2box = vec2box
         self.nms = nms_cfg
 
-    def __call__(self, predict, rev_tensor: Optional[Tensor]):
+    def __call__(self, predict, rev_tensor: Optional[Tensor] = None):
         pred_class, _, pred_bbox = self.vec2box(predict["Main"])
         if rev_tensor is not None:
             pred_bbox = (pred_bbox - rev_tensor[:, None, 1:]) / rev_tensor[:, 0:1, None]
@@ -114,13 +114,15 @@ class PostProccess:
         return pred_bbox
 
 
-def predicts_to_json(img_paths, predicts):
+def predicts_to_json(img_paths, predicts, rev_tensor):
     """
     TODO: function document
     turn a batch of imagepath and predicts(n x 6 for each image) to a List of diction(Detection output)
     """
     batch_json = []
-    for img_path, bboxes in zip(img_paths, predicts):
+    for img_path, bboxes, box_reverse in zip(img_paths, predicts, rev_tensor):
+        scale, shift = box_reverse.split([1, 4])
+        bboxes[:, 1:5] = (bboxes[:, 1:5] - shift[None]) / scale[None]
         bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
         for cls, *pos, conf in bboxes:
             bbox = {

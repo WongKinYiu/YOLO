@@ -13,18 +13,27 @@ Example:
 
 import os
 import sys
-from typing import Dict, List
+from collections import deque
+from typing import Any, Dict, List
 
 import wandb
 import wandb.errors.term
 from loguru import logger
-from rich.console import Console
-from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
+from omegaconf import ListConfig
+from rich.console import Console, Group
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
 from torch import Tensor
 from torch.optim import Optimizer
 
 from yolo.config.config import Config, YOLOLayer
+from yolo.utils.solver_utils import make_ap_table
 
 
 def custom_logger(quite: bool = False):
@@ -38,20 +47,24 @@ def custom_logger(quite: bool = False):
     )
 
 
-class ProgressLogger:
-    def __init__(self, cfg: Config, exp_name: str):
+class ProgressLogger(Progress):
+    def __init__(self, cfg: Config, exp_name: str, *args, **kwargs):
         local_rank = int(os.getenv("LOCAL_RANK", "0"))
         self.quite_mode = local_rank or getattr(cfg, "quite", False)
         custom_logger(self.quite_mode)
         self.save_path = validate_log_directory(cfg, exp_name=cfg.name)
 
-        self.progress = Progress(
+        progress_bar = (
+            SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(bar_width=None),
             TextColumn("{task.completed:.0f}/{task.total:.0f}"),
             TimeRemainingColumn(),
         )
-        self.progress.start()
+        self.ap_table = Table()
+        # TODO: load maxlen by config files
+        self.ap_past_list = deque(maxlen=5)
+        super().__init__(*args, *progress_bar, **kwargs)
 
         self.use_wandb = cfg.use_wandb
         if self.use_wandb:
@@ -60,35 +73,71 @@ class ProgressLogger:
                 project="YOLO", resume="allow", mode="online", dir=self.save_path, id=None, name=exp_name
             )
 
+    def get_renderable(self):
+        renderable = Group(*self.get_renderables(), self.ap_table)
+        return renderable
+
     def start_train(self, num_epochs: int):
-        self.task_epoch = self.progress.add_task("[cyan]Epochs  [white]| Loss | Box  | DFL  | BCE  |", total=num_epochs)
+        self.task_epoch = self.add_task(f"[cyan]Start Training {num_epochs} epochs", total=num_epochs)
 
-    def start_one_epoch(self, num_batches: int, optimizer: Optimizer = None, epoch_idx: int = None):
+    def start_one_epoch(
+        self, num_batches: int, task: str = "Train", optimizer: Optimizer = None, epoch_idx: int = None
+    ):
         self.num_batches = num_batches
-        if self.use_wandb:
+        self.task = task
+        if hasattr(self, "task_epoch"):
+            self.update(self.task_epoch, description=f"[cyan] Preparing Data")
+
+        if self.use_wandb and optimizer is not None:
             lr_values = [params["lr"] for params in optimizer.param_groups]
-            lr_names = ["bias", "norm", "conv"]
+            lr_names = ["Learning Rate/bias", "Learning Rate/norm", "Learning Rate/conv"]
             for lr_name, lr_value in zip(lr_names, lr_values):
-                self.wandb.log({f"Learning Rate/{lr_name}": lr_value}, step=epoch_idx)
-        self.batch_task = self.progress.add_task("[green]Batches", total=num_batches)
+                self.wandb.log({lr_name: lr_value}, step=epoch_idx)
+        self.batch_task = self.add_task(f"[green] Phase: {task}", total=num_batches)
 
-    def one_batch(self, loss_dict: Dict[str, Tensor] = None):
-        if loss_dict is None:
-            self.progress.update(self.batch_task, advance=1, description=f"[green]Validating")
-            return
+    def one_batch(self, batch_info: Dict[str, Tensor] = None):
+        epoch_descript = "[cyan]" + self.task + "[white] |"
+        batch_descript = "|"
+        if self.task == "Train":
+            self.update(self.task_epoch, advance=1 / self.num_batches)
+        elif self.task == "Validate":
+            batch_info = {
+                "mAP.5": batch_info.mean(dim=0)[0],
+                "mAP.5:.95": batch_info.mean(dim=0)[1],
+            }
+        for info_name, info_val in batch_info.items():
+            epoch_descript += f"{info_name: ^9}|"
+            batch_descript += f"   {info_val:2.2f}  |"
+        self.update(self.batch_task, advance=1, description=f"[green]{self.task} [white]{batch_descript}")
+        if hasattr(self, "task_epoch"):
+            self.update(self.task_epoch, description=epoch_descript)
+
+    def finish_one_epoch(self, batch_info: Dict[str, Any] = None, epoch_idx: int = -1):
+        if self.task == "Train":
+            for loss_name in batch_info.keys():
+                batch_info["Loss/" + loss_name] = batch_info.pop(loss_name)
+        elif self.task == "Validate":
+            batch_info = {
+                "Metrics/mAP.5": batch_info.mean(dim=0)[0],
+                "Metrics/mAP.5:.95": batch_info.mean(dim=0)[1],
+            }
         if self.use_wandb:
-            for loss_name, loss_value in loss_dict.items():
-                self.wandb.log({f"Loss/{loss_name}": loss_value})
+            self.wandb.log(batch_info, step=epoch_idx)
+        self.remove_task(self.batch_task)
 
-        loss_str = "| -.-- |"
-        for loss_name, loss_val in loss_dict.items():
-            loss_str += f" {loss_val:2.2f} |"
+    def start_pycocotools(self):
+        self.batch_task = self.add_task("[green] run pycocotools", total=1)
 
-        self.progress.update(self.batch_task, advance=1, description=f"[green]Batches [white]{loss_str}")
-        self.progress.update(self.task_epoch, advance=1 / self.num_batches)
+    def finish_pycocotools(self, result, epoch_idx=-1):
+        ap_table, ap_main = make_ap_table(result, self.ap_past_list, epoch_idx)
+        self.ap_past_list.append((epoch_idx, ap_main))
+        self.ap_table = ap_table
 
-    def finish_one_epoch(self):
-        self.progress.remove_task(self.batch_task)
+        if self.use_wandb:
+            self.wandb.log({"PyCOCO/AP @ .5:.95": ap_main[1], "PyCOCO/AP @ .5": ap_main[3]})
+        self.update(self.batch_task, advance=1)
+        self.refresh()
+        self.remove_task(self.batch_task)
 
     def finish_train(self):
         self.wandb.finish()
@@ -115,7 +164,11 @@ def log_model_structure(model: List[YOLOLayer]):
         layer_param = sum(x.numel() for x in layer.parameters())  # number parameters
         in_channels, out_channels = getattr(layer, "in_c", None), getattr(layer, "out_c", None)
         if in_channels and out_channels:
-            channels = f"{in_channels:4} -> {out_channels:4}"
+            if isinstance(in_channels, (list, ListConfig)):
+                in_channels = "M"
+            if isinstance(out_channels, (list, ListConfig)):
+                out_channels = "M"
+            channels = f"{str(in_channels): >4} -> {str(out_channels): >4}"
         else:
             channels = "-"
         table.add_row(str(idx), layer.layer_type, layer.tags, f"{layer_param:,}", channels)

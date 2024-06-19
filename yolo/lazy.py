@@ -28,18 +28,14 @@ def main(cfg: Config):
         model = model.to(device)
 
     vec2box = Vec2Box(model, cfg.image_size, device)
-
     if cfg.task.task == "train":
-        trainer = ModelTrainer(cfg, model, vec2box, progress, device, use_ddp)
-        trainer.solve(dataloader)
-
-    if cfg.task.task == "inference":
-        tester = ModelTester(cfg, model, vec2box, progress, device)
-        tester.solve(dataloader)
-
+        solver = ModelTrainer(cfg, model, vec2box, progress, device, use_ddp)
     if cfg.task.task == "validation":
-        valider = ModelValidator(cfg.task, model, vec2box, progress, device)
-        valider.solve(dataloader)
+        solver = ModelValidator(cfg.task, model, vec2box, progress, device)
+    if cfg.task.task == "inference":
+        solver = ModelTester(cfg, model, vec2box, progress, device)
+    progress.start()
+    solver.solve(dataloader)
 
 
 if __name__ == "__main__":
