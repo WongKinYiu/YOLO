@@ -122,6 +122,7 @@ class ModelTrainer:
             self.progress.finish_one_epoch(epoch_loss, epoch)
 
             self.validator.solve(self.validation_dataloader, epoch_idx=epoch)
+        self.progress.finish_train()
 
 
 class ModelTester:

@@ -1,5 +1,5 @@
-import os
-import sys
+import contextlib
+import io
 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -7,13 +7,12 @@ from rich.table import Table
 
 
 def calculate_ap(coco_gt: COCO, pd_path):
-    sys.stdout = open(os.devnull, "w")
-    coco_dt = coco_gt.loadRes(pd_path)
-    coco_eval = COCOeval(coco_gt, coco_dt, "bbox")
-    coco_eval.evaluate()
-    coco_eval.accumulate()
-    coco_eval.summarize()
-    sys.stdout = sys.__stdout__
+    with contextlib.redirect_stdout(io.StringIO()):
+        coco_dt = coco_gt.loadRes(pd_path)
+        coco_eval = COCOeval(coco_gt, coco_dt, "bbox")
+        coco_eval.evaluate()
+        coco_eval.accumulate()
+        coco_eval.summarize()
     return coco_eval.stats
 
 

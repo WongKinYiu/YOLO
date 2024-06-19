@@ -268,7 +268,7 @@ class Vec2Box:
     def __init__(self, model: YOLO, image_size, device):
         self.device = device
 
-        if getattr(model, "strides"):
+        if hasattr(model, "strides"):
             logger.info(f"🈶 Found stride of model {model.strides}")
             self.strides = model.strides
         else:
