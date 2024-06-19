@@ -275,10 +275,6 @@ class Vec2Box:
             logger.info("🧸 Found no stride of model, performed a dummy test for auto-anchor size")
             self.strides = self.create_auto_anchor(model, image_size)
 
-        # TODO: this is a exception of onnx, remove it when onnx device if fixed
-        if not isinstance(model, YOLO):
-            device = torch.device("cpu")
-
         anchor_grid, scaler = generate_anchors(image_size, self.strides)
         self.anchor_grid, self.scaler = anchor_grid.to(device), scaler.to(device)
 

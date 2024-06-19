@@ -27,38 +27,41 @@ class FastModelLoader:
 
     def load_model(self, device):
         if self.compiler == "onnx":
-            return self._load_onnx_model()
+            return self._load_onnx_model(device)
         elif self.compiler == "trt":
             return self._load_trt_model().to(device)
         elif self.compiler == "deploy":
             self.cfg.model.model.auxiliary = {}
         return create_model(self.cfg.model, class_num=self.cfg.class_num, weight_path=self.cfg.weight).to(device)
 
-    def _load_onnx_model(self):
+    def _load_onnx_model(self, device):
         from onnxruntime import InferenceSession
 
         def onnx_forward(self: InferenceSession, x: Tensor):
             x = {self.get_inputs()[0].name: x.cpu().numpy()}
             model_outputs, layer_output = [], []
             for idx, predict in enumerate(self.run(None, x)):
-                layer_output.append(torch.from_numpy(predict))
+                layer_output.append(torch.from_numpy(predict).to(device))
                 if idx % 3 == 2:
                     model_outputs.append(layer_output)
                     layer_output = []
             return {"Main": model_outputs}
 
         InferenceSession.__call__ = onnx_forward
+
+        if device == "cpu":
+            providers = ["CPUExecutionProvider"]
+        else:
+            providers = ["CUDAExecutionProvider"]
         try:
-            ort_session = InferenceSession(self.model_path)
+            ort_session = InferenceSession(self.model_path, providers=providers)
             logger.info("🚀 Using ONNX as MODEL frameworks!")
         except Exception as e:
             logger.warning(f"🈳 Error loading ONNX model: {e}")
-            ort_session = self._create_onnx_model()
-        # TODO: Update if GPU onnx unavailable change to cpu
-        self.cfg.device = "cpu"
+            ort_session = self._create_onnx_model(providers)
         return ort_session
 
-    def _create_onnx_model(self):
+    def _create_onnx_model(self, providers):
         from onnxruntime import InferenceSession
         from torch.onnx import export
 
@@ -73,7 +76,7 @@ class FastModelLoader:
             dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
         )
         logger.info(f"📥 ONNX model saved to {self.model_path}")
-        return InferenceSession(self.model_path)
+        return InferenceSession(self.model_path, providers=providers)
 
     def _load_trt_model(self):
         from torch2trt import TRTModule
