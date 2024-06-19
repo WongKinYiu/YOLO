@@ -122,6 +122,7 @@ class ModelTrainer:
             self.progress.finish_one_epoch(epoch_loss, epoch)
 
             self.validator.solve(self.validation_dataloader, epoch_idx=epoch)
+            # TODO: save model if result are better than before
         self.progress.finish_train()
 
 

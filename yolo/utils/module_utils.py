@@ -68,8 +68,7 @@ def divide_into_chunks(input_list, chunk_num):
 
     if list_size % chunk_num != 0:
         raise ValueError(
-            f"The length of the input list ({list_size}) must be exactly\
-                            divisible by the number of chunks ({chunk_num})."
+            f"The length of the input list ({list_size}) must be exactly divisible by the number of chunks ({chunk_num})."
         )
 
     chunk_size = list_size // chunk_num

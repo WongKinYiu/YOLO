@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -6,7 +7,11 @@ from torch import nn
 
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
-from yolo.utils.module_utils import auto_pad, create_activation_function
+from yolo.utils.module_utils import (
+    auto_pad,
+    create_activation_function,
+    divide_into_chunks,
+)
 
 
 @pytest.mark.parametrize(
@@ -35,3 +40,34 @@ def test_get_activation(activation_name, expected_type):
 def test_get_activation_invalid():
     with pytest.raises(ValueError):
         create_activation_function("unsupported_activation")
+
+
+def test_divide_into_chunks():
+    input_list = [0, 1, 2, 3, 4, 5]
+    chunk_num = 2
+    expected_output = [[0, 1, 2], [3, 4, 5]]
+    assert divide_into_chunks(input_list, chunk_num) == expected_output
+
+
+def test_divide_into_chunks_non_divisible_length():
+    input_list = [0, 1, 2, 3, 4, 5]
+    chunk_num = 4
+    with pytest.raises(
+        ValueError,
+        match=re.escape("The length of the input list (6) must be exactly divisible by the number of chunks (4)."),
+    ):
+        divide_into_chunks(input_list, chunk_num)
+
+
+def test_divide_into_chunks_single_chunk():
+    input_list = [0, 1, 2, 3, 4, 5]
+    chunk_num = 1
+    expected_output = [[0, 1, 2, 3, 4, 5]]
+    assert divide_into_chunks(input_list, chunk_num) == expected_output
+
+
+def test_divide_into_chunks_equal_chunks():
+    input_list = [0, 1, 2, 3, 4, 5, 6, 7]
+    chunk_num = 4
+    expected_output = [[0, 1], [2, 3], [4, 5], [6, 7]]
+    assert divide_into_chunks(input_list, chunk_num) == expected_output

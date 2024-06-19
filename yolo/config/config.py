@@ -163,9 +163,6 @@ class YOLOLayer(nn.Module):
     layer_type: str
     usable: bool
 
-    def __post_init__(self):
-        super().__init__()
-
 
 IDX_TO_ID = [
     1,

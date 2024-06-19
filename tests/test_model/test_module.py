@@ -43,13 +43,6 @@ def test_adown():
     assert out.shape == (1, OUT_CHANNELS, 32, 32)
 
 
-def test_adown():
-    adown = ADown(IN_CHANNELS, OUT_CHANNELS)
-    x = torch.randn(1, IN_CHANNELS, 64, 64)
-    out = adown(x)
-    assert out.shape == (1, OUT_CHANNELS, 32, 32)
-
-
 def test_cblinear():
     cblinear = CBLinear(IN_CHANNELS, [5, 5])
     x = torch.randn(1, IN_CHANNELS, 64, 64)

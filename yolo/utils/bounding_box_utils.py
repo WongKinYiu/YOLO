@@ -46,7 +46,7 @@ def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
     # Calculate IoU
     iou = intersection_area / (union_area + EPS)
     if metrics == "iou":
-        return iou
+        return iou.to(dtype)
 
     # Calculate centroid distance
     cx1 = (bbox1[..., 2] + bbox1[..., 0]) / 2
@@ -62,7 +62,7 @@ def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
 
     diou = iou - (cent_dis / diag_dis)
     if metrics == "diou":
-        return diou
+        return diou.to(dtype)
 
     # Compute aspect ratio penalty term
     arctan = torch.atan((bbox1[..., 2] - bbox1[..., 0]) / (bbox1[..., 3] - bbox1[..., 1] + EPS)) - torch.atan(
@@ -268,7 +268,7 @@ class Vec2Box:
     def __init__(self, model: YOLO, image_size, device):
         self.device = device
 
-        if hasattr(model, "strides"):
+        if hasattr(model, "strides") and getattr(model, "strides"):
             logger.info(f"🈶 Found stride of model {model.strides}")
             self.strides = model.strides
         else:

@@ -5,6 +5,7 @@ loguru
 numpy
 opencv-python
 Pillow
+pycocotools
 pytest
 pyyaml
 requests

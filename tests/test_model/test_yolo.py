@@ -16,9 +16,19 @@ config_path = "../../yolo/config"
 config_name = "config"
 
 
-def test_build_model():
+def test_build_model_v9c():
     with initialize(config_path=config_path, version_base=None):
         cfg: Config = compose(config_name=config_name)
+
+        OmegaConf.set_struct(cfg.model, False)
+        cfg.weight = None
+        model = YOLO(cfg.model)
+        assert len(model.model) == 39
+
+
+def test_build_model_v9m():
+    with initialize(config_path=config_path, version_base=None):
+        cfg: Config = compose(config_name=config_name, overrides=[f"model=v9-m"])
 
         OmegaConf.set_struct(cfg.model, False)
         cfg.weight = None
