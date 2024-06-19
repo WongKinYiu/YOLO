@@ -69,7 +69,7 @@ def create_scheduler(optimizer: Optimizer, schedule_cfg: SchedulerConfig) -> _LR
     schedule = scheduler_class(optimizer, **schedule_cfg.args)
     if hasattr(schedule_cfg, "warmup"):
         wepoch = schedule_cfg.warmup.epochs
-        lambda1 = lambda epoch: 0.1 + 0.9 * (epoch + 1 / wepoch) if epoch < wepoch else 1
+        lambda1 = lambda epoch: 0.1 + 0.9 * (epoch / wepoch) if epoch < wepoch else 1
         lambda2 = lambda epoch: 10 - 9 * (epoch / wepoch) if epoch < wepoch else 1
         warmup_schedule = LambdaLR(optimizer, lr_lambda=[lambda1, lambda2, lambda1])
         schedule = SequentialLR(optimizer, schedulers=[warmup_schedule, schedule], milestones=[2])
