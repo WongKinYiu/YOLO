@@ -166,15 +166,14 @@ class BoxMatcher:
         Get the (predicted class' probabilities) corresponding to the target classes across all anchors
 
         Args:
-            predict_cls [batch x class x anchors]: The predicted probabilities for each class across each anchor.
+            predict_cls [batch x anchors x class]: The predicted probabilities for each class across each anchor.
             target_cls [batch x targets]: The class index for each target.
 
         Returns:
             [batch x targets x anchors]: The probabilities from `pred_cls` corresponding to the class indices specified in `target_cls`.
         """
-        # TODO: Turn 8400 to HW
-        target_cls = target_cls.expand(-1, -1, 8400)
         predict_cls = predict_cls.transpose(1, 2)
+        target_cls = target_cls.expand(-1, -1, predict_cls.size(2))
         cls_probabilities = torch.gather(predict_cls, 1, target_cls)
         return cls_probabilities
 
