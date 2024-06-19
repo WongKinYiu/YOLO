@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import time
+from collections import defaultdict
 
 import torch
 from loguru import logger
@@ -72,22 +73,28 @@ class ModelTrainer:
         self.scaler.step(self.optimizer)
         self.scaler.update()
 
-        return loss.item(), loss_item
+        return loss_item
 
     def train_one_epoch(self, dataloader):
         self.model.train()
-        total_loss = 0
+        total_loss = defaultdict(lambda: torch.tensor(0.0, device=self.device))
+        total_samples = 0
 
-        for images, targets, *_ in dataloader:
-            loss, loss_each = self.train_one_batch(images, targets)
+        for batch_size, images, targets, *_ in dataloader:
+            loss_each = self.train_one_batch(images, targets)
 
-            total_loss += loss
+            for loss_name, loss_val in loss_each.items():
+                total_loss[loss_name] += loss_val * batch_size
+            total_samples += batch_size
             self.progress.one_batch(loss_each)
+
+        for loss_val in total_loss.values():
+            loss_val /= total_samples
 
         if self.scheduler:
             self.scheduler.step()
 
-        return total_loss / len(dataloader)
+        return total_loss
 
     def save_checkpoint(self, epoch: int, filename="checkpoint.pt"):
         checkpoint = {
@@ -110,10 +117,9 @@ class ModelTrainer:
             if self.use_ddp:
                 dataloader.sampler.set_epoch(epoch)
 
-            self.progress.start_one_epoch(len(dataloader), self.optimizer, epoch)
-            # TODO: calculate epoch loss
+            self.progress.start_one_epoch(len(dataloader), "Train", self.optimizer, epoch)
             epoch_loss = self.train_one_epoch(dataloader)
-            self.progress.finish_one_epoch()
+            self.progress.finish_one_epoch(epoch_loss, epoch)
 
             self.validator.solve(self.validation_dataloader, epoch_idx=epoch)
 
@@ -199,21 +205,21 @@ class ModelValidator:
         # logger.info("🧪 Start Validation!")
         self.model.eval()
         mAPs, predict_json = [], []
-        self.progress.start_one_epoch(len(dataloader))
-        for images, targets, rev_tensor, img_paths in dataloader:
+        self.progress.start_one_epoch(len(dataloader), task="Validate")
+        for batch_size, images, targets, rev_tensor, img_paths in dataloader:
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
                 predicts = self.model(images)
                 predicts = self.post_proccess(predicts)
                 for idx, predict in enumerate(predicts):
                     mAPs.append(calculate_map(predict, targets[idx]))
-            self.progress.one_batch(mAP=Tensor(mAPs))
+            self.progress.one_batch(Tensor(mAPs))
 
             predict_json.extend(predicts_to_json(img_paths, predicts, rev_tensor))
-        self.progress.finish_one_epoch()
+        self.progress.finish_one_epoch(Tensor(mAPs), epoch_idx=epoch_idx)
         with open(self.json_path, "w") as f:
             json.dump(predict_json, f)
 
-        self.progress.run_coco()
+        self.progress.start_pycocotools()
         result = calculate_ap(self.coco_gt, predict_json)
-        self.progress.finish_coco(result, epoch_idx)
+        self.progress.finish_pycocotools(result, epoch_idx)

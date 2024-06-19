@@ -199,7 +199,7 @@ class YoloDataLoader(DataLoader):
         batch_images = torch.stack(batch_images)
         batch_reverse = torch.stack(batch_reverse)
 
-        return batch_images, batch_targets, batch_reverse, batch_path
+        return batch_size, batch_images, batch_targets, batch_reverse, batch_path
 
 
 def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):

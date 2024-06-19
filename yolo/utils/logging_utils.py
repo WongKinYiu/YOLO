@@ -14,11 +14,12 @@ Example:
 import os
 import sys
 from collections import deque
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import wandb
 import wandb.errors.term
 from loguru import logger
+from omegaconf import ListConfig
 from rich.console import Console, Group
 from rich.progress import (
     BarColumn,
@@ -72,56 +73,70 @@ class ProgressLogger(Progress):
                 project="YOLO", resume="allow", mode="online", dir=self.save_path, id=None, name=exp_name
             )
 
-    def update_ap_table(self, ap_list, epoch_idx=-1):
-        ap_table, ap_main = make_ap_table(ap_list, self.ap_past_list, epoch_idx)
+    def get_renderable(self):
+        renderable = Group(*self.get_renderables(), self.ap_table)
+        return renderable
+
+    def start_train(self, num_epochs: int):
+        self.task_epoch = self.add_task(f"[cyan]Start Training {num_epochs} epochs", total=num_epochs)
+
+    def start_one_epoch(
+        self, num_batches: int, task: str = "Train", optimizer: Optimizer = None, epoch_idx: int = None
+    ):
+        self.num_batches = num_batches
+        self.task = task
+        if hasattr(self, "task_epoch"):
+            self.update(self.task_epoch, description=f"[cyan] Preparing Data")
+
+        if self.use_wandb and optimizer is not None:
+            lr_values = [params["lr"] for params in optimizer.param_groups]
+            lr_names = ["Learning Rate/bias", "Learning Rate/norm", "Learning Rate/conv"]
+            for lr_name, lr_value in zip(lr_names, lr_values):
+                self.wandb.log({lr_name: lr_value}, step=epoch_idx)
+        self.batch_task = self.add_task(f"[green] Phase: {task}", total=num_batches)
+
+    def one_batch(self, batch_info: Dict[str, Tensor] = None):
+        epoch_descript = "[cyan]" + self.task + "[white] |"
+        batch_descript = "|"
+        if self.task == "Train":
+            self.update(self.task_epoch, advance=1 / self.num_batches)
+        elif self.task == "Validate":
+            batch_info = {
+                "mAP.5": batch_info.mean(dim=0)[0],
+                "mAP.5:.95": batch_info.mean(dim=0)[1],
+            }
+        for info_name, info_val in batch_info.items():
+            epoch_descript += f"{info_name: ^9}|"
+            batch_descript += f"   {info_val:2.2f}  |"
+        self.update(self.batch_task, advance=1, description=f"[green]{self.task} [white]{batch_descript}")
+        if hasattr(self, "task_epoch"):
+            self.update(self.task_epoch, description=epoch_descript)
+
+    def finish_one_epoch(self, batch_info: Dict[str, Any] = None, epoch_idx: int = -1):
+        if self.task == "Train":
+            for loss_name in batch_info.keys():
+                batch_info["Loss/" + loss_name] = batch_info.pop(loss_name)
+        elif self.task == "Validate":
+            batch_info = {
+                "Metrics/mAP.5": batch_info.mean(dim=0)[0],
+                "Metrics/mAP.5:.95": batch_info.mean(dim=0)[1],
+            }
+        if self.use_wandb:
+            self.wandb.log(batch_info, step=epoch_idx)
+        self.remove_task(self.batch_task)
+
+    def start_pycocotools(self):
+        self.batch_task = self.add_task("[green] run pycocotools", total=1)
+
+    def finish_pycocotools(self, result, epoch_idx=-1):
+        ap_table, ap_main = make_ap_table(result, self.ap_past_list, epoch_idx)
         self.ap_past_list.append((epoch_idx, ap_main))
         self.ap_table = ap_table
 
         if self.use_wandb:
-            self.wandb.log({f"mAP/AP @ .5:.95": ap_main[1], f"mAP/AP @ .5": ap_main[3]})
-
-    def get_renderable(self):
-        return Group(*self.get_renderables(), self.ap_table)
-
-    def start_train(self, num_epochs: int):
-        self.task_epoch = self.add_task("[cyan]Epochs  [white]| Loss | Box  | DFL  | BCE  |", total=num_epochs)
-
-    def start_one_epoch(self, num_batches: int, optimizer: Optimizer = None, epoch_idx: int = None):
-        self.num_batches = num_batches
-        if self.use_wandb and optimizer is not None:
-            lr_values = [params["lr"] for params in optimizer.param_groups]
-            lr_names = ["bias", "norm", "conv"]
-            for lr_name, lr_value in zip(lr_names, lr_values):
-                self.wandb.log({f"Learning Rate/{lr_name}": lr_value}, step=epoch_idx)
-        self.batch_task = self.add_task("[green]Batches", total=num_batches)
-
-    def one_batch(self, loss_dict: Dict[str, Tensor] = None, mAP: Tensor = None):
-        if loss_dict is None:
-            # refactor this block & class
-            mAP_50, mAP_50_95 = mAP.mean(0)
-            self.update(self.batch_task, advance=1, description=f"[green]Validating {mAP_50: .2f} {mAP_50_95: .2f}")
-            return
-        if self.use_wandb:
-            for loss_name, loss_value in loss_dict.items():
-                self.wandb.log({f"Loss/{loss_name}": loss_value})
-
-        loss_str = "| -.-- |"
-        for loss_name, loss_val in loss_dict.items():
-            loss_str += f" {loss_val:2.2f} |"
-
-        self.update(self.batch_task, advance=1, description=f"[green]Batches [white]{loss_str}")
-        self.update(self.task_epoch, advance=1 / self.num_batches)
-
-    def run_coco(self):
-        self.batch_task = self.add_task("[green]Run COCO", total=1)
-
-    def finish_coco(self, result, epoch_idx):
-        self.update_ap_table(result, epoch_idx)
+            self.wandb.log({"PyCOCO/AP @ .5:.95": ap_main[1], "PyCOCO/AP @ .5": ap_main[3]})
         self.update(self.batch_task, advance=1)
         self.refresh()
-        self.remove_task(self.batch_task)
-
-    def finish_one_epoch(self):
         self.remove_task(self.batch_task)
 
     def finish_train(self):
@@ -149,7 +164,11 @@ def log_model_structure(model: List[YOLOLayer]):
         layer_param = sum(x.numel() for x in layer.parameters())  # number parameters
         in_channels, out_channels = getattr(layer, "in_c", None), getattr(layer, "out_c", None)
         if in_channels and out_channels:
-            channels = f"{in_channels:4} -> {out_channels:4}"
+            if isinstance(in_channels, (list, ListConfig)):
+                in_channels = "M"
+            if isinstance(out_channels, (list, ListConfig)):
+                out_channels = "M"
+            channels = f"{str(in_channels): >4} -> {str(out_channels): >4}"
         else:
             channels = "-"
         table.add_row(str(idx), layer.layer_type, layer.tags, f"{layer_param:,}", channels)
