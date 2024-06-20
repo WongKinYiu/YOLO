@@ -6,7 +6,7 @@ To facilitate easy customization of the YOLO model, we've structured the codebas
 
 ```shell
 # Train
-python yolo/lazy.py dataset=dev use_wandb=True
+python yolo/lazy.py task=train dataset=dev use_wandb=True
 
 # Validate
 python yolo/lazy.py task=validation

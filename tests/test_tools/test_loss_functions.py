@@ -17,7 +17,7 @@ from yolo.utils.bounding_box_utils import Vec2Box
 @pytest.fixture
 def cfg() -> Config:
     with initialize(config_path="../../yolo/config", version_base=None):
-        cfg = compose(config_name="config")
+        cfg = compose(config_name="config", overrides=["task=train"])
     return cfg
 
 

@@ -6,7 +6,7 @@ name: v9-dev
 
 defaults:
   - _self_
-  - task: train
+  - task: inference
   - dataset: coco
   - model: v9-c
   - general
