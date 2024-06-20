@@ -69,7 +69,7 @@ def prepare_dataset(dataset_cfg: DatasetConfig, task: str):
             extract_to = data_dir / data_type if data_type != "annotations" else data_dir
             final_place = extract_to / dataset_type
 
-            final_place.mkdir(exist_ok=True)
+            final_place.mkdir(parents=True, exist_ok=True)
             if check_files(final_place, dataset_args.get("file_num")):
                 logger.info(f"✅ Dataset {dataset_type: <12} already verified.")
                 continue

@@ -154,10 +154,10 @@ def test_calculate_map():
     predictions = tensor([[0, 60, 60, 160, 160, 0.5], [0, 40, 40, 120, 120, 0.5]])  # [class, x1, y1, x2, y2]
     ground_truths = tensor([[0, 50, 50, 150, 150], [0, 30, 30, 100, 100]])  # [class, x1, y1, x2, y2]
 
-    mean_ap, first_ap = calculate_map(predictions, ground_truths)
+    mAP = calculate_map(predictions, ground_truths)
 
-    expected_mean_ap = tensor(0.2)
-    expected_first_ap = tensor(0.5)
+    expected_ap50 = tensor(0.5)
+    expected_ap50_95 = tensor(0.2)
 
-    assert isclose(mean_ap, expected_mean_ap, atol=1e-5), f"Mean AP mismatch: {mean_ap} != {expected_mean_ap}"
-    assert isclose(first_ap, expected_first_ap, atol=1e-5), f"First AP mismatch: {first_ap} != {expected_first_ap}"
+    assert isclose(mAP["mAP.5"], expected_ap50, atol=1e-5), f"AP50 mismatch"
+    assert isclose(mAP["mAP.5:.95"], expected_ap50_95, atol=1e-5), f"Mean AP mismatch"

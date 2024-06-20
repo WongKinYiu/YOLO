@@ -31,7 +31,7 @@ def main(cfg: Config):
     if cfg.task.task == "train":
         solver = ModelTrainer(cfg, model, vec2box, progress, device, use_ddp)
     if cfg.task.task == "validation":
-        solver = ModelValidator(cfg.task, model, vec2box, progress, device)
+        solver = ModelValidator(cfg.task, cfg.dataset, model, vec2box, progress, device)
     if cfg.task.task == "inference":
         solver = ModelTester(cfg, model, vec2box, progress, device)
     progress.start()

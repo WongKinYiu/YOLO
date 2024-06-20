@@ -376,7 +376,7 @@ def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05
         aps.append(ap)
 
     mAP = {
-        "mAP.5": torch.mean(torch.stack(aps)),
-        "mAP.5:.95": aps[0],
+        "mAP.5": aps[0],
+        "mAP.5:.95": torch.mean(torch.stack(aps)),
     }
     return mAP

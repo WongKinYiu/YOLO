@@ -4,6 +4,7 @@ import json
 import os
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, Optional
 
 import torch
@@ -16,12 +17,13 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 
-from yolo.config.config import Config, TrainConfig, ValidationConfig
+from yolo.config.config import Config, DatasetConfig, TrainConfig, ValidationConfig
 from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes, draw_model
 from yolo.tools.loss_functions import create_loss_function
 from yolo.utils.bounding_box_utils import Vec2Box, calculate_map
+from yolo.utils.dataset_utils import locate_label_paths
 from yolo.utils.logging_utils import ProgressLogger, log_model_structure
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
@@ -57,7 +59,7 @@ class ModelTrainer:
         self.validation_dataloader = create_dataloader(
             cfg.task.validation.data, cfg.dataset, cfg.task.validation.task, use_ddp
         )
-        self.validator = ModelValidator(cfg.task.validation, model, vec2box, progress, device)
+        self.validator = ModelValidator(cfg.task.validation, cfg.dataset, model, vec2box, progress, device)
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
@@ -207,6 +209,7 @@ class ModelValidator:
     def __init__(
         self,
         validation_cfg: ValidationConfig,
+        dataset_cfg: DatasetConfig,
         model: YOLO,
         vec2box: Vec2Box,
         progress: ProgressLogger,
@@ -221,7 +224,9 @@ class ModelValidator:
 
         with contextlib.redirect_stdout(io.StringIO()):
             # TODO: load with config file
-            self.coco_gt = COCO("data/coco/annotations/instances_val2017.json")
+            json_path, _ = locate_label_paths(Path(dataset_cfg.path), dataset_cfg.get("val", "val"))
+            if json_path:
+                self.coco_gt = COCO(json_path)
 
     def solve(self, dataloader, epoch_idx=-1):
         # logger.info("🧪 Start Validation!")
@@ -246,9 +251,9 @@ class ModelValidator:
 
         with open(self.json_path, "w") as f:
             json.dump(predict_json, f)
-
-        self.progress.start_pycocotools()
-        result = calculate_ap(self.coco_gt, predict_json)
-        self.progress.finish_pycocotools(result, epoch_idx)
+        if hasattr(self, "coco_gt"):
+            self.progress.start_pycocotools()
+            result = calculate_ap(self.coco_gt, predict_json)
+            self.progress.finish_pycocotools(result, epoch_idx)
 
         return avg_mAPs

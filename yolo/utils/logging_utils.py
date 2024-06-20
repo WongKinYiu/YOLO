@@ -189,7 +189,7 @@ def validate_log_directory(cfg: Config, exp_name: str) -> Path:
                 f"🔀 Experiment directory exists! Changed <red>{old_exp_name}</> to <green>{exp_name}</>"
             )
 
-    save_path.mkdir(exist_ok=True)
+    save_path.mkdir(parents=True, exist_ok=True)
     logger.opt(colors=True).info(f"📄 Created log folder: <u><fg #808080>{save_path}</></>")
     logger.add(save_path / "output.log", mode="w", backtrace=True, diagnose=True)
     return save_path
