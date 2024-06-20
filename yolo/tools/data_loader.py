@@ -189,10 +189,10 @@ class YoloDataLoader(DataLoader):
         batch_size = len(batch)
         target_sizes = [item[1].size(0) for item in batch]
         # TODO: Improve readability of these proccess
-        batch_targets = torch.zeros(batch_size, max(target_sizes), 5)
+        batch_targets = torch.zeros(batch_size, min(max(target_sizes), 100), 5)
         batch_targets[:, :, 0] = -1
         for idx, target_size in enumerate(target_sizes):
-            batch_targets[idx, :target_size] = batch[idx][1]
+            batch_targets[idx, : min(target_size, 100)] = batch[idx][1][:100]
         batch_targets[:, :, 1:] *= self.image_size
 
         batch_images, _, batch_reverse, batch_path = zip(*batch)
