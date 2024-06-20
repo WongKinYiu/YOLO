@@ -189,6 +189,7 @@ class YoloDataLoader(DataLoader):
         batch_size = len(batch)
         target_sizes = [item[1].size(0) for item in batch]
         # TODO: Improve readability of these proccess
+        # TODO: remove maxBbox or reduce loss function memory usage
         batch_targets = torch.zeros(batch_size, min(max(target_sizes), 100), 5)
         batch_targets[:, :, 0] = -1
         for idx, target_size in enumerate(target_sizes):
