@@ -1,14 +1,14 @@
 # YOLO: Official Implementation of YOLOv9, YOLOv7
 
 ![GitHub License](https://img.shields.io/github/license/WongKinYiu/YOLO)
-![WIP](https://img.shields.io/badge/status-WIP-orange)
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/henry000/YOLO)
-> [!IMPORTANT]
+<!-- ![WIP](https://img.shields.io/badge/status-WIP-orange) -->
+<!-- > [!IMPORTANT]
 > This project is currently a Work In Progress and may undergo significant changes. It is not recommended for use in production environments until further notice. Please check back regularly for updates.
 >
 > Use of this code is at your own risk and discretion. It is advisable to consult with the project owner before deploying or integrating into any critical systems.
 
-Welcome to the official implementation of YOLOv7 and YOLOv9. This repository will contains the complete codebase, pre-trained models, and detailed instructions for training and deploying YOLOv9.
+Welcome to the official implementation of YOLOv7 and YOLOv9. This repository will contains the complete codebase, pre-trained models, and detailed instructions for training and deploying YOLOv9. -->
 
 ## TL;DR
 - This is the official YOLO model implementation with an MIT License.
@@ -65,7 +65,8 @@ To train YOLO on your dataset:
 1. Modify the configuration file `data/config.yaml` to point to your dataset.
 2. Run the training script:
 ```shell
-python yolo/lazy.py task=train task.data.batch_size=8 model=v9-c
+python yolo/lazy.py dataset=dev use_wandb=True
+python yolo/lazy.py task.data.batch_size=8 model=v9-c # or more args
 ```
 
 ### Transfer Learning
@@ -77,15 +78,24 @@ python yolo/lazy.py task=train task.data.batch_size=8 model=v9-c dataset={datase
 ### Inference
 To evaluate the model performance, use:
 ```shell
-python yolo/lazy.py task=inference weight=weights/v9-c.pt model=v9-c task.fast_inference=deploy # use deploy weight
 python yolo/lazy.py task=inference # if cloned from GitHub
+python yolo/lazy.py task=inference \
+                    name=AnyNameYouWant \ # AnyNameYouWant
+                    device=cpu \ # hardware cuda, cpu, mps
+                    model=v9-s \ # model version: v9-c, m, s
+                    task.nms.min_confidence=0.1 \ # nms config
+                    task.fast_inference=onnx \ # onnx, trt, deploy
+                    task.data.source=data/toy/images/train \ # path to file, dir, webcam
+                    +quite=True \ # Quite Output
 yolo task=inference task.data.source={Any} # if pip installed
 ```
 
-### Validation [WIP]
+### Validation
 To validate the model performance, use:
 ```shell
-# Work In Progress...
+python yolo/lazy.py task=validation
+# or
+python yolo/lazy.py task=validation dataset=toy
 ```
 
 ## Contributing

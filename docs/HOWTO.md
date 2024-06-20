@@ -2,6 +2,30 @@
 
 To facilitate easy customization of the YOLO model, we've structured the codebase to allow for changes through configuration files and minimal code adjustments. This guide will walk you through the steps to customize various components of the model including the architecture, blocks, data loaders, and loss functions.
 
+## Examples
+
+```shell
+# Train
+python yolo/lazy.py dataset=dev use_wandb=True
+
+# Validate
+python yolo/lazy.py task=validation
+python yolo/lazy.py task=validation model=v9-s
+python yolo/lazy.py task=validation dataset=toy
+python yolo/lazy.py task=validation dataset=toy name=validation
+
+# Inference
+python yolo/lazy.py task=inference
+python yolo/lazy.py task=inference device=cpu
+python yolo/lazy.py task=inference +quite=True
+python yolo/lazy.py task=inference name=AnyNameYouWant
+python yolo/lazy.py task=inference image_size=\[480,640]
+python yolo/lazy.py task=inference task.nms.min_confidence=0.1
+python yolo/lazy.py task=inference task.fast_inference=deploy
+python yolo/lazy.py task=inference task.fast_inference=onnx device=cpu
+python yolo/lazy.py task=inference task.data.source=data/toy/images/train
+```
+
 ## Custom Model Architecture
 
 You can change the model architecture simply by modifying the YAML configuration file. Here's how:
