@@ -1,6 +1,7 @@
+import contextlib
+import io
 import json
 import os
-import sys
 import time
 from collections import defaultdict
 from typing import Dict, Optional
@@ -46,7 +47,8 @@ class ModelTrainer:
         self.num_epochs = cfg.task.epoch
         self.mAPs_dict = defaultdict(list)
 
-        os.makedirs(os.path.join(self.progress.save_path, "weights"), exist_ok=True)
+        self.weights_dir = self.progress.save_path / "weights"
+        self.weights_dir.mkdir(exist_ok=True)
 
         if not progress.quite_mode:
             log_model_structure(model.model)
@@ -102,7 +104,7 @@ class ModelTrainer:
 
     def save_checkpoint(self, epoch_idx: int, file_name: Optional[str] = None):
         file_name = file_name or f"E{epoch_idx:03d}.pt"
-        file_path = os.path.join(self.progress.save_path, "weights", file_name)
+        file_path = self.weights_dir / file_name
 
         checkpoint = {
             "epoch": epoch_idx,
@@ -152,7 +154,7 @@ class ModelTester:
         self.progress = progress
 
         self.post_proccess = PostProccess(vec2box, cfg.task.nms)
-        self.save_path = os.path.join(progress.save_path, "images")
+        self.save_path = progress.save_path / "images"
         os.makedirs(self.save_path, exist_ok=True)
         self.save_predict = getattr(cfg.task, "save_predict", None)
         self.idx2label = cfg.class_list
@@ -187,7 +189,7 @@ class ModelTester:
                     if not self.save_predict:
                         continue
                 if self.save_predict != False:
-                    save_image_path = os.path.join(self.save_path, f"frame{idx:03d}.png")
+                    save_image_path = self.save_path / f"frame{idx:03d}.png"
                     img.save(save_image_path)
                     logger.info(f"💾 Saved visualize image at {save_image_path}")
 
@@ -215,12 +217,11 @@ class ModelValidator:
         self.progress = progress
 
         self.post_proccess = PostProccess(vec2box, validation_cfg.nms)
-        self.json_path = os.path.join(self.progress.save_path, f"predict.json")
+        self.json_path = self.progress.save_path / "predict.json"
 
-        sys.stdout = open(os.devnull, "w")
-        # TODO: load with config file
-        self.coco_gt = COCO("data/coco/annotations/instances_val2017.json")
-        sys.stdout = sys.__stdout__
+        with contextlib.redirect_stdout(io.StringIO()):
+            # TODO: load with config file
+            self.coco_gt = COCO("data/coco/annotations/instances_val2017.json")
 
     def solve(self, dataloader, epoch_idx=-1):
         # logger.info("🧪 Start Validation!")

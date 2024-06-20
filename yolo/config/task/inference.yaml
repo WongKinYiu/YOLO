@@ -1,6 +1,6 @@
 task: inference
 
-fast_inference:  # onnx, trt or Empty
+fast_inference:  # onnx, trt, deploy or Empty
 data:
   source: demo/images/inference/image.png
   image_size: ${image_size}

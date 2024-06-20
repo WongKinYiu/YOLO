@@ -1,5 +1,4 @@
-import os
-from os import path
+from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Thread
 from typing import Generator, List, Tuple, Union
@@ -39,22 +38,22 @@ class YoloDataset(Dataset):
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.data = self.load_data(dataset_cfg.path, phase_name)
+        self.data = self.load_data(Path(dataset_cfg.path), phase_name)
 
-    def load_data(self, dataset_path, phase_name):
+    def load_data(self, dataset_path: Path, phase_name: str):
         """
         Loads data from a cache or generates a new cache for a specific dataset phase.
 
         Parameters:
-            dataset_path (str): The root path to the dataset directory.
+            dataset_path (Path): The root path to the dataset directory.
             phase_name (str): The specific phase of the dataset (e.g., 'train', 'test') to load or generate data for.
 
         Returns:
             dict: The loaded data from the cache for the specified phase.
         """
-        cache_path = path.join(dataset_path, f"{phase_name}.cache")
+        cache_path = dataset_path / f"{phase_name}.cache"
 
-        if not path.isfile(cache_path):
+        if not cache_path.exists():
             logger.info("🏭 Generating {} cache", phase_name)
             data = self.filter_data(dataset_path, phase_name)
             torch.save(data, cache_path)
@@ -63,20 +62,20 @@ class YoloDataset(Dataset):
             logger.info("📦 Loaded {} cache", phase_name)
         return data
 
-    def filter_data(self, dataset_path: str, phase_name: str) -> list:
+    def filter_data(self, dataset_path: Path, phase_name: str) -> list:
         """
         Filters and collects dataset information by pairing images with their corresponding labels.
 
         Parameters:
-            images_path (str): Path to the directory containing image files.
+            images_path (Path): Path to the directory containing image files.
             labels_path (str): Path to the directory containing label files.
 
         Returns:
             list: A list of tuples, each containing the path to an image file and its associated segmentation as a tensor.
         """
-        images_path = path.join(dataset_path, "images", phase_name)
+        images_path = dataset_path / "images" / phase_name
         labels_path, data_type = locate_label_paths(dataset_path, phase_name)
-        images_list = sorted(os.listdir(images_path))
+        images_list = sorted([p.name for p in Path(images_path).iterdir() if p.is_file()])
         if data_type == "json":
             annotations_index, image_info_dict = create_image_metadata(labels_path)
 
@@ -85,7 +84,7 @@ class YoloDataset(Dataset):
         for image_name in track(images_list, description="Filtering data"):
             if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
                 continue
-            image_id, _ = path.splitext(image_name)
+            image_id = Path(image_name).stem
 
             if data_type == "json":
                 image_info = image_info_dict.get(image_id, None)
@@ -97,8 +96,8 @@ class YoloDataset(Dataset):
                     continue
 
             elif data_type == "txt":
-                label_path = path.join(labels_path, f"{image_id}.txt")
-                if not path.isfile(label_path):
+                label_path = labels_path / f"{image_id}.txt"
+                if not label_path.is_file():
                     continue
                 with open(label_path, "r") as file:
                     image_seg_annotations = [list(map(float, line.strip().split())) for line in file]
@@ -107,13 +106,13 @@ class YoloDataset(Dataset):
 
             labels = self.load_valid_labels(image_id, image_seg_annotations)
 
-            img_path = path.join(images_path, image_name)
+            img_path = images_path / image_name
             data.append((img_path, labels))
             valid_inputs += 1
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
 
-    def load_valid_labels(self, label_path, seg_data_one_img) -> Union[torch.Tensor, None]:
+    def load_valid_labels(self, label_path: str, seg_data_one_img: list) -> Union[torch.Tensor, None]:
         """
         Loads and validates bounding box data is [0, 1] from a label file.
 
@@ -215,9 +214,9 @@ def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: st
 
 class StreamDataLoader:
     def __init__(self, data_cfg: DataConfig):
-        self.source = data_cfg.source
+        self.source = Path(data_cfg.source)
         self.running = True
-        self.is_stream = isinstance(self.source, int) or self.source.lower().startswith("rtmp://")
+        self.is_stream = isinstance(self.source, int) or str(self.source).lower().startswith("rtmp://")
 
         self.transform = AugmentationComposer([], data_cfg.image_size)
         self.stop_event = Event()
@@ -230,20 +229,20 @@ class StreamDataLoader:
             self.thread.start()
 
     def load_source(self):
-        if os.path.isdir(self.source):  # image folder
+        if self.source.is_dir():  # image folder
             self.load_image_folder(self.source)
-        elif any(self.source.lower().endswith(ext) for ext in [".mp4", ".avi", ".mkv"]):  # Video file
+        elif any(self.source.suffix.lower().endswith(ext) for ext in [".mp4", ".avi", ".mkv"]):  # Video file
             self.load_video_file(self.source)
         else:  # Single image
             self.process_image(self.source)
 
     def load_image_folder(self, folder):
-        for root, _, files in os.walk(folder):
-            for file in files:
-                if self.stop_event.is_set():
-                    break
-                if any(file.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".bmp"]):
-                    self.process_image(os.path.join(root, file))
+        folder_path = Path(folder)
+        for file_path in folder_path.rglob("*"):
+            if self.stop_event.is_set():
+                break
+            if file_path.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp"]:
+                self.process_image(file_path)
 
     def process_image(self, image_path):
         image = Image.open(image_path).convert("RGB")

@@ -1,5 +1,5 @@
 import json
-import os
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from tqdm import tqdm
@@ -17,14 +17,14 @@ def discretize_categories(categories: List[Dict[str, int]]) -> Dict[int, int]:
 def process_annotations(
     image_annotations: Dict[int, List[Dict]],
     image_info_dict: Dict[int, tuple],
-    output_dir: str,
+    output_dir: Path,
     id_to_idx: Optional[Dict[int, int]] = None,
 ) -> None:
     """
     Process and save annotations to files, with option to remap category IDs.
     """
     for image_id, annotations in tqdm(image_annotations.items(), desc="Processing annotations"):
-        file_path = os.path.join(output_dir, f"{image_id:0>12}.txt")
+        file_path = output_dir / "{image_id:0>12}.txt"
         if not annotations:
             continue
         with open(file_path, "w") as file:
@@ -73,7 +73,7 @@ def convert_annotations(json_file: str, output_dir: str) -> None:
     with open(json_file) as file:
         data = json.load(file)
 
-    os.makedirs(output_dir, exist_ok=True)
+    Path(output_dir).mkdir(exist_ok=True)
 
     image_info_dict = {img["id"]: (img["width"], img["height"]) for img in data.get("images", [])}
     id_to_idx = discretize_categories(data.get("categories", [])) if "categories" in data else None

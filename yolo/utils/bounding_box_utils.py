@@ -1,5 +1,5 @@
 import math
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -333,7 +333,7 @@ def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig):
     return predicts_nms
 
 
-def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05)):
+def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05)) -> Dict[str, Tensor]:
     # TODO: Refactor this block, Flexible for calculate different mAP condition?
     device = predictions.device
     n_preds = predictions.size(0)
@@ -375,5 +375,8 @@ def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05
 
         aps.append(ap)
 
-    mean_ap = torch.mean(torch.stack(aps))
-    return mean_ap, aps[0]
+    mAP = {
+        "mAP.5": torch.mean(torch.stack(aps)),
+        "mAP.5:.95": aps[0],
+    }
+    return mAP

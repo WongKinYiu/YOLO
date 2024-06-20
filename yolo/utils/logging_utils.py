@@ -14,8 +14,10 @@ Example:
 import os
 import sys
 from collections import deque
+from pathlib import Path
 from typing import Any, Dict, List
 
+import numpy as np
 import wandb
 import wandb.errors.term
 from loguru import logger
@@ -64,6 +66,7 @@ class ProgressLogger(Progress):
         self.ap_table = Table()
         # TODO: load maxlen by config files
         self.ap_past_list = deque(maxlen=5)
+        self.last_result = 0
         super().__init__(*args, *progress_bar, **kwargs)
 
         self.use_wandb = cfg.use_wandb
@@ -121,17 +124,20 @@ class ProgressLogger(Progress):
         self.batch_task = self.add_task("[green]Run pycocotools", total=1)
 
     def finish_pycocotools(self, result, epoch_idx=-1):
-        ap_table, ap_main = make_ap_table(result, self.ap_past_list, epoch_idx)
+        ap_table, ap_main = make_ap_table(result, self.ap_past_list, self.last_result, epoch_idx)
+        self.last_result = np.maximum(result, self.last_result)
         self.ap_past_list.append((epoch_idx, ap_main))
         self.ap_table = ap_table
 
         if self.use_wandb:
-            self.wandb.log({"PyCOCO/AP @ .5:.95": ap_main[1], "PyCOCO/AP @ .5": ap_main[3]})
+            self.wandb.log({"PyCOCO/AP @ .5:.95": ap_main[2], "PyCOCO/AP @ .5": ap_main[5]})
         self.update(self.batch_task, advance=1)
         self.refresh()
         self.remove_task(self.batch_task)
 
     def finish_train(self):
+        self.remove_task(self.task_epoch)
+        self.stop()
         self.wandb.finish()
 
 
@@ -167,23 +173,23 @@ def log_model_structure(model: List[YOLOLayer]):
     console.print(table)
 
 
-def validate_log_directory(cfg: Config, exp_name: str):
-    base_path = os.path.join(cfg.out_path, cfg.task.task)
-    save_path = os.path.join(base_path, exp_name)
+def validate_log_directory(cfg: Config, exp_name: str) -> Path:
+    base_path = Path(cfg.out_path, cfg.task.task)
+    save_path = base_path / exp_name
 
     if not cfg.exist_ok:
         index = 1
         old_exp_name = exp_name
-        while os.path.isdir(save_path):
+        while save_path.is_dir():
             exp_name = f"{old_exp_name}{index}"
-            save_path = os.path.join(base_path, exp_name)
+            save_path = base_path / exp_name
             index += 1
         if index > 1:
             logger.opt(colors=True).warning(
                 f"🔀 Experiment directory exists! Changed <red>{old_exp_name}</> to <green>{exp_name}</>"
             )
 
-    os.makedirs(save_path, exist_ok=True)
+    save_path.mkdir(exist_ok=True)
     logger.opt(colors=True).info(f"📄 Created log folder: <u><fg #808080>{save_path}</></>")
-    logger.add(os.path.join(save_path, "output.log"), mode="w", backtrace=True, diagnose=True)
+    logger.add(save_path / "output.log", mode="w", backtrace=True, diagnose=True)
     return save_path

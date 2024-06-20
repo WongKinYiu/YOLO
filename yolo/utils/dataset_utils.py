@@ -1,7 +1,7 @@
 import json
 import os
 from itertools import chain
-from os import path
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -10,25 +10,25 @@ from loguru import logger
 from yolo.tools.data_conversion import discretize_categories
 
 
-def locate_label_paths(dataset_path: str, phase_name: str):
+def locate_label_paths(dataset_path: Path, phase_name: Path) -> Tuple[Path, Path]:
     """
     Find the path to label files for a specified dataset and phase(e.g. training).
 
     Args:
-        dataset_path (str): The path to the root directory of the dataset.
-        phase_name (str): The name of the phase for which labels are being searched (e.g., "train", "val", "test").
+        dataset_path (Path): The path to the root directory of the dataset.
+        phase_name (Path): The name of the phase for which labels are being searched (e.g., "train", "val", "test").
 
     Returns:
-        Tuple[str, str]: A tuple containing the path to the labels file and the file format ("json" or "txt").
+        Tuple[Path, Path]: A tuple containing the path to the labels file and the file format ("json" or "txt").
     """
-    json_labels_path = path.join(dataset_path, "annotations", f"instances_{phase_name}.json")
+    json_labels_path = dataset_path / "annotations" / f"instances_{phase_name}.json"
 
-    txt_labels_path = path.join(dataset_path, "labels", phase_name)
+    txt_labels_path = dataset_path / "labels" / phase_name
 
-    if path.isfile(json_labels_path):
+    if json_labels_path.is_file():
         return json_labels_path, "json"
 
-    elif path.isdir(txt_labels_path):
+    elif txt_labels_path.is_dir():
         txt_files = [f for f in os.listdir(txt_labels_path) if f.endswith(".txt")]
         if txt_files:
             return txt_labels_path, "txt"
@@ -52,7 +52,7 @@ def create_image_metadata(labels_path: str) -> Tuple[Dict[str, List], Dict[str, 
         labels_data = json.load(file)
         id_to_idx = discretize_categories(labels_data.get("categories", [])) if "categories" in labels_data else None
         annotations_index = organize_annotations_by_image(labels_data, id_to_idx)  # check lookup is a good name?
-        image_info_dict = {path.splitext(img["file_name"])[0]: img for img in labels_data["images"]}
+        image_info_dict = {Path(img["file_name"]).stem: img for img in labels_data["images"]}
         return annotations_index, image_info_dict
 
 
