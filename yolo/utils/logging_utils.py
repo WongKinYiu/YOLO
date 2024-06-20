@@ -100,11 +100,6 @@ class ProgressLogger(Progress):
         batch_descript = "|"
         if self.task == "Train":
             self.update(self.task_epoch, advance=1 / self.num_batches)
-        elif self.task == "Validate":
-            batch_info = {
-                "mAP.5": batch_info.mean(dim=0)[0],
-                "mAP.5:.95": batch_info.mean(dim=0)[1],
-            }
         for info_name, info_val in batch_info.items():
             epoch_descript += f"{info_name: ^9}|"
             batch_descript += f"   {info_val:2.2f}  |"
@@ -114,19 +109,16 @@ class ProgressLogger(Progress):
 
     def finish_one_epoch(self, batch_info: Dict[str, Any] = None, epoch_idx: int = -1):
         if self.task == "Train":
-            for loss_name in batch_info.keys():
-                batch_info["Loss/" + loss_name] = batch_info.pop(loss_name)
+            prefix = "Loss/"
         elif self.task == "Validate":
-            batch_info = {
-                "Metrics/mAP.5": batch_info.mean(dim=0)[0],
-                "Metrics/mAP.5:.95": batch_info.mean(dim=0)[1],
-            }
+            prefix = "Metrics/"
+        batch_info = {f"{prefix}{key}": value for key, value in batch_info.items()}
         if self.use_wandb:
             self.wandb.log(batch_info, step=epoch_idx)
         self.remove_task(self.batch_task)
 
     def start_pycocotools(self):
-        self.batch_task = self.add_task("[green] run pycocotools", total=1)
+        self.batch_task = self.add_task("[green]Run pycocotools", total=1)
 
     def finish_pycocotools(self, result, epoch_idx=-1):
         ap_table, ap_main = make_ap_table(result, self.ap_past_list, epoch_idx)

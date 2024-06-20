@@ -3,6 +3,7 @@ import os
 import sys
 import time
 from collections import defaultdict
+from typing import Dict, Optional
 
 import torch
 from loguru import logger
@@ -43,6 +44,9 @@ class ModelTrainer:
         self.loss_fn = create_loss_function(cfg, vec2box)
         self.progress = progress
         self.num_epochs = cfg.task.epoch
+        self.mAPs_dict = defaultdict(list)
+
+        os.makedirs(os.path.join(self.progress.save_path, "weights"), exist_ok=True)
 
         if not progress.quite_mode:
             log_model_structure(model.model)
@@ -96,9 +100,12 @@ class ModelTrainer:
 
         return total_loss
 
-    def save_checkpoint(self, epoch: int, filename="checkpoint.pt"):
+    def save_checkpoint(self, epoch_idx: int, file_name: Optional[str] = None):
+        file_name = file_name or f"E{epoch_idx:03d}.pt"
+        file_path = os.path.join(self.progress.save_path, "weights", file_name)
+
         checkpoint = {
-            "epoch": epoch,
+            "epoch": epoch_idx,
             "model_state_dict": self.model.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
         }
@@ -106,22 +113,34 @@ class ModelTrainer:
             self.ema.apply_shadow()
             checkpoint["model_state_dict_ema"] = self.model.state_dict()
             self.ema.restore()
-        torch.save(checkpoint, filename)
+
+        print(f"💾 success save at {file_path}")
+        torch.save(checkpoint, file_path)
+
+    def good_epoch(self, mAPs: Dict[str, Tensor]) -> bool:
+        save_flag = True
+        for mAP_key, mAP_val in mAPs.items():
+            self.mAPs_dict[mAP_key].append(mAP_val)
+            if mAP_val < max(self.mAPs_dict[mAP_key]):
+                save_flag = False
+        return save_flag
 
     def solve(self, dataloader: DataLoader):
         logger.info("🚄 Start Training!")
         num_epochs = self.num_epochs
 
         self.progress.start_train(num_epochs)
-        for epoch in range(num_epochs):
+        for epoch_idx in range(num_epochs):
             if self.use_ddp:
-                dataloader.sampler.set_epoch(epoch)
+                dataloader.sampler.set_epoch(epoch_idx)
 
-            self.progress.start_one_epoch(len(dataloader), "Train", self.optimizer, epoch)
+            self.progress.start_one_epoch(len(dataloader), "Train", self.optimizer, epoch_idx)
             epoch_loss = self.train_one_epoch(dataloader)
-            self.progress.finish_one_epoch(epoch_loss, epoch)
+            self.progress.finish_one_epoch(epoch_loss, epoch_idx=epoch_idx)
 
-            self.validator.solve(self.validation_dataloader, epoch_idx=epoch)
+            mAPs = self.validator.solve(self.validation_dataloader, epoch_idx=epoch_idx)
+            if self.good_epoch(mAPs):
+                self.save_checkpoint(epoch_idx=epoch_idx)
             # TODO: save model if result are better than before
         self.progress.finish_train()
 
@@ -206,7 +225,7 @@ class ModelValidator:
     def solve(self, dataloader, epoch_idx=-1):
         # logger.info("🧪 Start Validation!")
         self.model.eval()
-        mAPs, predict_json = [], []
+        predict_json, mAPs = [], defaultdict(list)
         self.progress.start_one_epoch(len(dataloader), task="Validate")
         for batch_size, images, targets, rev_tensor, img_paths in dataloader:
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
@@ -214,14 +233,21 @@ class ModelValidator:
                 predicts = self.model(images)
                 predicts = self.post_proccess(predicts)
                 for idx, predict in enumerate(predicts):
-                    mAPs.append(calculate_map(predict, targets[idx]))
-            self.progress.one_batch(Tensor(mAPs))
+                    mAP = calculate_map(predict, targets[idx])
+                    for mAP_key, mAP_val in mAP.items():
+                        mAPs[mAP_key].append(mAP_val)
+
+            avg_mAPs = {key: torch.mean(torch.stack(val)) for key, val in mAPs.items()}
+            self.progress.one_batch(avg_mAPs)
 
             predict_json.extend(predicts_to_json(img_paths, predicts, rev_tensor))
-        self.progress.finish_one_epoch(Tensor(mAPs), epoch_idx=epoch_idx)
+        self.progress.finish_one_epoch(avg_mAPs, epoch_idx=epoch_idx)
+
         with open(self.json_path, "w") as f:
             json.dump(predict_json, f)
 
         self.progress.start_pycocotools()
         result = calculate_ap(self.coco_gt, predict_json)
         self.progress.finish_pycocotools(result, epoch_idx)
+
+        return avg_mAPs
