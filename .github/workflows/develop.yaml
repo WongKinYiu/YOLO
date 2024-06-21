@@ -1,26 +1,34 @@
-name: YOLOv9 - Model test and Code Style Check
+name: Developer Mode Build & Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python 3.8
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python 3.10
       uses: actions/setup-python@v2
       with:
-        python-version: 3.8
+        python-version: 3.10
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-glx
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
@@ -35,8 +43,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-precommit-
 
-    - name: Run pre-commit (black and isort)
+    - name: Run pre-commit hooks
       run: pre-commit run --all-files
 
     - name: Test with pytest
-      run: pytest
+      run: |
+        pip install pytest pytest-cov
+        pytest --cov=yolo
