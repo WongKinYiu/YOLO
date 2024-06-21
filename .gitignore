@@ -114,6 +114,7 @@ dmypy.json
 runs
 /data
 /datasets
+*/data
 
 # Datasets and model checkpoints
 *.pth
