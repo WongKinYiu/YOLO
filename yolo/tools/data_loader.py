@@ -3,7 +3,6 @@ from queue import Empty, Queue
 from threading import Event, Thread
 from typing import Generator, List, Tuple, Union
 
-import cv2
 import numpy as np
 import torch
 from loguru import logger
@@ -222,6 +221,8 @@ class StreamDataLoader:
         self.stop_event = Event()
 
         if self.is_stream:
+            import cv2
+
             self.cap = cv2.VideoCapture(self.source)
         else:
             self.queue = Queue()
@@ -251,6 +252,8 @@ class StreamDataLoader:
         self.process_frame(image)
 
     def load_video_file(self, video_path):
+        import cv2
+
         cap = cv2.VideoCapture(video_path)
         while self.running:
             ret, frame = cap.read()
@@ -261,6 +264,9 @@ class StreamDataLoader:
 
     def process_frame(self, frame):
         if isinstance(frame, np.ndarray):
+            # TODO: we don't need cv2
+            import cv2
+
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = Image.fromarray(frame)
         origin_frame = frame
