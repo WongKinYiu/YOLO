@@ -82,7 +82,7 @@ def prepare_dataset(dataset_cfg: DatasetConfig, task: str):
                 logger.error(f"Error verifying the {dataset_type} dataset after extraction.")
 
 
-def prepare_weight(download_link: Optional[str] = None, weight_path: Path = "v9-c.pt"):
+def prepare_weight(download_link: Optional[str] = None, weight_path: Path = Path("v9-c.pt")):
     weight_name = weight_path.name
     if download_link is None:
         download_link = "https://github.com/WongKinYiu/yolov9mit/releases/download/v1.0-alpha/"
@@ -97,13 +97,3 @@ def prepare_weight(download_link: Optional[str] = None, weight_path: Path = "v9-
         download_file(weight_link, weight_path)
     except requests.exceptions.RequestException as e:
         logger.warning(f"Failed to download the weight file: {e}")
-
-
-if __name__ == "__main__":
-    import sys
-
-    sys.path.append("./")
-    from utils.logging_utils import custom_logger
-
-    custom_logger()
-    prepare_weight()

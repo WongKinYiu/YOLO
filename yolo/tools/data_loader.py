@@ -111,7 +111,7 @@ class YoloDataset(Dataset):
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
 
-    def load_valid_labels(self, label_path: str, seg_data_one_img: list) -> Union[torch.Tensor, None]:
+    def load_valid_labels(self, label_path: str, seg_data_one_img: list) -> Union[Tensor, None]:
         """
         Loads and validates bounding box data is [0, 1] from a label file.
 
@@ -119,7 +119,7 @@ class YoloDataset(Dataset):
             label_path (str): The filepath to the label file containing bounding box data.
 
         Returns:
-            torch.Tensor or None: A tensor of all valid bounding boxes if any are found; otherwise, None.
+            Tensor or None: A tensor of all valid bounding boxes if any are found; otherwise, None.
         """
         bboxes = []
         for seg_data in seg_data_one_img:
@@ -145,7 +145,7 @@ class YoloDataset(Dataset):
         indices = torch.randint(0, len(self), (num,))
         return [self.get_data(idx)[:2] for idx in indices]
 
-    def __getitem__(self, idx) -> Union[Image.Image, torch.Tensor]:
+    def __getitem__(self, idx) -> Tuple[Image.Image, Tensor, Tensor, List[str]]:
         img, bboxes, img_path = self.get_data(idx)
         img, bboxes, rev_tensor = self.transform(img, bboxes)
         return img, bboxes, rev_tensor, img_path
@@ -170,17 +170,17 @@ class YoloDataLoader(DataLoader):
             collate_fn=self.collate_fn,
         )
 
-    def collate_fn(self, batch: List[Tuple[torch.Tensor, torch.Tensor]]) -> Tuple[torch.Tensor, List[torch.Tensor]]:
+    def collate_fn(self, batch: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, List[Tensor]]:
         """
         A collate function to handle batching of images and their corresponding targets.
 
         Args:
             batch (list of tuples): Each tuple contains:
-                - image (torch.Tensor): The image tensor.
-                - labels (torch.Tensor): The tensor of labels for the image.
+                - image (Tensor): The image tensor.
+                - labels (Tensor): The tensor of labels for the image.
 
         Returns:
-            Tuple[torch.Tensor, List[torch.Tensor]]: A tuple containing:
+            Tuple[Tensor, List[Tensor]]: A tuple containing:
                 - A tensor of batched images.
                 - A list of tensors, each corresponding to bboxes for each image in the batch.
         """
@@ -213,7 +213,7 @@ def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: st
 
 class StreamDataLoader:
     def __init__(self, data_cfg: DataConfig):
-        self.source = Path(data_cfg.source)
+        self.source = data_cfg.source
         self.running = True
         self.is_stream = isinstance(self.source, int) or str(self.source).lower().startswith("rtmp://")
 
@@ -225,6 +225,7 @@ class StreamDataLoader:
 
             self.cap = cv2.VideoCapture(self.source)
         else:
+            self.source = Path(self.source)
             self.queue = Queue()
             self.thread = Thread(target=self.load_source)
             self.thread.start()

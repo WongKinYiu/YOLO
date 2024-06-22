@@ -138,7 +138,8 @@ class ProgressLogger(Progress):
     def finish_train(self):
         self.remove_task(self.task_epoch)
         self.stop()
-        self.wandb.finish()
+        if self.use_wandb:
+            self.wandb.finish()
 
 
 def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=True, silent=False):

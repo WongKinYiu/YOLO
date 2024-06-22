@@ -7,6 +7,9 @@ from loguru import logger
 from PIL import Image, ImageDraw, ImageFont
 from torchvision.transforms.functional import to_pil_image
 
+from yolo.config.config import ModelConfig
+from yolo.model.yolo import YOLO
+
 
 def draw_bboxes(
     img: Union[Image.Image, torch.Tensor],
@@ -62,7 +65,7 @@ def draw_bboxes(
     return img
 
 
-def draw_model(*, model_cfg=None, model=None, v7_base=False):
+def draw_model(*, model_cfg: ModelConfig = None, model: YOLO = None, v7_base=False):
     from graphviz import Digraph
 
     if model_cfg:
