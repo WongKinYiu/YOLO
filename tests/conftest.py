@@ -11,6 +11,7 @@ sys.path.append(str(project_root))
 from yolo import Config, Vec2Box, create_model
 from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, YoloDataLoader
+from yolo.tools.dataset_preparation import prepare_dataset
 from yolo.utils.logging_utils import ProgressLogger, set_seed
 
 
@@ -72,11 +73,13 @@ def vec2box(train_cfg: Config, model: YOLO, device) -> Vec2Box:
 
 @pytest.fixture(scope="session")
 def train_dataloader(train_cfg: Config):
+    prepare_dataset(train_cfg.dataset, task="train")
     return YoloDataLoader(train_cfg.task.data, train_cfg.dataset, train_cfg.task.task)
 
 
 @pytest.fixture(scope="session")
 def validation_dataloader(validation_cfg: Config):
+    prepare_dataset(validation_cfg.dataset, task="val")
     return YoloDataLoader(validation_cfg.task.data, validation_cfg.dataset, validation_cfg.task.task)
 
 

@@ -33,10 +33,10 @@ def test_training_data_loader_correctness(train_dataloader: YoloDataLoader):
     assert batch_size == 2
     assert images.shape == (2, 3, 640, 640)
     assert reverse_tensors.shape == (2, 5)
-    expected_paths = [
+    expected_paths = (
         Path("tests/data/images/train/000000050725.jpg"),
         Path("tests/data/images/train/000000167848.jpg"),
-    ]
+    )
     assert image_paths == expected_paths
 
 
@@ -46,12 +46,12 @@ def test_validation_data_loader_correctness(validation_dataloader: YoloDataLoade
     assert images.shape == (4, 3, 640, 640)
     assert targets.shape == (4, 18, 5)
     assert reverse_tensors.shape == (4, 5)
-    expected_paths = [
+    expected_paths = (
         Path("tests/data/images/val/000000151480.jpg"),
         Path("tests/data/images/val/000000284106.jpg"),
         Path("tests/data/images/val/000000323571.jpg"),
         Path("tests/data/images/val/000000570456.jpg"),
-    ]
+    )
     assert image_paths == expected_paths
 
 
