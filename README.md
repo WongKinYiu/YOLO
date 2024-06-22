@@ -20,7 +20,7 @@ Welcome to the official implementation of YOLOv7 and YOLOv9. This repository wil
 - This is the official YOLO model implementation with an MIT License.
 - For quick deployment: you can directly install by pip+git:
 ```shell
-pip install git+git@github.com:WongKinYiu/YOLO.git
+pip install git+https://github.com/WongKinYiu/YOLO.git
 yolo task.data.source=0 # source could be a single file, video, image folder, webcam ID
 ```
 

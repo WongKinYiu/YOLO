@@ -37,9 +37,9 @@ def draw_bboxes(
     draw = ImageDraw.Draw(img, "RGBA")
 
     try:
-        font = ImageFont.truetype("arial.ttf", label_size)
+        font = ImageFont.truetype("arial.ttf", int(label_size))
     except IOError:
-        font = ImageFont.load_default(label_size)
+        font = ImageFont.load_default(int(label_size))
 
     for bbox in bboxes:
         class_id, x_min, y_min, x_max, y_max, *conf = [float(val) for val in bbox]
