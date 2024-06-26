@@ -2,7 +2,8 @@
 
 ![GitHub License](https://img.shields.io/github/license/WongKinYiu/YOLO)
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/WongKinYiu/YOLO/main.yaml)
+![](https://img.shields.io/github/actions/workflow/status/WongKinYiu/YOLO/deploy.yaml)
+
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/yolov9-learning-what-you-want-to-learn-using/real-time-object-detection-on-coco)](https://paperswithcode.com/sota/real-time-object-detection-on-coco)
 

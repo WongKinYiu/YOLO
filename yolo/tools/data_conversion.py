@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from tqdm import tqdm
+from rich.progress import track
 
 
 def discretize_categories(categories: List[Dict[str, int]]) -> Dict[int, int]:
@@ -23,7 +23,7 @@ def process_annotations(
     """
     Process and save annotations to files, with option to remap category IDs.
     """
-    for image_id, annotations in tqdm(image_annotations.items(), desc="Processing annotations"):
+    for image_id, annotations in track(image_annotations.items(), description="Processing annotations"):
         file_path = output_dir / "{image_id:0>12}.txt"
         if not annotations:
             continue
