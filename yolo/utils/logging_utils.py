@@ -16,7 +16,7 @@ import random
 import sys
 from collections import deque
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, Union
 
 import numpy as np
 import torch
@@ -34,9 +34,11 @@ from rich.progress import (
 )
 from rich.table import Table
 from torch import Tensor
+from torch.nn import ModuleList
 from torch.optim import Optimizer
 
 from yolo.config.config import Config, YOLOLayer
+from yolo.model.yolo import YOLO
 from yolo.utils.solver_utils import make_ap_table
 
 
@@ -163,7 +165,9 @@ def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=Tru
         logger.opt(raw=not newline, colors=True).info("🌐 " + line)
 
 
-def log_model_structure(model: List[YOLOLayer]):
+def log_model_structure(model: Union[ModuleList, YOLOLayer, YOLO]):
+    if isinstance(model, YOLO):
+        model = model.model
     console = Console()
     table = Table(title="Model Layers")
 
