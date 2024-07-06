@@ -1,14 +1,14 @@
 import math
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 from einops import rearrange
 from loguru import logger
-from torch import Tensor, arange
+from torch import Tensor, arange, tensor
 from torchvision.ops import batched_nms
 
-from yolo.config.config import MatcherConfig, ModelConfig, NMSConfig
+from yolo.config.config import AnchorConfig, MatcherConfig, ModelConfig, NMSConfig
 from yolo.model.yolo import YOLO
 
 
@@ -308,9 +308,64 @@ class Vec2Box:
         return preds_cls, preds_anc, preds_box
 
 
-def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig):
-    # TODO change function to class or set 80 to class_num instead of a number
-    cls_dist = cls_dist.sigmoid()
+class Anc2Box:
+    def __init__(self, model: YOLO, anchor_cfg: AnchorConfig, image_size, device):
+        self.device = device
+
+        if hasattr(anchor_cfg, "strides"):
+            logger.info(f"🈶 Found stride of model {anchor_cfg.strides}")
+            self.strides = anchor_cfg.strides
+        else:
+            logger.info("🧸 Found no stride of model, performed a dummy test for auto-anchor size")
+            self.strides = self.create_auto_anchor(model, image_size)
+
+        self.generate_anchors(image_size)
+        self.anchor_grid = [anchor_grid.to(device) for anchor_grid in self.anchor_grid]
+        self.head_num = len(anchor_cfg.anchor)
+        self.anchor_scale = tensor(anchor_cfg.anchor, device=device).view(self.head_num, 1, -1, 1, 1, 2)
+        self.anchor_num = self.anchor_scale.size(2)
+        self.class_num = model.num_classes
+
+    def create_auto_anchor(self, model: YOLO, image_size):
+        dummy_input = torch.zeros(1, 3, *image_size).to(self.device)
+        dummy_output = model(dummy_input)
+        strides = []
+        for predict_head in dummy_output:
+            _, _, *anchor_num = predict_head.shape
+            strides.append(image_size[1] // anchor_num[1])
+        return strides
+
+    def generate_anchors(self, image_size: List[int]):
+        self.anchor_grid = []
+        for stride in self.strides:
+            W, H = image_size[0] // stride, image_size[1] // stride
+            anchor_h, anchor_w = torch.meshgrid([torch.arange(H), torch.arange(W)], indexing="ij")
+            self.anchor_grid.append(torch.stack((anchor_w, anchor_h), 2).view((1, 1, H, W, 2)).float())
+
+    def __call__(self, predicts: List[Tensor]):
+        preds_box, preds_cls, preds_cnf = [], [], []
+        for layer_idx, predict in enumerate(predicts):
+            predict = rearrange(predict, "B (L C) h w -> B L h w C", L=self.anchor_num)
+            pred_box, pred_cnf, pred_cls = predict.split((4, 1, self.class_num), dim=-1)
+            pred_box = pred_box.sigmoid()
+            pred_box[..., 0:2] = (pred_box[..., 0:2] * 2.0 - 0.5 + self.anchor_grid[layer_idx]) * self.strides[
+                layer_idx
+            ]
+            pred_box[..., 2:4] = (pred_box[..., 2:4] * 2) ** 2 * self.anchor_scale[layer_idx]
+            preds_box.append(rearrange(pred_box, "B L h w A -> B (L h w) A"))
+            preds_cls.append(rearrange(pred_cls, "B L h w C -> B (L h w) C"))
+            preds_cnf.append(rearrange(pred_cnf, "B L h w C -> B (L h w) C"))
+
+        preds_box = torch.concat(preds_box, dim=1)
+        preds_cls = torch.concat(preds_cls, dim=1)
+        preds_cnf = torch.concat(preds_cnf, dim=1)
+
+        preds_box = transform_bbox(preds_box, "xycwh -> xyxy")
+        return preds_cls, None, preds_box, preds_cnf.sigmoid()
+
+
+def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Optional[Tensor]):
+    cls_dist = cls_dist.sigmoid() * (1 if confidence is None else confidence)
 
     # filter class by confidence
     cls_val, cls_idx = cls_dist.max(dim=-1, keepdim=True)

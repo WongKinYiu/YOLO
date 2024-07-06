@@ -6,8 +6,10 @@ from torch import nn
 
 @dataclass
 class AnchorConfig:
-    reg_max: int
     strides: List[int]
+    reg_max: Optional[int]
+    anchor_num: Optional[int]
+    anchor: List[List[int]]
 
 
 @dataclass

@@ -103,15 +103,17 @@ class PostProccess:
     scale back the prediction and do nms for pred_bbox
     """
 
-    def __init__(self, vec2box, nms_cfg: NMSConfig) -> None:
-        self.vec2box = vec2box
+    def __init__(self, converter, nms_cfg: NMSConfig) -> None:
+        self.converter = converter
         self.nms = nms_cfg
 
     def __call__(self, predict, rev_tensor: Optional[Tensor] = None):
-        pred_class, _, pred_bbox = self.vec2box(predict["Main"])
+        prediction = self.converter(predict["Main"])
+        pred_class, _, pred_bbox = prediction[:3]
+        pred_conf = prediction[3] if len(prediction) == 4 else None
         if rev_tensor is not None:
             pred_bbox = (pred_bbox - rev_tensor[:, None, 1:]) / rev_tensor[:, 0:1, None]
-        pred_bbox = bbox_nms(pred_class, pred_bbox, self.nms)
+        pred_bbox = bbox_nms(pred_class, pred_bbox, self.nms, pred_conf)
         return pred_bbox
 
 
