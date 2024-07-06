@@ -1,12 +1,10 @@
 import sys
 from pathlib import Path
 
-import pytest
-
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 
-from yolo.config.config import Config, TrainConfig
+from yolo.config.config import Config
 from yolo.tools.data_loader import StreamDataLoader, YoloDataLoader, create_dataloader
 
 
