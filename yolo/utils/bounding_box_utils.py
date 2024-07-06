@@ -265,12 +265,12 @@ class BoxMatcher:
 
 
 class Vec2Box:
-    def __init__(self, model: YOLO, image_size, device):
+    def __init__(self, model: YOLO, anchor_cfg: AnchorConfig, image_size, device):
         self.device = device
 
-        if hasattr(model, "strides") and getattr(model, "strides"):
-            logger.info(f"🈶 Found stride of model {model.strides}")
-            self.strides = model.strides
+        if hasattr(anchor_cfg, "strides"):
+            logger.info(f"🈶 Found stride of model {anchor_cfg.strides}")
+            self.strides = anchor_cfg.strides
         else:
             logger.info("🧸 Found no stride of model, performed a dummy test for auto-anchor size")
             self.strides = self.create_auto_anchor(model, image_size)
