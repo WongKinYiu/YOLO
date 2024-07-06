@@ -7,7 +7,6 @@ from loguru import logger
 from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
 
-from yolo.utils.bounding_box_utils import generate_anchors
 from yolo.utils.module_utils import auto_pad, create_activation_function, round_up
 
 
