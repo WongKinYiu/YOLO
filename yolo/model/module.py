@@ -91,13 +91,40 @@ class Detection(nn.Module):
         return class_x, anchor_x, vector_x
 
 
+class IDetection(nn.Module):
+    def __init__(self, in_channels: Tuple[int], num_classes: int, *args, anchor_num: int = 3, **kwargs):
+        super().__init__()
+
+        if isinstance(in_channels, tuple):
+            in_channels = in_channels[1]
+
+        out_channel = num_classes + 5
+        out_channels = out_channel * anchor_num
+        self.head_conv = nn.Conv2d(in_channels, out_channels, 1)
+
+        self.implicit_a = ImplicitA(in_channels)
+        self.implicit_m = ImplicitM(out_channels)
+
+    def forward(self, x):
+        x = self.implicit_a(x)
+        x = self.head_conv(x)
+        x = self.implicit_m(x)
+
+        return x
+
+
 class MultiheadDetection(nn.Module):
     """Mutlihead Detection module for Dual detect or Triple detect"""
 
     def __init__(self, in_channels: List[int], num_classes: int, **head_kwargs):
         super().__init__()
+        DetectionHead = Detection
+
+        if head_kwargs.pop("version", None) == "v7":
+            DetectionHead = IDetection
+
         self.heads = nn.ModuleList(
-            [Detection((in_channels[0], in_channel), num_classes, **head_kwargs) for in_channel in in_channels]
+            [DetectionHead((in_channels[0], in_channel), num_classes, **head_kwargs) for in_channel in in_channels]
         )
 
     def forward(self, x_list: List[torch.Tensor]) -> List[torch.Tensor]:
@@ -320,6 +347,32 @@ class CBLinear(nn.Module):
         return x.split(self.out_channels, dim=1)
 
 
+class SPPCSPConv(nn.Module):
+    # CSP https://github.com/WongKinYiu/CrossStagePartialNetworks
+    def __init__(self, in_channels: int, out_channels: int, expand: float = 0.5, kernel_sizes: Tuple[int] = (5, 9, 13)):
+        super().__init__()
+        neck_channels = int(2 * out_channels * expand)
+        self.pre_conv = nn.Sequential(
+            Conv(in_channels, neck_channels, 1),
+            Conv(neck_channels, neck_channels, 3),
+            Conv(neck_channels, neck_channels, 1),
+        )
+        self.short_conv = Conv(in_channels, neck_channels, 1)
+        self.pools = nn.ModuleList([Pool(kernel_size=kernel_size, stride=1) for kernel_size in kernel_sizes])
+        self.post_conv = nn.Sequential(Conv(4 * neck_channels, neck_channels, 1), Conv(neck_channels, neck_channels, 3))
+        self.merge_conv = Conv(2 * neck_channels, out_channels, 1)
+
+    def forward(self, x):
+        features = [self.pre_conv(x)]
+        for pool in self.pools:
+            features.append(pool(features[-1]))
+        features = torch.cat(features, dim=1)
+        y1 = self.post_conv(features)
+        y2 = self.short_conv(x)
+        y = torch.cat((y1, y2), dim=1)
+        return self.merge_conv(y)
+
+
 class SPPELAN(nn.Module):
     """SPPELAN module comprising multiple pooling and convolution layers."""
 
@@ -360,3 +413,39 @@ class CBFuse(nn.Module):
         res = [F.interpolate(x[pick_id], size=target_size, mode=self.mode) for pick_id, x in zip(self.idx, x_list)]
         out = torch.stack(res + [target]).sum(dim=0)
         return out
+
+
+class ImplicitA(nn.Module):
+    """
+    Implement YOLOR - implicit knowledge(Add), paper: https://arxiv.org/abs/2105.04206
+    """
+
+    def __init__(self, channel: int, mean: float = 0.0, std: float = 0.02):
+        super().__init__()
+        self.channel = channel
+        self.mean = mean
+        self.std = std
+
+        self.implicit = nn.Parameter(torch.empty(1, channel, 1, 1))
+        nn.init.normal_(self.implicit, mean=mean, std=self.std)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.implicit + x
+
+
+class ImplicitM(nn.Module):
+    """
+    Implement YOLOR - implicit knowledge(multiply), paper: https://arxiv.org/abs/2105.04206
+    """
+
+    def __init__(self, channel: int, mean: float = 1.0, std: float = 0.02):
+        super().__init__()
+        self.channel = channel
+        self.mean = mean
+        self.std = std
+
+        self.implicit = nn.Parameter(torch.empty(1, channel, 1, 1))
+        nn.init.normal_(self.implicit, mean=self.mean, std=self.std)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.implicit * x
