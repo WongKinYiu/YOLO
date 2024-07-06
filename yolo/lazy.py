@@ -27,7 +27,7 @@ def main(cfg: Config):
         model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight)
         model = model.to(device)
 
-    vec2box = Vec2Box(model, cfg.image_size, device)
+    vec2box = Vec2Box(model, cfg.model.anchor, cfg.image_size, device)
     if cfg.task.task == "train":
         solver = ModelTrainer(cfg, model, vec2box, progress, device, use_ddp)
     if cfg.task.task == "validation":

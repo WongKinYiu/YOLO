@@ -364,7 +364,7 @@ class Anc2Box:
         return preds_cls, None, preds_box, preds_cnf.sigmoid()
 
 
-def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Optional[Tensor]):
+def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Optional[Tensor] = None):
     cls_dist = cls_dist.sigmoid() * (1 if confidence is None else confidence)
 
     # filter class by confidence

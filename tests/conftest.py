@@ -67,7 +67,7 @@ def model(train_cfg: Config, device) -> YOLO:
 
 @pytest.fixture(scope="session")
 def vec2box(train_cfg: Config, model: YOLO, device) -> Vec2Box:
-    vec2box = Vec2Box(model, train_cfg.image_size, device)
+    vec2box = Vec2Box(model, train_cfg.model.anchor, train_cfg.image_size, device)
     return vec2box
 
 

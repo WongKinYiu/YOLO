@@ -31,7 +31,7 @@ def model(cfg: Config):
 @pytest.fixture
 def vec2box(cfg: Config, model):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return Vec2Box(model, cfg.image_size, device)
+    return Vec2Box(model, cfg.model.anchor, cfg.image_size, device)
 
 
 @pytest.fixture

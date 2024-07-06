@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 import torch
 from hydra import compose, initialize
-from torch import Tensor, allclose, float32, isclose, nn, tensor
+from torch import allclose, float32, isclose, tensor
 
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
@@ -117,7 +117,7 @@ def test_vec2box_autoanchor():
         cfg: Config = compose(config_name="config", overrides=["model=v9-m"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = create_model(cfg.model, weight_path=None).to(device)
-    vec2box = Vec2Box(model, cfg.image_size, device)
+    vec2box = Vec2Box(model, cfg.model.anchor, cfg.image_size, device)
     assert vec2box.strides == [8, 16, 32]
 
     vec2box.update((320, 640))
