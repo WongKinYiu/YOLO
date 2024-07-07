@@ -10,7 +10,7 @@ from yolo.config.config import Config
 from yolo.model.yolo import create_model
 from yolo.tools.data_loader import create_dataloader
 from yolo.tools.solver import ModelTester, ModelTrainer, ModelValidator
-from yolo.utils.bounding_box_utils import Vec2Box
+from yolo.utils.bounding_box_utils import create_converter
 from yolo.utils.deploy_utils import FastModelLoader
 from yolo.utils.logging_utils import ProgressLogger
 from yolo.utils.model_utils import get_device
@@ -27,13 +27,14 @@ def main(cfg: Config):
         model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight)
         model = model.to(device)
 
-    vec2box = Vec2Box(model, cfg.model.anchor, cfg.image_size, device)
+    converter = create_converter(cfg.model.name, model, cfg.model.anchor, cfg.image_size, device)
+
     if cfg.task.task == "train":
-        solver = ModelTrainer(cfg, model, vec2box, progress, device, use_ddp)
+        solver = ModelTrainer(cfg, model, converter, progress, device, use_ddp)
     if cfg.task.task == "validation":
-        solver = ModelValidator(cfg.task, cfg.dataset, model, vec2box, progress, device)
+        solver = ModelValidator(cfg.task, cfg.dataset, model, converter, progress, device)
     if cfg.task.task == "inference":
-        solver = ModelTester(cfg, model, vec2box, progress, device)
+        solver = ModelTester(cfg, model, converter, progress, device)
     progress.start()
     solver.solve(dataloader)
 
