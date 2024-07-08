@@ -9,7 +9,9 @@ from torch import allclose, float32, isclose, tensor
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 from yolo import Config, NMSConfig, create_model
+from yolo.config.config import AnchorConfig
 from yolo.utils.bounding_box_utils import (
+    Anc2Box,
     Vec2Box,
     bbox_nms,
     calculate_iou,
@@ -123,6 +125,24 @@ def test_vec2box_autoanchor():
     vec2box.update((320, 640))
     assert vec2box.anchor_grid.shape == (4200, 2)
     assert vec2box.scaler.shape == tuple([4200])
+
+
+def test_anc2box_autoanchor(inference_v7_cfg: Config):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = create_model(inference_v7_cfg.model, weight_path=None).to(device)
+    anchor_cfg: AnchorConfig = inference_v7_cfg.model.anchor.copy()
+    del anchor_cfg.strides
+    anc2box = Anc2Box(model, anchor_cfg, inference_v7_cfg.image_size, device)
+    assert anc2box.strides == [8, 16, 32]
+
+    anc2box.update((320, 640))
+    anchor_grids_shape = [anchor_grid.shape for anchor_grid in anc2box.anchor_grids]
+    assert anchor_grids_shape == [
+        torch.Size([1, 1, 80, 80, 2]),
+        torch.Size([1, 1, 40, 40, 2]),
+        torch.Size([1, 1, 20, 20, 2]),
+    ]
+    assert anc2box.anchor_scale.shape == torch.Size([3, 1, 3, 1, 1, 2])
 
 
 def test_bbox_nms():

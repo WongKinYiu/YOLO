@@ -36,6 +36,16 @@ def test_build_model_v9m():
         assert len(model.model) == 39
 
 
+def test_build_model_v7():
+    with initialize(config_path=config_path, version_base=None):
+        cfg: Config = compose(config_name=config_name, overrides=[f"model=v7"])
+
+        OmegaConf.set_struct(cfg.model, False)
+        cfg.weight = None
+        model = YOLO(cfg.model)
+        assert len(model.model) == 106
+
+
 @pytest.fixture
 def cfg() -> Config:
     with initialize(config_path="../../yolo/config", version_base=None):

@@ -11,7 +11,7 @@ from yolo.config.config import Config
 from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, YoloDataLoader
 from yolo.tools.solver import ModelTester, ModelTrainer, ModelValidator
-from yolo.utils.bounding_box_utils import Vec2Box
+from yolo.utils.bounding_box_utils import Anc2Box, Vec2Box
 
 
 @pytest.fixture
@@ -41,6 +41,12 @@ def model_tester(inference_cfg: Config, model: YOLO, vec2box: Vec2Box, validatio
     return tester
 
 
+@pytest.fixture
+def modelv7_tester(inference_v7_cfg: Config, model_v7: YOLO, anc2box: Anc2Box, validation_progress_logger, device):
+    tester = ModelTester(inference_v7_cfg, model_v7, anc2box, validation_progress_logger, device)
+    return tester
+
+
 def test_model_tester_initialization(model_tester: ModelTester):
     assert isinstance(model_tester.model, YOLO)
     assert hasattr(model_tester, "solve")
@@ -48,6 +54,10 @@ def test_model_tester_initialization(model_tester: ModelTester):
 
 def test_model_tester_solve_single_image(model_tester: ModelTester, file_stream_data_loader: StreamDataLoader):
     model_tester.solve(file_stream_data_loader)
+
+
+def test_modelv7_tester_solve_single_image(modelv7_tester: ModelTester, file_stream_data_loader_v7: StreamDataLoader):
+    modelv7_tester.solve(file_stream_data_loader_v7)
 
 
 @pytest.fixture
