@@ -319,9 +319,8 @@ class Anc2Box:
             logger.info("🧸 Found no stride of model, performed a dummy test for auto-anchor size")
             self.strides = self.create_auto_anchor(model, image_size)
 
-        self.generate_anchors(image_size)
-        self.anchor_grid = [anchor_grid.to(device) for anchor_grid in self.anchor_grid]
         self.head_num = len(anchor_cfg.anchor)
+        self.anchor_grids = self.generate_anchors(image_size)
         self.anchor_scale = tensor(anchor_cfg.anchor, device=device).view(self.head_num, 1, -1, 1, 1, 2)
         self.anchor_num = self.anchor_scale.size(2)
         self.class_num = model.num_classes
@@ -330,17 +329,22 @@ class Anc2Box:
         dummy_input = torch.zeros(1, 3, *image_size).to(self.device)
         dummy_output = model(dummy_input)
         strides = []
-        for predict_head in dummy_output:
+        for predict_head in dummy_output["Main"]:
             _, _, *anchor_num = predict_head.shape
             strides.append(image_size[1] // anchor_num[1])
         return strides
 
     def generate_anchors(self, image_size: List[int]):
-        self.anchor_grid = []
+        anchor_grids = []
         for stride in self.strides:
             W, H = image_size[0] // stride, image_size[1] // stride
             anchor_h, anchor_w = torch.meshgrid([torch.arange(H), torch.arange(W)], indexing="ij")
-            self.anchor_grid.append(torch.stack((anchor_w, anchor_h), 2).view((1, 1, H, W, 2)).float())
+            anchor_grid = torch.stack((anchor_w, anchor_h), 2).view((1, 1, H, W, 2)).float().to(self.device)
+            anchor_grids.append(anchor_grid)
+        return anchor_grids
+
+    def update(self, image_size):
+        self.anchor_grid = self.generate_anchors(image_size)
 
     def __call__(self, predicts: List[Tensor]):
         preds_box, preds_cls, preds_cnf = [], [], []
@@ -348,7 +352,7 @@ class Anc2Box:
             predict = rearrange(predict, "B (L C) h w -> B L h w C", L=self.anchor_num)
             pred_box, pred_cnf, pred_cls = predict.split((4, 1, self.class_num), dim=-1)
             pred_box = pred_box.sigmoid()
-            pred_box[..., 0:2] = (pred_box[..., 0:2] * 2.0 - 0.5 + self.anchor_grid[layer_idx]) * self.strides[
+            pred_box[..., 0:2] = (pred_box[..., 0:2] * 2.0 - 0.5 + self.anchor_grids[layer_idx]) * self.strides[
                 layer_idx
             ]
             pred_box[..., 2:4] = (pred_box[..., 2:4] * 2) ** 2 * self.anchor_scale[layer_idx]
