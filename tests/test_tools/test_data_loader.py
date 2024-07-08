@@ -35,7 +35,7 @@ def test_training_data_loader_correctness(train_dataloader: YoloDataLoader):
         Path("tests/data/images/train/000000050725.jpg"),
         Path("tests/data/images/train/000000167848.jpg"),
     ]
-    assert image_paths == expected_paths
+    assert list(image_paths) == list(expected_paths)
 
 
 def test_validation_data_loader_correctness(validation_dataloader: YoloDataLoader):
@@ -50,7 +50,7 @@ def test_validation_data_loader_correctness(validation_dataloader: YoloDataLoade
         Path("tests/data/images/val/000000323571.jpg"),
         Path("tests/data/images/val/000000570456.jpg"),
     ]
-    assert image_paths == expected_paths
+    assert list(image_paths) == list(expected_paths)
 
 
 def test_file_stream_data_loader_frame(file_stream_data_loader: StreamDataLoader):
