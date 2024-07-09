@@ -60,6 +60,7 @@ jobs:
     - name: Run Inference
       run: |
         python yolo/lazy.py task=inference
+        python yolo/lazy.py task=inference model=v7
         python yolo/lazy.py task=inference +quite=True
         python yolo/lazy.py task=inference name=AnyNameYouWant
         python yolo/lazy.py task=inference image_size=\[480,640]
