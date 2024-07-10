@@ -94,7 +94,8 @@ def get_device(device_spec: Union[str, int, List[int]]) -> torch.device:
         device_spec = initialize_distributed()
     if torch.cuda.is_available() and "cuda" in str(device_spec):
         return torch.device(device_spec), ddp_flag
-    return torch.device("cpu"), False
+    device = torch.device(device_spec)
+    return device, ddp_flag
 
 
 class PostProccess:
