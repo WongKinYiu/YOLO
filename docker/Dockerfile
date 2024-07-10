@@ -1,23 +1,11 @@
-FROM ubuntu:22.04
+ARG BASE_IMG=nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM ${BASE_IMG}
 
-ENV DEBIAN_FRONTEND=noninteractive
 ARG USERNAME=user
-ARG WORKDIR=/home/${USERNAME}/workdir
-ARG TORCHVER=2.1.0
-ARG TORCHVISIONVER=0.16.0
-ARG ONNXVER=1.16.1
-ARG ONNXRUNTIMEVER=1.18.0
-ARG ONNXSIMVER=0.4.30
-ARG H5PYVER=3.11.0
-ARG PSUTILVER=5.9.8
-ARG CMAKEVER=3.29.3
-ARG FLATBUFFERSVER=23.5.26
-ARG PACKAGINGVER=24.0
-ARG WHEELVER=0.43.0
+ARG WORKDIR=/home/${USERNAME}/YOLO
 
 SHELL ["/bin/bash", "-c"]
 
-COPY requirements.txt /requirements.txt
 
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${PATH}:${CUDA_HOME}/bin
@@ -59,26 +47,18 @@ RUN echo "root:root" | chpasswd \
 USER ${USERNAME}
 WORKDIR ${WORKDIR}
 
-# Install Torch
-RUN pip install \
-    --index-url https://download.pytorch.org/whl/cpu \
-    torch==${TORCHVER} \
-    torchvision==${TORCHVISIONVER}
+COPY docker/requirements-locked.txt /app/requirements-locked.txt
+COPY requirements.txt /app/requirements.txt
 
-# Install other pip packages
-RUN pip install \
-        psutil==${PSUTILVER} \
-        onnx==${ONNXVER} \
-        onnxruntime==${ONNXRUNTIMEVER} \
-        onnxsim==${ONNXSIMVER} \
-        h5py==${H5PYVER} \
-        flatbuffers==${FLATBUFFERSVER} \
-        cmake==${CMAKEVER} \
-        packaging==${PACKAGINGVER} \
-        wheel==${WHEELVER}
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements-locked.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Install requirements
-RUN pip install -r /requirements.txt
 
-# Setting pip package path
+RUN git clone https://github.com/WongKinYiu/YOLO.git .
+
+# Ensure pip-installed packages are available in the PATH
 RUN echo 'export PATH=${PATH}:${HOME}/.local/bin' >> ~/.bashrc
+
+# Optional: Source .bashrc to apply changes in the current session
+RUN source ~/.bashrc
