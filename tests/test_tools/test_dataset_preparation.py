@@ -22,7 +22,8 @@ def test_prepare_dataset(train_cfg: Config):
         assert len(os.listdir(data_type)) == 5
 
     annotations_path = Path("tests/data/annotations")
-    assert os.listdir(annotations_path) == ["instances_val.json", "instances_train.json"]
+    assert "instances_val.json" in os.listdir(annotations_path)
+    assert "instances_train.json" in os.listdir(annotations_path)
 
 
 def test_prepare_weight():
