@@ -108,6 +108,32 @@ python yolo/lazy.py task=validation dataset=toy
 ## Contributing
 Contributions to the YOLO project are welcome! See [CONTRIBUTING](docs/CONTRIBUTING.md) for guidelines on how to contribute.
 
+### TODO Diagrams
+```mermaid
+flowchart TB
+    subgraph Features
+      Taskv7-->Segmentation["#35 Segmentation"]
+      Taskv7-->Classification["#34 Classification"]
+      Taskv9-->Segmentation
+      Taskv9-->Classification
+      Trainv7
+    end
+    subgraph Model
+      MODELv7-->v7-X
+      MODELv7-->v7-E6
+      MODELv7-->v7-E6E
+      MODELv9-->v9-T
+      MODELv9-->v9-S
+      MODELv9-->v9-E
+    end
+    subgraph Bugs
+      Fix-->Fix1["#12 mAP > 1"]
+      Fix-->Fix2["v9 Gradient Bump"]
+      Reply-->Reply1["#39"]
+      Reply-->Reply2["#36"]
+    end
+```
+
 ## Star History
 [![Star History Chart](https://api.star-history.com/svg?repos=WongKinYiu/YOLO&type=Date)](https://star-history.com/#WongKinYiu/YOLO&Date)
 
