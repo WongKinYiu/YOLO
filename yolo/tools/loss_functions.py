@@ -134,6 +134,7 @@ class DualLoss:
 
 
 def create_loss_function(cfg: Config, vec2box) -> DualLoss:
+    # TODO: make it flexible, if cfg doesn't contain aux, only use SingleLoss
     loss_function = DualLoss(cfg, vec2box)
     logger.info("✅ Success load loss function")
     return loss_function
