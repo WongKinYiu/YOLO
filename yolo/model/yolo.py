@@ -45,7 +45,7 @@ class YOLO(nn.Module):
                 # Find in channels
                 if any(module in layer_type for module in ["Conv", "ELAN", "ADown", "AConv", "CBLinear"]):
                     layer_args["in_channels"] = output_dim[source]
-                if "Detection" in layer_type:
+                if "Detection" in layer_type or "Segmentation" in layer_type:
                     layer_args["in_channels"] = [output_dim[idx] for idx in source]
                     layer_args["num_classes"] = self.num_classes
                     layer_args["reg_max"] = self.reg_max
