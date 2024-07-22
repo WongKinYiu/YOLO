@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -368,7 +368,7 @@ class Anc2Box:
         return preds_cls, None, preds_box, preds_cnf.sigmoid()
 
 
-def create_converter(model_version: str = "v9-c", *args, **kwargs):
+def create_converter(model_version: str = "v9-c", *args, **kwargs) -> Union[Anc2Box, Vec2Box]:
     if "v7" in model_version:  # check model if v7
         converter = Anc2Box(*args, **kwargs)
     else:
