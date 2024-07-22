@@ -29,7 +29,7 @@ class AugmentationComposer:
 
 
 class PadAndResize:
-    def __init__(self, image_size, background_color=(128, 128, 128)):
+    def __init__(self, image_size, background_color=(114, 114, 114)):
         """Initialize the object with the target image size."""
         self.target_width, self.target_height = image_size
         self.background_color = background_color
@@ -99,7 +99,7 @@ class Mosaic:
         more_data = self.parent.get_more_data(3)  # get 3 more images randomly
 
         data = [(image, boxes)] + more_data
-        mosaic_image = Image.new("RGB", (2 * img_sz, 2 * img_sz))
+        mosaic_image = Image.new("RGB", (2 * img_sz, 2 * img_sz), (114, 114, 114))
         vectors = np.array([(-1, -1), (0, -1), (-1, 0), (0, 0)])
         center = np.array([img_sz, img_sz])
         all_labels = []
