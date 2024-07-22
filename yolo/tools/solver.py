@@ -224,7 +224,7 @@ class ModelValidator:
 
         with contextlib.redirect_stdout(io.StringIO()):
             # TODO: load with config file
-            json_path, _ = locate_label_paths(Path(dataset_cfg.path), dataset_cfg.get("val", "val"))
+            json_path, _ = locate_label_paths(Path(dataset_cfg.path), dataset_cfg.get("validation", "val"))
             if json_path:
                 self.coco_gt = COCO(json_path)
 
