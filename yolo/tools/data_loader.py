@@ -255,7 +255,7 @@ class StreamDataLoader:
     def load_video_file(self, video_path):
         import cv2
 
-        cap = cv2.VideoCapture(video_path)
+        cap = cv2.VideoCapture(str(video_path))
         while self.running:
             ret, frame = cap.read()
             if not ret:

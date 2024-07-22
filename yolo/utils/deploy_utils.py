@@ -45,6 +45,8 @@ class FastModelLoader:
                 if idx % 3 == 2:
                     model_outputs.append(layer_output)
                     layer_output = []
+            if len(model_outputs) == 6:
+                model_outputs = model_outputs[:3]
             return {"Main": model_outputs}
 
         InferenceSession.__call__ = onnx_forward
