@@ -78,6 +78,8 @@ class ModelTrainer:
             loss, loss_item = self.loss_fn(aux_predicts, main_predicts, targets)
 
         self.scaler.scale(loss).backward()
+        self.scaler.unscale_(self.optimizer)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)
         self.scaler.step(self.optimizer)
         self.scaler.update()
 
