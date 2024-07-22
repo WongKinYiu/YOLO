@@ -88,7 +88,7 @@ class YOLOLoss:
     def __call__(self, predicts: List[Tensor], targets: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         predicts_cls, predicts_anc, predicts_box = predicts
         # For each predicted targets, assign a best suitable ground truth box.
-        align_targets, valid_masks = self.matcher(targets, (predicts_cls, predicts_box))
+        align_targets, valid_masks = self.matcher(targets, (predicts_cls.detach(), predicts_box.detach()))
 
         targets_cls, targets_bbox = self.separate_anchor(align_targets)
         predicts_box = predicts_box / self.vec2box.scaler[None, :, None]
@@ -134,6 +134,7 @@ class DualLoss:
 
 
 def create_loss_function(cfg: Config, vec2box) -> DualLoss:
+    # TODO: make it flexible, if cfg doesn't contain aux, only use SingleLoss
     loss_function = DualLoss(cfg, vec2box)
     logger.info("✅ Success load loss function")
     return loss_function

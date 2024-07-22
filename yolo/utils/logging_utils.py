@@ -67,6 +67,7 @@ def set_seed(seed):
 
 class ProgressLogger(Progress):
     def __init__(self, cfg: Config, exp_name: str, *args, **kwargs):
+        set_seed(cfg.lucky_number)
         local_rank = int(os.getenv("LOCAL_RANK", "0"))
         self.quite_mode = local_rank or getattr(cfg, "quite", False)
         custom_logger(self.quite_mode)
