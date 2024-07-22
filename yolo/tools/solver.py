@@ -87,8 +87,9 @@ class ModelTrainer:
         self.model.train()
         total_loss = defaultdict(lambda: torch.tensor(0.0, device=self.device))
         total_samples = 0
-
+        self.optimizer.next_epoch(len(dataloader))
         for batch_size, images, targets, *_ in dataloader:
+            self.optimizer.next_batch()
             loss_each = self.train_one_batch(images, targets)
 
             for loss_name, loss_val in loss_each.items():
