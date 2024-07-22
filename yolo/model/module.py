@@ -81,7 +81,7 @@ class Detection(nn.Module):
         self.anc2vec = Anchor2Vec(reg_max=reg_max)
 
         self.anchor_conv[-1].bias.data.fill_(1.0)
-        self.class_conv[-1].bias.data.fill_(-10)
+        self.class_conv[-1].bias.data.fill_(-10)  # TODO: math.log(5 * 4 ** idx / 80 ** 3)
 
     def forward(self, x: Tensor) -> Tuple[Tensor]:
         anchor_x = self.anchor_conv(x)
