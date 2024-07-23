@@ -14,8 +14,8 @@ class BCELoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         # TODO: Refactor the device, should be assign by config
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.bce = BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=device), reduction="none")
+        # TODO: origin v9 assing pos_weight == 1?
+        self.bce = BCEWithLogitsLoss(reduction="none")
 
     def forward(self, predicts_cls: Tensor, targets_cls: Tensor, cls_norm: Tensor) -> Any:
         return self.bce(predicts_cls, targets_cls).sum() / cls_norm

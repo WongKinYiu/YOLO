@@ -99,7 +99,7 @@ def initialize_distributed() -> None:
 
     torch.cuda.set_device(local_rank)
     dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
-    logger.info(f"Initialized process group; rank: {rank}, size: {world_size}")
+    logger.info(f"🔢 Initialized process group; rank: {rank}, size: {world_size}")
     return local_rank
 
 
