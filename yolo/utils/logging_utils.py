@@ -68,8 +68,8 @@ def set_seed(seed):
 class ProgressLogger(Progress):
     def __init__(self, cfg: Config, exp_name: str, *args, **kwargs):
         set_seed(cfg.lucky_number)
-        local_rank = int(os.getenv("LOCAL_RANK", "0"))
-        self.quite_mode = local_rank or getattr(cfg, "quite", False)
+        self.local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        self.quite_mode = self.local_rank or getattr(cfg, "quite", False)
         custom_logger(self.quite_mode)
         self.save_path = validate_log_directory(cfg, exp_name=cfg.name)
 
@@ -93,13 +93,23 @@ class ProgressLogger(Progress):
                 project="YOLO", resume="allow", mode="online", dir=self.save_path, id=None, name=exp_name
             )
 
+    def rank_check(logging_function):
+        def wrapper(self, *args, **kwargs):
+            if getattr(self, "local_rank", 0) != 0:
+                return
+            return logging_function(self, *args, **kwargs)
+
+        return wrapper
+
     def get_renderable(self):
         renderable = Group(*self.get_renderables(), self.ap_table)
         return renderable
 
+    @rank_check
     def start_train(self, num_epochs: int):
         self.task_epoch = self.add_task(f"[cyan]Start Training {num_epochs} epochs", total=num_epochs)
 
+    @rank_check
     def start_one_epoch(
         self, num_batches: int, task: str = "Train", optimizer: Optimizer = None, epoch_idx: int = None
     ):
@@ -115,6 +125,7 @@ class ProgressLogger(Progress):
                 self.wandb.log({lr_name: lr_value}, step=epoch_idx)
         self.batch_task = self.add_task(f"[green] Phase: {task}", total=num_batches)
 
+    @rank_check
     def one_batch(self, batch_info: Dict[str, Tensor] = None):
         epoch_descript = "[cyan]" + self.task + "[white] |"
         batch_descript = "|"
@@ -127,6 +138,7 @@ class ProgressLogger(Progress):
         if hasattr(self, "task_epoch"):
             self.update(self.task_epoch, description=epoch_descript)
 
+    @rank_check
     def finish_one_epoch(self, batch_info: Dict[str, Any] = None, epoch_idx: int = -1):
         if self.task == "Train":
             prefix = "Loss/"
@@ -137,9 +149,11 @@ class ProgressLogger(Progress):
             self.wandb.log(batch_info, step=epoch_idx)
         self.remove_task(self.batch_task)
 
+    @rank_check
     def start_pycocotools(self):
         self.batch_task = self.add_task("[green]Run pycocotools", total=1)
 
+    @rank_check
     def finish_pycocotools(self, result, epoch_idx=-1):
         ap_table, ap_main = make_ap_table(result, self.ap_past_list, self.last_result, epoch_idx)
         self.last_result = np.maximum(result, self.last_result)
@@ -152,6 +166,7 @@ class ProgressLogger(Progress):
         self.refresh()
         self.remove_task(self.batch_task)
 
+    @rank_check
     def finish_train(self):
         self.remove_task(self.task_epoch)
         self.stop()
