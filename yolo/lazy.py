@@ -24,7 +24,7 @@ def main(cfg: Config):
     if getattr(cfg.task, "fast_inference", False):
         model = FastModelLoader(cfg).load_model(device)
     else:
-        model = create_model(cfg.model, class_num=cfg.class_num, weight_path=cfg.weight)
+        model = create_model(cfg.model, class_num=cfg.dataset.class_num, weight_path=cfg.weight)
         model = model.to(device)
 
     converter = create_converter(cfg.model.name, model, cfg.model.anchor, cfg.image_size, device)

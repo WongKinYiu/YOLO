@@ -162,7 +162,7 @@ class ModelTester:
         self.save_path = progress.save_path / "images"
         os.makedirs(self.save_path, exist_ok=True)
         self.save_predict = getattr(cfg.task, "save_predict", None)
-        self.idx2label = cfg.class_list
+        self.idx2label = cfg.dataset.class_list
 
     def solve(self, dataloader: StreamDataLoader):
         logger.info("👀 Start Inference!")
