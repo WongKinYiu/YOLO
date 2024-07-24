@@ -4,6 +4,7 @@
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
 ![](https://img.shields.io/github/actions/workflow/status/WongKinYiu/YOLO/deploy.yaml)
 
+[![Documentation Status](https://readthedocs.org/projects/yolo-docs/badge/?version=latest)](https://yolo-docs.readthedocs.io/en/latest/?badge=latest)
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/yolov9-learning-what-you-want-to-learn-using/real-time-object-detection-on-coco)](https://paperswithcode.com/sota/real-time-object-detection-on-coco)
 
