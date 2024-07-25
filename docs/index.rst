@@ -26,7 +26,8 @@ Explore our documentation:
    :caption: Get Started
 
    0_get_start/0_quick_start
-   0_get_start/1_installations
+   0_get_start/1_introduction
+   0_get_start/2_installations
 
 .. toctree::
    :maxdepth: 1
