@@ -1,4 +1,2 @@
-.. _IPython:
-
 IPython
 =======

@@ -5,6 +5,7 @@ Quick Start
    We expect all customizations to be done primarily by passing arguments or modifying the YAML config files.
    If more detailed modifications are needed, custom content should be modularized as much as possible to avoid extensive code modifications.
 
+.. _QuickInstallYOLO:
 Install YOLO
 ------------
 

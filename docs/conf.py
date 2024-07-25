@@ -19,8 +19,13 @@ import sys
 sys.path.insert(0, os.path.abspath(".."))
 
 extensions = [
-    "sphinx.ext.autodoc",
     "sphinx_rtd_theme",
+    "sphinxcontrib.mermaid",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosectionlabel",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.napoleon",
+    "linuxdoc.rstFlatTable",
     "myst_parser",
 ]
 

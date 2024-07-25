@@ -1,4 +1,2 @@
-.. _Task:
-
-Task
-====
+Custom Task
+===========

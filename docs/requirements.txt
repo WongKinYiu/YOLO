@@ -1,3 +1,5 @@
+myst-parser
+linuxdoc
 sphinx
 sphinx_rtd_theme
-myst-parser
+sphinxcontrib-mermaid

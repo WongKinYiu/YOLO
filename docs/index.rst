@@ -22,14 +22,14 @@ Explore our documentation:
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Get Started
 
    0_get_start/0_quick_start
    0_get_start/1_installations
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Tutorials
 
    1_tutorials/0_train
@@ -38,7 +38,7 @@ Explore our documentation:
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Model Zoo
 
    2_model_zoo/0_object_detection
@@ -46,7 +46,7 @@ Explore our documentation:
    2_model_zoo/2_classification
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Custom YOLO
 
    3_custom/0_model
@@ -56,7 +56,7 @@ Explore our documentation:
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Deploy
 
    4_deploy/1_deploy
@@ -65,7 +65,7 @@ Explore our documentation:
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Features
 
    5_features/0_small_object
@@ -73,7 +73,7 @@ Explore our documentation:
    5_features/2_IPython
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Function Docs
 
    6_function_docs/0_solver
