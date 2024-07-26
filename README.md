@@ -3,6 +3,7 @@
 [![Documentation Status](https://readthedocs.org/projects/yolo-docs/badge/?version=latest)](https://yolo-docs.readthedocs.io/en/latest/?badge=latest)
 ![GitHub License](https://img.shields.io/github/license/WongKinYiu/YOLO)
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FWongKinYiu%2FYOLO.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FWongKinYiu%2FYOLO?ref=badge_shield)
 ![](https://img.shields.io/github/actions/workflow/status/WongKinYiu/YOLO/deploy.yaml)
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/yolov9-learning-what-you-want-to-learn-using/real-time-object-detection-on-coco)](https://paperswithcode.com/sota/real-time-object-detection-on-coco)
@@ -156,3 +157,7 @@ flowchart TB
       primaryClass={cs.CV}
 }
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FWongKinYiu%2FYOLO.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FWongKinYiu%2FYOLO?ref=badge_large)
