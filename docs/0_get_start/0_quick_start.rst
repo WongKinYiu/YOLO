@@ -6,6 +6,7 @@ Quick Start
    If more detailed modifications are needed, custom content should be modularized as much as possible to avoid extensive code modifications.
 
 .. _QuickInstallYOLO:
+
 Install YOLO
 ------------
 

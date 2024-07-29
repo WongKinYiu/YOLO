@@ -10,26 +10,42 @@ Torch Requirements
 
 The following table summarizes the torch requirements for different operating systems and hardware configurations:
 
-.. flat-table::
 
-   * - OS
-     - :cspan:`1` Linux
-     - :cspan:`1` MacOS
-     - :cspan:`1` Windows
-   * - Hardware
-     - CUDA
-     - CPU
-     - MPS
-     - CPU
-     - CUDA
-     - CPU
-   * - PyTorch
-     - 1.12+
-     - 1.12+
-     - 1.12+
-     - 2.3+
-     - [WIP]
-     - [WIP]
+.. tabs::
+
+   .. tab:: Linux
+
+      .. tabs::
+
+         .. tab:: CUDA
+
+            PyTorch: 1.12+
+
+         .. tab:: CPU
+
+            PyTorch: 1.12+
+
+   .. tab:: MacOS
+
+      .. tabs::
+
+         .. tab:: MPS
+
+            PyTorch: 2.2+
+         .. tab:: CPU
+            PyTorch: 2.2+
+   .. tab:: Windows
+
+      .. tabs::
+
+         .. tab:: CUDA
+
+            [WIP]
+
+         .. tab:: CPU
+
+            [WIP]
+
 
 Git & GitHub
 ------------
