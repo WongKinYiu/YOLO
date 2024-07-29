@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 extensions = [
     "sphinx_rtd_theme",
+    "sphinx_tabs.tabs",
     "sphinxcontrib.mermaid",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosectionlabel",
@@ -35,7 +36,9 @@ myst_enable_extensions = [
     "deflist",
 ]
 html_theme = "sphinx_rtd_theme"
-
+html_theme_options = {
+    "sticky_navigation": False,
+}
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

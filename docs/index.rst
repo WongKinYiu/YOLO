@@ -33,9 +33,12 @@ Explore our documentation:
    :maxdepth: 1
    :caption: Tutorials
 
-   1_tutorials/0_train
-   1_tutorials/1_validation
-   1_tutorials/2_inference
+   1_tutorials/0_allIn1
+   1_tutorials/1_setup
+   1_tutorials/2_buildmodel
+   1_tutorials/3_dataset
+   1_tutorials/4_train
+   1_tutorials/5_inference
 
 
 .. toctree::
