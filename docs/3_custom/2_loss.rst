@@ -1,2 +1,2 @@
-Loss
-====
+Loss Function
+=============
