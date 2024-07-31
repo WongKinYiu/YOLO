@@ -1,0 +1,20 @@
+Inference
+==========
+
+
+Inference Video
+---------------
+
+Inference Image
+---------------
+task: inference
+
+fast_inference:  # onnx, trt, deploy or Empty
+data:
+    source: demo/images/inference/image.png
+    image_size: ${image_size}
+    data_augment: {}
+nms:
+  min_confidence: 0.5
+  min_iou: 0.5
+# save_predict: True

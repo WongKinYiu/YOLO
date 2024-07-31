@@ -22,58 +22,67 @@ Explore our documentation:
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Get Started
 
-   0_get_start/0_quick_start.md
-   0_get_start/1_installations.md
-   0_get_start/2_git.md
-   0_get_start/3_pypi.md
-   0_get_start/4_docker.md
-   0_get_start/5_conda.md
+   0_get_start/0_quick_start
+   0_get_start/1_introduction
+   0_get_start/2_installations
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Tutorials
 
-   1_tutorials/0_train.md
-   1_tutorials/1_validation.md
+   1_tutorials/0_allIn1
+   1_tutorials/1_setup
+   1_tutorials/2_buildmodel
+   1_tutorials/3_dataset
+   1_tutorials/4_train
+   1_tutorials/5_inference
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Model Zoo
 
-   2_model_zoo/0_object_detection.md
-   2_model_zoo/1_segmentation.md
-   2_model_zoo/2_classification.md
+   2_model_zoo/0_object_detection
+   2_model_zoo/1_segmentation
+   2_model_zoo/2_classification
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Custom YOLO
 
-   3_custom/0_model.md
-   3_custom/1_data_augment.md
-   3_custom/2_loss.md
-   3_custom/3_task.md
+   3_custom/0_model
+   3_custom/1_data_augment
+   3_custom/2_loss
+   3_custom/3_task
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Deploy
 
-   4_deploy/1_deploy.md
-   4_deploy/2_onnx.md
-   4_deploy/3_tensorrt.md
+   4_deploy/1_deploy
+   4_deploy/2_onnx
+   4_deploy/3_tensorrt
 
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Deploy
+   :maxdepth: 1
+   :caption: Features
 
-   4_deploy/1_deploy.md
-   4_deploy/2_onnx.md
-   4_deploy/3_tensorrt.md
+   5_features/0_small_object
+   5_features/1_version_convert
+   5_features/2_IPython
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Function Docs
+
+   6_function_docs/0_solver
+   6_function_docs/1_tools
+   6_function_docs/2_module
 
 License
 -------

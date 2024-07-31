@@ -1,3 +1,6 @@
-sphinx
-sphinx_rtd_theme
 myst-parser
+linuxdoc
+sphinx
+sphinx-tabs
+sphinx_rtd_theme
+sphinxcontrib-mermaid
