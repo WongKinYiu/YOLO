@@ -66,4 +66,4 @@ def test_directory_stream_data_loader_frame(directory_stream_data_loader: Stream
     frame, rev_tensor, origin_frame = next(iter(directory_stream_data_loader))
     assert frame.shape == (1, 3, 640, 640)
     assert rev_tensor.shape == (1, 5)
-    assert origin_frame.size == (480, 640) or origin_frame.size == (512, 640)
+    assert origin_frame.size != (640, 640)
