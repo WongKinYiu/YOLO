@@ -16,7 +16,7 @@ YOLOv7
      - :math:`AP_{75}^{val}`
      - Param.
      - FLOPs
-   * - `YOLOv7 <URL>`_
+   * - `YOLOv7 <https://github.com/WongKinYiu/YOLO/releases/download/v1.0-alpha/v7.pt>`_
      - 🔧
      - 640
      - **51.4%**
@@ -79,7 +79,7 @@ YOLOv9
      - :math:`AP_{75}^{val}`
      - Param.
      - FLOPs
-   * - `YOLOv9-T <https://github.com/WongKinYiu/YOLO/releases/download/v1.0-alpha/v9-s.pt>`_
+   * - `YOLOv9-T <https://github.com/WongKinYiu/YOLO/releases/download/v1.0-alpha/v9-t.pt>`_
      - 🔧
      - 640
      -
