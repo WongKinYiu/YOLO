@@ -11,7 +11,7 @@ from yolo import (
     AugmentationComposer,
     NMSConfig,
     PostProccess,
-    Vec2Box,
+    create_converter,
     create_model,
     draw_bboxes,
 )
@@ -25,22 +25,22 @@ def load_model(model_name, device):
     model_cfg.model.auxiliary = {}
     model = create_model(model_cfg, True)
     model.to(device).eval()
-    return model
+    return model, model_cfg
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = load_model(DEFAULT_MODEL, device)
-v2b = Vec2Box(model, IMAGE_SIZE, device)
-class_list = OmegaConf.load("yolo/config/general.yaml").class_list
+model, model_cfg = load_model(DEFAULT_MODEL, device)
+converter = create_converter(model_cfg.name, model, model_cfg.anchor, IMAGE_SIZE, device)
+class_list = OmegaConf.load("yolo/config/dataset/coco.yaml").class_list
 
 transform = AugmentationComposer([])
 
 
 def predict(model_name, image, nms_confidence, nms_iou):
-    global DEFAULT_MODEL, model, device, v2b, class_list, post_proccess
+    global DEFAULT_MODEL, model, device, converter, class_list, post_proccess
     if model_name != DEFAULT_MODEL:
-        model = load_model(model_name, device)
-        v2b = Vec2Box(model, IMAGE_SIZE, device)
+        model, model_cfg = load_model(model_name, device)
+        converter = create_converter(model_cfg.name, model, model_cfg.anchor, IMAGE_SIZE, device)
         DEFAULT_MODEL = model_name
 
     image_tensor, _, rev_tensor = transform(image)
@@ -49,7 +49,7 @@ def predict(model_name, image, nms_confidence, nms_iou):
     rev_tensor = rev_tensor.to(device)[None]
 
     nms_config = NMSConfig(nms_confidence, nms_iou)
-    post_proccess = PostProccess(v2b, nms_config)
+    post_proccess = PostProccess(converter, nms_config)
 
     with torch.no_grad():
         predict = model(image_tensor)
