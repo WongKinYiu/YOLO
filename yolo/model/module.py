@@ -198,7 +198,7 @@ class RepConv(nn.Module):
         return self.act(self.conv1(x) + self.conv2(x))
 
 
-class RepNBottleneck(nn.Module):
+class Bottleneck(nn.Module):
     """A bottleneck block with optional residual connections."""
 
     def __init__(
@@ -250,7 +250,7 @@ class RepNCSP(nn.Module):
         self.conv3 = Conv(2 * neck_channels, out_channels, kernel_size, **kwargs)
 
         self.bottleneck = nn.Sequential(
-            *[RepNBottleneck(neck_channels, neck_channels, **neck_args) for _ in range(repeat_num)]
+            *[Bottleneck(neck_channels, neck_channels, **neck_args) for _ in range(repeat_num)]
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
