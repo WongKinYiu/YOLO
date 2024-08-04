@@ -163,8 +163,9 @@ def create_model(model_cfg: ModelConfig, weight_path: Union[bool, Path] = True, 
     if weight_path:
         if weight_path == True:
             weight_path = Path("weights") / f"{model_cfg.name}.pt"
-        if isinstance(weight_path, str):
+        elif isinstance(weight_path, str):
             weight_path = Path(weight_path)
+
         if not weight_path.exists():
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")
             prepare_weight(weight_path=weight_path)
