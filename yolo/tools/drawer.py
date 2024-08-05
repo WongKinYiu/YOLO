@@ -32,7 +32,7 @@ def draw_bboxes(
             img = img[0]
         img = to_pil_image(img)
 
-    if bboxes.ndim == 3:
+    if isinstance(bboxes, list) or bboxes.ndim == 3:
         bboxes = bboxes[0]
 
     img = img.copy()
