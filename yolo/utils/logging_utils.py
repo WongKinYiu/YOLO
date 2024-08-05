@@ -36,9 +36,11 @@ from rich.table import Table
 from torch import Tensor
 from torch.nn import ModuleList
 from torch.optim import Optimizer
+from torchvision.transforms.functional import pil_to_tensor
 
 from yolo.config.config import Config, YOLOLayer
 from yolo.model.yolo import YOLO
+from yolo.tools.drawer import draw_bboxes
 from yolo.utils.solver_utils import make_ap_table
 
 
@@ -153,6 +155,49 @@ class ProgressLogger(Progress):
 
         self.remove_task(self.batch_task)
 
+    def visualize_image(
+        self,
+        images: Optional[Tensor] = None,
+        ground_truth: Optional[Tensor] = None,
+        prediction: Optional[Union[List[Tensor], Tensor]] = None,
+        epoch_idx: int = 0,
+    ) -> None:
+        """
+        Upload the ground truth bounding boxes, predicted bounding boxes, and the original image to wandb or TensorBoard.
+
+        Args:
+            images (Optional[Tensor]): Tensor of images with shape (BZ, 3, 640, 640).
+            ground_truth (Optional[Tensor]): Ground truth bounding boxes with shape (BZ, N, 5) or (N, 5). Defaults to None.
+            prediction (prediction: Optional[Union[List[Tensor], Tensor]]): List of predicted bounding boxes with shape (N, 6) or (N, 6). Defaults to None.
+            epoch_idx (int): Current epoch index. Defaults to 0.
+        """
+        if images is not None:
+            images = images[0] if images.ndim == 4 else images
+            if self.use_wandb:
+                wandb.log({"Input Image": wandb.Image(images)}, step=epoch_idx)
+            if self.use_tensorboard:
+                self.tb_writer.add_image("Media/Input Image", images, 1)
+
+        if ground_truth is not None:
+            gt_boxes = ground_truth[0] if ground_truth.ndim == 3 else ground_truth
+            if self.use_wandb:
+                wandb.log(
+                    {"Ground Truth": wandb.Image(images, boxes={"predictions": {"box_data": log_bbox(gt_boxes)}})},
+                    step=epoch_idx,
+                )
+            if self.use_tensorboard:
+                self.tb_writer.add_image("Media/Ground Truth", pil_to_tensor(draw_bboxes(images, gt_boxes)), epoch_idx)
+
+        if prediction is not None:
+            pred_boxes = prediction[0] if isinstance(prediction, list) else prediction
+            if self.use_wandb:
+                wandb.log(
+                    {"Prediction": wandb.Image(images, boxes={"predictions": {"box_data": log_bbox(pred_boxes)}})},
+                    step=epoch_idx,
+                )
+            if self.use_tensorboard:
+                self.tb_writer.add_image("Media/Prediction", pil_to_tensor(draw_bboxes(images, pred_boxes)), epoch_idx)
+
     def start_pycocotools(self):
         self.batch_task = self.add_task("[green]Run pycocotools", total=1)
 
@@ -236,3 +281,37 @@ def validate_log_directory(cfg: Config, exp_name: str) -> Path:
     logger.opt(colors=True).info(f"📄 Created log folder: <u><fg #808080>{save_path}</></>")
     logger.add(save_path / "output.log", mode="w", backtrace=True, diagnose=True)
     return save_path
+
+
+def log_bbox(
+    bboxes: Tensor, class_list: Optional[List[str]] = None, image_size: Tuple[int, int] = (640, 640)
+) -> List[dict]:
+    """
+    Convert bounding boxes tensor to a list of dictionaries for logging, normalized by the image size.
+
+    Args:
+        bboxes (Tensor): Bounding boxes with shape (N, 5) or (N, 6), where each box is [class_id, x_min, y_min, x_max, y_max, (confidence)].
+        class_list (Optional[List[str]]): List of class names. Defaults to None.
+        image_size (Tuple[int, int]): The size of the image, used for normalization. Defaults to (640, 640).
+
+    Returns:
+        List[dict]: List of dictionaries containing normalized bounding box information.
+    """
+    bbox_list = []
+    scale_tensor = torch.Tensor([1, *image_size, *image_size]).to(bboxes.device)
+    normalized_bboxes = bboxes[:, :5] / scale_tensor
+    for bbox in normalized_bboxes:
+        class_id, x_min, y_min, x_max, y_max, *conf = [float(val) for val in bbox]
+        if class_id == -1:
+            break
+        bbox_entry = {
+            "position": {"minX": x_min, "maxX": x_max, "minY": y_min, "maxY": y_max},
+            "class_id": int(class_id),
+        }
+        if class_list:
+            bbox_entry["box_caption"] = class_list[int(class_id)]
+        if conf:
+            bbox_entry["scores"] = {"confidence": conf[0]}
+        bbox_list.append(bbox_entry)
+
+    return bbox_list
