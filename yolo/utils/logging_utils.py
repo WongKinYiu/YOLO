@@ -16,7 +16,7 @@ import random
 import sys
 from collections import deque
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -93,6 +93,12 @@ class ProgressLogger(Progress):
                 project="YOLO", resume="allow", mode="online", dir=self.save_path, id=None, name=exp_name
             )
 
+        self.use_tensorboard = cfg.use_tensorboard
+        if self.use_tensorboard:
+            from torch.utils.tensorboard import SummaryWriter
+
+            self.tb_writer = SummaryWriter(log_dir=self.save_path / "tensorboard")
+
     def get_renderable(self):
         renderable = Group(*self.get_renderables(), self.ap_table)
         return renderable
@@ -108,11 +114,17 @@ class ProgressLogger(Progress):
         if hasattr(self, "task_epoch"):
             self.update(self.task_epoch, description=f"[cyan] Preparing Data")
 
-        if self.use_wandb and optimizer is not None:
+        if optimizer is not None:
             lr_values = [params["lr"] for params in optimizer.param_groups]
             lr_names = ["Learning Rate/bias", "Learning Rate/norm", "Learning Rate/conv"]
-            for lr_name, lr_value in zip(lr_names, lr_values):
-                self.wandb.log({lr_name: lr_value}, step=epoch_idx)
+            if self.use_wandb:
+                for lr_name, lr_value in zip(lr_names, lr_values):
+                    self.wandb.log({lr_name: lr_value}, step=epoch_idx)
+
+            if self.use_tensorboard:
+                for lr_name, lr_value in zip(lr_names, lr_values):
+                    self.tb_writer.add_scalar(lr_name, lr_value, global_step=epoch_idx)
+
         self.batch_task = self.add_task(f"[green] Phase: {task}", total=num_batches)
 
     def one_batch(self, batch_info: Dict[str, Tensor] = None):
@@ -135,6 +147,10 @@ class ProgressLogger(Progress):
         batch_info = {f"{prefix}/{key}": value for key, value in batch_info.items()}
         if self.use_wandb:
             self.wandb.log(batch_info, step=epoch_idx)
+        if self.use_tensorboard:
+            for key, value in batch_info.items():
+                self.tb_writer.add_scalar(key, value, epoch_idx)
+
         self.remove_task(self.batch_task)
 
     def start_pycocotools(self):
@@ -148,6 +164,11 @@ class ProgressLogger(Progress):
 
         if self.use_wandb:
             self.wandb.log({"PyCOCO/AP @ .5:.95": ap_main[2], "PyCOCO/AP @ .5": ap_main[5]})
+        if self.use_tensorboard:
+            # TODO: waiting torch bugs fix, https://github.com/pytorch/pytorch/issues/32651
+            self.tb_writer.add_scalar("PyCOCO/AP @ .5:.95", ap_main[2], epoch_idx)
+            self.tb_writer.add_scalar("PyCOCO/AP @ .5", ap_main[5], epoch_idx)
+
         self.update(self.batch_task, advance=1)
         self.refresh()
         self.remove_task(self.batch_task)
@@ -157,6 +178,8 @@ class ProgressLogger(Progress):
         self.stop()
         if self.use_wandb:
             self.wandb.finish()
+        if self.use_tensorboard:
+            self.tb_writer.close()
 
 
 def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=True, silent=False):

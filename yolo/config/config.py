@@ -144,7 +144,6 @@ class Config:
     device: Union[str, int, List[int]]
     cpu_num: int
 
-    class_idx_id: List[int]
     image_size: List[int]
 
     out_path: str
