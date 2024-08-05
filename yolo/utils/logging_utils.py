@@ -100,6 +100,7 @@ class ProgressLogger(Progress):
             from torch.utils.tensorboard import SummaryWriter
 
             self.tb_writer = SummaryWriter(log_dir=self.save_path / "tensorboard")
+            logger.opt(colors=True).info(f"📍 Enable TensorBoard locally at <blue><u>http://localhost:6006</></>")
 
     def get_renderable(self):
         renderable = Group(*self.get_renderables(), self.ap_table)

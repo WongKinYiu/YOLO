@@ -32,7 +32,10 @@ def draw_bboxes(
             img = img[0]
         img = to_pil_image(img)
 
-    img, bboxes = img.copy(), bboxes[0]
+    if bboxes.ndim == 3:
+        bboxes = bboxes[0]
+
+    img = img.copy()
     label_size = img.size[1] / 30
     draw = ImageDraw.Draw(img, "RGBA")
 
@@ -43,6 +46,8 @@ def draw_bboxes(
 
     for bbox in bboxes:
         class_id, x_min, y_min, x_max, y_max, *conf = [float(val) for val in bbox]
+        x_min, x_max = min(x_min, x_max), max(x_min, x_max)
+        y_min, y_max = min(y_min, y_max), max(y_min, y_max)
         bbox = [(x_min, y_min), (x_max, y_max)]
 
         random.seed(int(class_id))
