@@ -129,10 +129,10 @@ class ProgressLogger(Progress):
 
     def finish_one_epoch(self, batch_info: Dict[str, Any] = None, epoch_idx: int = -1):
         if self.task == "Train":
-            prefix = "Loss/"
+            prefix = "Loss"
         elif self.task == "Validate":
-            prefix = "Metrics/"
-        batch_info = {f"{prefix}{key}": value for key, value in batch_info.items()}
+            prefix = "Metrics"
+        batch_info = {f"{prefix}/{key}": value for key, value in batch_info.items()}
         if self.use_wandb:
             self.wandb.log(batch_info, step=epoch_idx)
         self.remove_task(self.batch_task)
