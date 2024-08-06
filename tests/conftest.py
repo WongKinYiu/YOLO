@@ -39,7 +39,7 @@ def validation_cfg():
 
 @pytest.fixture(scope="session")
 def inference_cfg():
-    return get_cfg(overrides=["task=inference"])
+    return get_cfg(overrides=["task=inference", "task.data.source='../demo/images/inference/image.png'"])
 
 
 @pytest.fixture(scope="session")
