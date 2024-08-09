@@ -11,7 +11,7 @@ import torch
 from loguru import logger
 from pycocotools.coco import COCO
 from torch import Tensor, distributed
-from torch.amp import GradScaler, autocast
+from torch.cuda.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 
@@ -63,13 +63,13 @@ class ModelTrainer:
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
         else:
             self.ema = None
-        self.scaler = GradScaler(str(self.device))
+        self.scaler = GradScaler()
 
     def train_one_batch(self, images: Tensor, targets: Tensor):
         images, targets = images.to(self.device), targets.to(self.device)
         self.optimizer.zero_grad()
 
-        with autocast(str(self.device)):
+        with autocast():
             predicts = self.model(images)
             aux_predicts = self.vec2box(predicts["AUX"])
             main_predicts = self.vec2box(predicts["Main"])
