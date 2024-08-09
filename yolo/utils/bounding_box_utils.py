@@ -217,6 +217,7 @@ class BoxMatcher:
         Returns:
             unique_indices [batch x anchors x 1]: The index of the best targets for each anchors
         """
+        # TODO: add a assert for no target on the image
         unique_indices = target_matrix.argmax(dim=1)
         return unique_indices[..., None]
 

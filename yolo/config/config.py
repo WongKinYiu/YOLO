@@ -45,6 +45,8 @@ class DownloadOptions:
 @dataclass
 class DatasetConfig:
     path: str
+    class_num: int
+    class_list: List[str]
     auto_download: Optional[DownloadOptions]
 
 
@@ -142,9 +144,6 @@ class Config:
     device: Union[str, int, List[int]]
     cpu_num: int
 
-    class_num: int
-    class_list: List[str]
-    class_idx_id: List[int]
     image_size: List[int]
 
     out_path: str
@@ -152,7 +151,7 @@ class Config:
 
     lucky_number: 10
     use_wandb: bool
-    use_TensorBoard: bool
+    use_tensorboard: bool
 
     weight: Optional[str]
 

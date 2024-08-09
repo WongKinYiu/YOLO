@@ -109,7 +109,7 @@ class YOLOLoss:
 class DualLoss:
     def __init__(self, cfg: Config, vec2box) -> None:
         loss_cfg = cfg.task.loss
-        self.loss = YOLOLoss(loss_cfg, vec2box, class_num=cfg.class_num, reg_max=cfg.model.anchor.reg_max)
+        self.loss = YOLOLoss(loss_cfg, vec2box, class_num=cfg.dataset.class_num, reg_max=cfg.model.anchor.reg_max)
 
         self.aux_rate = loss_cfg.aux
 

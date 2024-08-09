@@ -100,7 +100,10 @@ def scale_segmentation(
     h, w = image_dimensions["height"], image_dimensions["width"]
     for anno in annotations:
         category_id = anno["category_id"]
-        seg_list = [item for sublist in anno["segmentation"] for item in sublist]
+        if "segmentation" in anno:
+            seg_list = [item for sublist in anno["segmentation"] for item in sublist]
+        elif "bbox" in anno:
+            seg_list = anno["bbox"]
         scaled_seg_data = (
             np.array(seg_list).reshape(-1, 2) / [w, h]
         ).tolist()  # make the list group in x, y pairs and scaled with image width, height

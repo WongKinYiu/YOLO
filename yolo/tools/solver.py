@@ -162,7 +162,7 @@ class ModelTester:
         self.save_path = progress.save_path / "images"
         os.makedirs(self.save_path, exist_ok=True)
         self.save_predict = getattr(cfg.task, "save_predict", None)
-        self.idx2label = cfg.class_list
+        self.idx2label = cfg.dataset.class_list
 
     def solve(self, dataloader: StreamDataLoader):
         logger.info("👀 Start Inference!")
@@ -231,7 +231,7 @@ class ModelValidator:
             if json_path:
                 self.coco_gt = COCO(json_path)
 
-    def solve(self, dataloader, epoch_idx=-1):
+    def solve(self, dataloader, epoch_idx=1):
         # logger.info("🧪 Start Validation!")
         self.model.eval()
         predict_json, mAPs = [], defaultdict(list)
@@ -251,6 +251,7 @@ class ModelValidator:
 
             predict_json.extend(predicts_to_json(img_paths, predicts, rev_tensor))
         self.progress.finish_one_epoch(avg_mAPs, epoch_idx=epoch_idx)
+        self.progress.visualize_image(images, targets, predicts, epoch_idx=epoch_idx)
 
         with open(self.json_path, "w") as f:
             json.dump(predict_json, f)

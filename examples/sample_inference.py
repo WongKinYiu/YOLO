@@ -2,29 +2,39 @@ import sys
 from pathlib import Path
 
 import hydra
-import torch
 
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
-from yolo.config.config import Config
-from yolo.model.yolo import create_model
-from yolo.tools.data_loader import create_dataloader
-from yolo.tools.solver import ModelTester
-from yolo.utils.logging_utils import custom_logger, validate_log_directory
+
+from yolo import (
+    Config,
+    FastModelLoader,
+    ModelTester,
+    ProgressLogger,
+    create_converter,
+    create_dataloader,
+    create_model,
+)
+from yolo.utils.model_utils import get_device
 
 
-@hydra.main(config_path="../yolo/config", config_name="config", version_base=None)
+@hydra.main(config_path="config", config_name="config", version_base=None)
 def main(cfg: Config):
-    custom_logger()
-    save_path = validate_log_directory(cfg, cfg.name)
-    dataloader = create_dataloader(cfg)
+    progress = ProgressLogger(cfg, exp_name=cfg.name)
+    device, use_ddp = get_device(cfg.device)
+    dataloader = create_dataloader(cfg.task.data, cfg.dataset, cfg.task.task, use_ddp)
+    if getattr(cfg.task, "fast_inference", False):
+        model = FastModelLoader(cfg).load_model(device)
+    else:
+        model = create_model(cfg.model, class_num=cfg.dataset.class_num, weight_path=cfg.weight)
+        model = model.to(device)
 
-    device = torch.device(cfg.device)
-    model = create_model(cfg).to(device)
+    converter = create_converter(cfg.model.name, model, cfg.model.anchor, cfg.image_size, device)
 
-    tester = ModelTester(cfg, model, save_path, device)
-    tester.solve(dataloader)
+    solver = ModelTester(cfg, model, converter, progress, device)
+    progress.start()
+    solver.solve(dataloader)
 
 
 if __name__ == "__main__":

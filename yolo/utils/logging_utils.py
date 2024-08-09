@@ -16,7 +16,7 @@ import random
 import sys
 from collections import deque
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -36,9 +36,11 @@ from rich.table import Table
 from torch import Tensor
 from torch.nn import ModuleList
 from torch.optim import Optimizer
+from torchvision.transforms.functional import pil_to_tensor
 
 from yolo.config.config import Config, YOLOLayer
 from yolo.model.yolo import YOLO
+from yolo.tools.drawer import draw_bboxes
 from yolo.utils.solver_utils import make_ap_table
 
 
@@ -93,6 +95,13 @@ class ProgressLogger(Progress):
                 project="YOLO", resume="allow", mode="online", dir=self.save_path, id=None, name=exp_name
             )
 
+        self.use_tensorboard = cfg.use_tensorboard
+        if self.use_tensorboard:
+            from torch.utils.tensorboard import SummaryWriter
+
+            self.tb_writer = SummaryWriter(log_dir=self.save_path / "tensorboard")
+            logger.opt(colors=True).info(f"📍 Enable TensorBoard locally at <blue><u>http://localhost:6006</></>")
+
     def rank_check(logging_function):
         def wrapper(self, *args, **kwargs):
             if getattr(self, "local_rank", 0) != 0:
@@ -118,11 +127,17 @@ class ProgressLogger(Progress):
         if hasattr(self, "task_epoch"):
             self.update(self.task_epoch, description=f"[cyan] Preparing Data")
 
-        if self.use_wandb and optimizer is not None:
+        if optimizer is not None:
             lr_values = [params["lr"] for params in optimizer.param_groups]
             lr_names = ["Learning Rate/bias", "Learning Rate/norm", "Learning Rate/conv"]
-            for lr_name, lr_value in zip(lr_names, lr_values):
-                self.wandb.log({lr_name: lr_value}, step=epoch_idx)
+            if self.use_wandb:
+                for lr_name, lr_value in zip(lr_names, lr_values):
+                    self.wandb.log({lr_name: lr_value}, step=epoch_idx)
+
+            if self.use_tensorboard:
+                for lr_name, lr_value in zip(lr_names, lr_values):
+                    self.tb_writer.add_scalar(lr_name, lr_value, global_step=epoch_idx)
+
         self.batch_task = self.add_task(f"[green] Phase: {task}", total=num_batches)
 
     @rank_check
@@ -141,13 +156,61 @@ class ProgressLogger(Progress):
     @rank_check
     def finish_one_epoch(self, batch_info: Dict[str, Any] = None, epoch_idx: int = -1):
         if self.task == "Train":
-            prefix = "Loss/"
+            prefix = "Loss"
         elif self.task == "Validate":
-            prefix = "Metrics/"
-        batch_info = {f"{prefix}{key}": value for key, value in batch_info.items()}
+            prefix = "Metrics"
+        batch_info = {f"{prefix}/{key}": value for key, value in batch_info.items()}
         if self.use_wandb:
             self.wandb.log(batch_info, step=epoch_idx)
+        if self.use_tensorboard:
+            for key, value in batch_info.items():
+                self.tb_writer.add_scalar(key, value, epoch_idx)
+
         self.remove_task(self.batch_task)
+
+    @rank_check
+    def visualize_image(
+        self,
+        images: Optional[Tensor] = None,
+        ground_truth: Optional[Tensor] = None,
+        prediction: Optional[Union[List[Tensor], Tensor]] = None,
+        epoch_idx: int = 0,
+    ) -> None:
+        """
+        Upload the ground truth bounding boxes, predicted bounding boxes, and the original image to wandb or TensorBoard.
+
+        Args:
+            images (Optional[Tensor]): Tensor of images with shape (BZ, 3, 640, 640).
+            ground_truth (Optional[Tensor]): Ground truth bounding boxes with shape (BZ, N, 5) or (N, 5). Defaults to None.
+            prediction (prediction: Optional[Union[List[Tensor], Tensor]]): List of predicted bounding boxes with shape (N, 6) or (N, 6). Defaults to None.
+            epoch_idx (int): Current epoch index. Defaults to 0.
+        """
+        if images is not None:
+            images = images[0] if images.ndim == 4 else images
+            if self.use_wandb:
+                wandb.log({"Input Image": wandb.Image(images)}, step=epoch_idx)
+            if self.use_tensorboard:
+                self.tb_writer.add_image("Media/Input Image", images, 1)
+
+        if ground_truth is not None:
+            gt_boxes = ground_truth[0] if ground_truth.ndim == 3 else ground_truth
+            if self.use_wandb:
+                wandb.log(
+                    {"Ground Truth": wandb.Image(images, boxes={"predictions": {"box_data": log_bbox(gt_boxes)}})},
+                    step=epoch_idx,
+                )
+            if self.use_tensorboard:
+                self.tb_writer.add_image("Media/Ground Truth", pil_to_tensor(draw_bboxes(images, gt_boxes)), epoch_idx)
+
+        if prediction is not None:
+            pred_boxes = prediction[0] if isinstance(prediction, list) else prediction
+            if self.use_wandb:
+                wandb.log(
+                    {"Prediction": wandb.Image(images, boxes={"predictions": {"box_data": log_bbox(pred_boxes)}})},
+                    step=epoch_idx,
+                )
+            if self.use_tensorboard:
+                self.tb_writer.add_image("Media/Prediction", pil_to_tensor(draw_bboxes(images, pred_boxes)), epoch_idx)
 
     @rank_check
     def start_pycocotools(self):
@@ -162,6 +225,11 @@ class ProgressLogger(Progress):
 
         if self.use_wandb:
             self.wandb.log({"PyCOCO/AP @ .5:.95": ap_main[2], "PyCOCO/AP @ .5": ap_main[5]})
+        if self.use_tensorboard:
+            # TODO: waiting torch bugs fix, https://github.com/pytorch/pytorch/issues/32651
+            self.tb_writer.add_scalar("PyCOCO/AP @ .5:.95", ap_main[2], epoch_idx)
+            self.tb_writer.add_scalar("PyCOCO/AP @ .5", ap_main[5], epoch_idx)
+
         self.update(self.batch_task, advance=1)
         self.refresh()
         self.remove_task(self.batch_task)
@@ -172,6 +240,8 @@ class ProgressLogger(Progress):
         self.stop()
         if self.use_wandb:
             self.wandb.finish()
+        if self.use_tensorboard:
+            self.tb_writer.close()
 
 
 def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=True, silent=False):
@@ -228,3 +298,37 @@ def validate_log_directory(cfg: Config, exp_name: str) -> Path:
     logger.opt(colors=True).info(f"📄 Created log folder: <u><fg #808080>{save_path}</></>")
     logger.add(save_path / "output.log", mode="w", backtrace=True, diagnose=True)
     return save_path
+
+
+def log_bbox(
+    bboxes: Tensor, class_list: Optional[List[str]] = None, image_size: Tuple[int, int] = (640, 640)
+) -> List[dict]:
+    """
+    Convert bounding boxes tensor to a list of dictionaries for logging, normalized by the image size.
+
+    Args:
+        bboxes (Tensor): Bounding boxes with shape (N, 5) or (N, 6), where each box is [class_id, x_min, y_min, x_max, y_max, (confidence)].
+        class_list (Optional[List[str]]): List of class names. Defaults to None.
+        image_size (Tuple[int, int]): The size of the image, used for normalization. Defaults to (640, 640).
+
+    Returns:
+        List[dict]: List of dictionaries containing normalized bounding box information.
+    """
+    bbox_list = []
+    scale_tensor = torch.Tensor([1, *image_size, *image_size]).to(bboxes.device)
+    normalized_bboxes = bboxes[:, :5] / scale_tensor
+    for bbox in normalized_bboxes:
+        class_id, x_min, y_min, x_max, y_max, *conf = [float(val) for val in bbox]
+        if class_id == -1:
+            break
+        bbox_entry = {
+            "position": {"minX": x_min, "maxX": x_max, "minY": y_min, "maxY": y_max},
+            "class_id": int(class_id),
+        }
+        if class_list:
+            bbox_entry["box_caption"] = class_list[int(class_id)]
+        if conf:
+            bbox_entry["scores"] = {"confidence": conf[0]}
+        bbox_list.append(bbox_entry)
+
+    return bbox_list

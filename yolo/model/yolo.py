@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List, Union
 
@@ -114,6 +115,39 @@ class YOLO(nn.Module):
         else:
             raise ValueError(f"Unsupported layer type: {layer_type}")
 
+    def save_load_weights(self, weights: Union[Path, OrderedDict]):
+        """
+        Update the model's weights with the provided weights.
+
+        args:
+            weights: A OrderedDict containing the new weights.
+        """
+        if isinstance(weights, Path):
+            weights = torch.load(weights, map_location=torch.device("cpu"))
+        if "model_state_dict" in weights:
+            weights = weights["model_state_dict"]
+
+        model_state_dict = self.model.state_dict()
+
+        # TODO1: autoload old version weight
+        # TODO2: weight transform if num_class difference
+
+        error_dict = {"Mismatch": set(), "Not Found": set()}
+        for model_key, model_weight in model_state_dict.items():
+            if model_key not in weights:
+                error_dict["Not Found"].add(tuple(model_key.split(".")[:-2]))
+                continue
+            if model_weight.shape != weights[model_key].shape:
+                error_dict["Mismatch"].add(tuple(model_key.split(".")[:-2]))
+                continue
+            model_state_dict[model_key] = weights[model_key]
+
+        for error_name, error_set in error_dict.items():
+            for weight_name in error_set:
+                logger.warning(f"⚠️ Weight {error_name} for key: {'.'.join(weight_name)}")
+
+        self.model.load_state_dict(model_state_dict)
+
 
 def create_model(model_cfg: ModelConfig, weight_path: Union[bool, Path] = True, class_num: int = 80) -> YOLO:
     """Constructs and returns a model from a Dictionary configuration file.
@@ -129,11 +163,14 @@ def create_model(model_cfg: ModelConfig, weight_path: Union[bool, Path] = True, 
     if weight_path:
         if weight_path == True:
             weight_path = Path("weights") / f"{model_cfg.name}.pt"
+        elif isinstance(weight_path, str):
+            weight_path = Path(weight_path)
+
         if not weight_path.exists():
             logger.info(f"🌐 Weight {weight_path} not found, try downloading")
             prepare_weight(weight_path=weight_path)
         if weight_path.exists():
-            model.model.load_state_dict(torch.load(weight_path, map_location=torch.device("cpu")), strict=False)
+            model.save_load_weights(weight_path)
             logger.info("✅ Success load model & weight")
     else:
         logger.info("✅ Success load model")

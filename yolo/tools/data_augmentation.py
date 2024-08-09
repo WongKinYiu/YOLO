@@ -25,7 +25,30 @@ class AugmentationComposer:
         return image, boxes, rev_tensor
 
 
-# TODO: RandomCrop, Resize, ... etc.
+class RemoveOutliers:
+    """Removes outlier bounding boxes that are too small or have invalid dimensions."""
+
+    def __init__(self, min_box_area=1e-8):
+        """
+        Args:
+            min_box_area (float): Minimum area for a box to be kept, as a fraction of the image area.
+        """
+        self.min_box_area = min_box_area
+
+    def __call__(self, image, boxes):
+        """
+        Args:
+            image (PIL.Image): The cropped image.
+            boxes (torch.Tensor): Bounding boxes in normalized coordinates (x_min, y_min, x_max, y_max).
+        Returns:
+            PIL.Image: The input image (unchanged).
+            torch.Tensor: Filtered bounding boxes.
+        """
+        box_areas = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 4] - boxes[:, 2])
+
+        valid_boxes = (box_areas > self.min_box_area) & (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 4] > boxes[:, 2])
+
+        return image, boxes[valid_boxes]
 
 
 class PadAndResize:
@@ -155,3 +178,34 @@ class MixUp:
         mixed_boxes = torch.cat([lam * boxes, (1 - lam) * boxes2])
 
         return TF.to_pil_image(mixed_image), mixed_boxes
+
+
+class RandomCrop:
+    """Randomly crops the image to half its size along with adjusting the bounding boxes."""
+
+    def __init__(self, prob=0.5):
+        """
+        Args:
+            prob (float): Probability of applying the crop.
+        """
+        self.prob = prob
+
+    def __call__(self, image, boxes):
+        if torch.rand(1) < self.prob:
+            original_width, original_height = image.size
+            crop_height, crop_width = original_height // 2, original_width // 2
+            top = torch.randint(0, original_height - crop_height + 1, (1,)).item()
+            left = torch.randint(0, original_width - crop_width + 1, (1,)).item()
+
+            image = TF.crop(image, top, left, crop_height, crop_width)
+
+            boxes[:, [1, 3]] = boxes[:, [1, 3]] * original_width - left
+            boxes[:, [2, 4]] = boxes[:, [2, 4]] * original_height - top
+
+            boxes[:, [1, 3]] = boxes[:, [1, 3]].clamp(0, crop_width)
+            boxes[:, [2, 4]] = boxes[:, [2, 4]].clamp(0, crop_height)
+
+            boxes[:, [1, 3]] /= crop_width
+            boxes[:, [2, 4]] /= crop_height
+
+        return image, boxes
