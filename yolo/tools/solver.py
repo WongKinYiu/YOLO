@@ -121,7 +121,7 @@ class ModelTrainer:
             checkpoint["model_state_dict_ema"] = self.model.state_dict()
             self.ema.restore()
 
-        print(f"💾 success save at {file_path}")
+        logger.info(f"💾 success save at {file_path}")
         torch.save(checkpoint, file_path)
 
     def good_epoch(self, mAPs: Dict[str, Tensor]) -> bool:

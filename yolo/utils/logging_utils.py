@@ -89,14 +89,14 @@ class ProgressLogger(Progress):
         super().__init__(*args, *progress_bar, **kwargs)
 
         self.use_wandb = cfg.use_wandb
-        if self.use_wandb:
+        if self.use_wandb and self.local_rank == 0:
             wandb.errors.term._log = custom_wandb_log
             self.wandb = wandb.init(
                 project="YOLO", resume="allow", mode="online", dir=self.save_path, id=None, name=exp_name
             )
 
         self.use_tensorboard = cfg.use_tensorboard
-        if self.use_tensorboard:
+        if self.use_tensorboard and self.local_rank == 0:
             from torch.utils.tensorboard import SummaryWriter
 
             self.tb_writer = SummaryWriter(log_dir=self.save_path / "tensorboard")
