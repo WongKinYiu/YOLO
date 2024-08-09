@@ -11,9 +11,7 @@ import torch
 from loguru import logger
 from pycocotools.coco import COCO
 from torch import Tensor
-
-# TODO: We may can't use CUDA?
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 
@@ -65,13 +63,13 @@ class ModelTrainer:
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
         else:
             self.ema = None
-        self.scaler = GradScaler()
+        self.scaler = GradScaler(str(self.device))
 
     def train_one_batch(self, images: Tensor, targets: Tensor):
         images, targets = images.to(self.device), targets.to(self.device)
         self.optimizer.zero_grad()
 
-        with autocast():
+        with autocast(str(self.device)):
             predicts = self.model(images)
             aux_predicts = self.vec2box(predicts["AUX"])
             main_predicts = self.vec2box(predicts["Main"])
