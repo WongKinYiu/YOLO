@@ -10,7 +10,7 @@ from typing import Dict, Optional
 import torch
 from loguru import logger
 from pycocotools.coco import COCO
-from torch import Tensor
+from torch import Tensor, distributed
 from torch.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
@@ -93,6 +93,8 @@ class ModelTrainer:
             loss_each = self.train_one_batch(images, targets)
 
             for loss_name, loss_val in loss_each.items():
+                if self.use_ddp:  # collecting loss for each batch
+                    distributed.all_reduce(loss_val, op=distributed.ReduceOp.AVG)
                 total_loss[loss_name] += loss_val * batch_size
             total_samples += batch_size
             self.progress.one_batch(loss_each)
