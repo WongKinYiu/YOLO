@@ -25,7 +25,30 @@ class AugmentationComposer:
         return image, boxes, rev_tensor
 
 
-# TODO: RandomCrop, Resize, ... etc.
+class RemoveOutliers:
+    """Removes outlier bounding boxes that are too small or have invalid dimensions."""
+
+    def __init__(self, min_box_area=1e-8):
+        """
+        Args:
+            min_box_area (float): Minimum area for a box to be kept, as a fraction of the image area.
+        """
+        self.min_box_area = min_box_area
+
+    def __call__(self, image, boxes):
+        """
+        Args:
+            image (PIL.Image): The cropped image.
+            boxes (torch.Tensor): Bounding boxes in normalized coordinates (x_min, y_min, x_max, y_max).
+        Returns:
+            PIL.Image: The input image (unchanged).
+            torch.Tensor: Filtered bounding boxes.
+        """
+        box_areas = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 4] - boxes[:, 2])
+
+        valid_boxes = (box_areas > self.min_box_area) & (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 4] > boxes[:, 2])
+
+        return image, boxes[valid_boxes]
 
 
 class PadAndResize:
