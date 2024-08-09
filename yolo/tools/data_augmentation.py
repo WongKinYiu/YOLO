@@ -155,3 +155,34 @@ class MixUp:
         mixed_boxes = torch.cat([lam * boxes, (1 - lam) * boxes2])
 
         return TF.to_pil_image(mixed_image), mixed_boxes
+
+
+class RandomCrop:
+    """Randomly crops the image to half its size along with adjusting the bounding boxes."""
+
+    def __init__(self, prob=0.5):
+        """
+        Args:
+            prob (float): Probability of applying the crop.
+        """
+        self.prob = prob
+
+    def __call__(self, image, boxes):
+        if torch.rand(1) < self.prob:
+            original_width, original_height = image.size
+            crop_height, crop_width = original_height // 2, original_width // 2
+            top = torch.randint(0, original_height - crop_height + 1, (1,)).item()
+            left = torch.randint(0, original_width - crop_width + 1, (1,)).item()
+
+            image = TF.crop(image, top, left, crop_height, crop_width)
+
+            boxes[:, [1, 3]] = boxes[:, [1, 3]] * original_width - left
+            boxes[:, [2, 4]] = boxes[:, [2, 4]] * original_height - top
+
+            boxes[:, [1, 3]] = boxes[:, [1, 3]].clamp(0, crop_width)
+            boxes[:, [2, 4]] = boxes[:, [2, 4]].clamp(0, crop_height)
+
+            boxes[:, [1, 3]] /= crop_width
+            boxes[:, [2, 4]] /= crop_height
+
+        return image, boxes
