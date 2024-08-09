@@ -14,7 +14,9 @@ data:
   data_augment:
     Mosaic: 1
     # MixUp: 1
-    HorizontalFlip: 0.5
+    # HorizontalFlip: 0.5
+    RandomCrop: 1
+    RemoveOutliers: 1e-8
 
 optimizer:
   type: SGD
