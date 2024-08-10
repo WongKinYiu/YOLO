@@ -26,6 +26,7 @@ from yolo.utils.logging_utils import ProgressLogger, log_model_structure
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
     PostProccess,
+    collect_prediction,
     create_optimizer,
     create_scheduler,
     predicts_to_json,
@@ -146,7 +147,7 @@ class ModelTrainer:
             self.progress.finish_one_epoch(epoch_loss, epoch_idx=epoch_idx)
 
             mAPs = self.validator.solve(self.validation_dataloader, epoch_idx=epoch_idx)
-            if self.good_epoch(mAPs):
+            if mAPs is not None and self.good_epoch(mAPs):
                 self.save_checkpoint(epoch_idx=epoch_idx)
             # TODO: save model if result are better than before
         self.progress.finish_train()
@@ -254,6 +255,7 @@ class ModelValidator:
         self.progress.visualize_image(images, targets, predicts, epoch_idx=epoch_idx)
 
         with open(self.json_path, "w") as f:
+            predict_json = collect_prediction(predict_json, self.progress.local_rank)
             json.dump(predict_json, f)
         if hasattr(self, "coco_gt"):
             self.progress.start_pycocotools()
