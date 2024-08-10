@@ -256,6 +256,8 @@ class ModelValidator:
 
         with open(self.json_path, "w") as f:
             predict_json = collect_prediction(predict_json, self.progress.local_rank)
+            if self.progress.local_rank != 0:
+                return
             json.dump(predict_json, f)
         if hasattr(self, "coco_gt"):
             self.progress.start_pycocotools()
