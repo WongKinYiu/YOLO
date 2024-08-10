@@ -412,22 +412,22 @@ def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05
     ious = calculate_iou(predictions[:, 1:-1], ground_truths[:, 1:])  # [n_preds, n_gts]
 
     for threshold in iou_thresholds:
-        tp = torch.zeros(n_preds, device=device)
-        fp = torch.zeros(n_preds, device=device)
+        tp = torch.zeros(n_preds, device=device, dtype=bool)
 
-        max_iou, max_indices = torch.max(ious, dim=1)
+        max_iou, max_indices = ious.max(dim=1)
         above_threshold = max_iou >= threshold
         matched_classes = predictions[:, 0] == ground_truths[max_indices, 0]
-        tp[above_threshold & matched_classes] = 1
-        fp[above_threshold & ~matched_classes] = 1
-        fp[max_iou < threshold] = 1
+        max_match = torch.zeros_like(ious)
+        max_match[arange(n_preds), max_indices] = max_iou
+        if max_match.size(0):
+            tp[max_match.argmax(dim=0)] = True
+        tp[~above_threshold | ~matched_classes] = False
 
         _, indices = torch.sort(predictions[:, 1], descending=True)
         tp = tp[indices]
-        fp = fp[indices]
 
         tp_cumsum = torch.cumsum(tp, dim=0)
-        fp_cumsum = torch.cumsum(fp, dim=0)
+        fp_cumsum = torch.cumsum(~tp, dim=0)
 
         precision = tp_cumsum / (tp_cumsum + fp_cumsum + 1e-6)
         recall = tp_cumsum / (n_gts + 1e-6)
@@ -438,9 +438,7 @@ def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05
         precision, _ = torch.cummax(precision.flip(0), dim=0)
         precision = precision.flip(0)
 
-        indices = (recall[1:] != recall[:-1]).nonzero(as_tuple=True)[0]
-        ap = torch.sum((recall[indices + 1] - recall[indices]) * precision[indices + 1])
-
+        ap = torch.trapezoid(precision, recall)
         aps.append(ap)
 
     mAP = {
