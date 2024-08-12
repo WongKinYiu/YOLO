@@ -32,7 +32,19 @@ class YoloDataset(Dataset):
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.data = self.load_data(Path(dataset_cfg.path), phase_name)
+        self.img_paths, self.bboxes = self.tensorlize(self.load_data(Path(dataset_cfg.path), phase_name))
+
+    def tensorlize(self, data):
+        img_paths, bboxes = zip(*data)
+        max_box = max(bbox.size(0) for bbox in bboxes)
+        padded_bbox_list = []
+        for bbox in bboxes:
+            padding = torch.full((max_box, 5), -1, dtype=torch.float32)
+            padding[: bbox.size(0)] = bbox
+            padded_bbox_list.append(padding)
+        bboxes = torch.stack(padded_bbox_list)
+        img_paths = np.array(img_paths)
+        return img_paths, bboxes
 
     def load_data(self, dataset_path: Path, phase_name: str):
         """
@@ -132,7 +144,7 @@ class YoloDataset(Dataset):
             return torch.zeros((0, 5))
 
     def get_data(self, idx):
-        img_path, bboxes = self.data[idx]
+        img_path, bboxes = self.img_paths[idx], self.bboxes[idx]
         img = Image.open(img_path).convert("RGB")
         return img, bboxes, img_path
 
@@ -146,7 +158,7 @@ class YoloDataset(Dataset):
         return img, bboxes, rev_tensor, img_path
 
     def __len__(self) -> int:
-        return len(self.data)
+        return len(self.bboxes)
 
 
 class YoloDataLoader(DataLoader):
