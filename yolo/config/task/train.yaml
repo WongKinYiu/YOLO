@@ -4,6 +4,7 @@ defaults:
   - validation: ../validation
 
 epoch: 500
+eval_interval: 10
 
 data:
   batch_size: 16

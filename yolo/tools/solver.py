@@ -46,6 +46,7 @@ class ModelTrainer:
         self.loss_fn = create_loss_function(cfg, vec2box)
         self.progress = progress
         self.num_epochs = cfg.task.epoch
+        self.eval_interval = cfg.task.eval_interval
         self.mAPs_dict = defaultdict(list)
 
         self.weights_dir = self.progress.save_path / "weights"
@@ -126,11 +127,11 @@ class ModelTrainer:
         torch.save(checkpoint, file_path)
 
     def good_epoch(self, mAPs: Dict[str, Tensor]) -> bool:
-        save_flag = True
+        save_flag = False
         for mAP_key, mAP_val in mAPs.items():
+            if not self.mAPs_dict[mAP_key] or mAP_val > max(self.mAPs_dict[mAP_key]):
+                save_flag = True
             self.mAPs_dict[mAP_key].append(mAP_val)
-            if mAP_val < max(self.mAPs_dict[mAP_key]):
-                save_flag = False
         return save_flag
 
     def solve(self, dataloader: DataLoader):
@@ -146,9 +147,13 @@ class ModelTrainer:
             epoch_loss = self.train_one_epoch(dataloader)
             self.progress.finish_one_epoch(epoch_loss, epoch_idx=epoch_idx)
 
-            mAPs = self.validator.solve(self.validation_dataloader, epoch_idx=epoch_idx)
-            if mAPs is not None and self.good_epoch(mAPs):
-                self.save_checkpoint(epoch_idx=epoch_idx)
+            if (epoch_idx + 1) % self.eval_interval == 0:
+                mAPs = self.validator.solve(self.validation_dataloader, epoch_idx=epoch_idx)
+                if mAPs is not None:
+                    self.save_checkpoint(epoch_idx=epoch_idx+1)
+                    if self.good_epoch(mAPs):
+                        self.save_checkpoint(epoch_idx=epoch_idx+1, file_name="best.pt")
+                    
             # TODO: save model if result are better than before
         self.progress.finish_train()
 
@@ -259,9 +264,15 @@ class ModelValidator:
             if self.progress.local_rank != 0:
                 return
             json.dump(predict_json, f)
-        if hasattr(self, "coco_gt"):
+
+        if predict_json and hasattr(self, "coco_gt"):
             self.progress.start_pycocotools()
             result = calculate_ap(self.coco_gt, predict_json)
             self.progress.finish_pycocotools(result, epoch_idx)
+        else:
+            if not predict_json:
+                logger.warning("⚠️ No predictions available for evaluation.")
+            if not hasattr(self, "coco_gt"):
+                logger.warning("⚠️ COCO ground truth not found. Please check dataset configuration.")
 
         return avg_mAPs
