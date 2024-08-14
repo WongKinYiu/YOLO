@@ -2,7 +2,7 @@ name: Deploy Mode Validation & Inference
 
 on:
   push:
-    branches: [main]
+    branches: [main,TRAIN]
   pull_request:
     branches: [main]
 
