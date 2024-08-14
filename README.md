@@ -1,5 +1,13 @@
 # YOLO: Official Implementation of YOLOv9, YOLOv7
 
+> [!CAUTION]
+> We wanted to inform you that the training code for this project is still in progress, and there are two known issues:
+> - CPU memory leak during training
+> - Slower convergence speed
+> 
+> We strongly recommend refraining from training the model until version 1.0 is released.
+> However, inference and validation with pre-trained weights on COCO are available and can be used safely.
+
 [![Documentation Status](https://readthedocs.org/projects/yolo-docs/badge/?version=latest)](https://yolo-docs.readthedocs.io/en/latest/?badge=latest)
 ![GitHub License](https://img.shields.io/github/license/WongKinYiu/YOLO)
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
