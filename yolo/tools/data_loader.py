@@ -145,8 +145,9 @@ class YoloDataset(Dataset):
 
     def get_data(self, idx):
         img_path, bboxes = self.img_paths[idx], self.bboxes[idx]
+        valid_mask = bboxes[:, 0] != -1
         img = Image.open(img_path).convert("RGB")
-        return img, bboxes, img_path
+        return img, bboxes[valid_mask], img_path
 
     def get_more_data(self, num: int = 1):
         indices = torch.randint(0, len(self), (num,))
