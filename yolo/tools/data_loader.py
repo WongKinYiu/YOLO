@@ -32,7 +32,8 @@ class YoloDataset(Dataset):
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.data = self.load_data(Path(dataset_cfg.path), phase_name)
+        self.data_root = Path(dataset_cfg.path)
+        self.data = self.load_data(self.data_root, phase_name)
 
     def load_data(self, dataset_path: Path, phase_name: str):
         """
@@ -54,9 +55,8 @@ class YoloDataset(Dataset):
         else:
             data = torch.load(cache_path)
             logger.info("📦 Loaded {} cache", phase_name)
-            
             # Validate cache
-            if self.validate_cache(dataset_path, phase_name, data):
+            if data[0][0].parent == Path("images")/phase_name:
                 logger.info("✅ Cache validation successful")
             else:
                 logger.warning("⚠️ Cache validation failed, regenerating")
@@ -64,22 +64,6 @@ class YoloDataset(Dataset):
                 torch.save(data, cache_path)
         
         return data
-
-    def validate_cache(self, dataset_path: Path, phase_name: str, cached_data: list) -> bool:
-        """
-        Validates if the cached data is consistent with the current dataset, comparing complete file paths
-        """
-        images_path = dataset_path / "images" / phase_name
-        current_images = sorted([p.resolve() for p in images_path.iterdir() if p.is_file()])
-        cached_images = sorted([Path(item[0]).resolve() for item in cached_data])
-
-        # Check if image file paths are completely consistent
-        if current_images != cached_images:
-            return False
-
-        # Can add more validation steps, e.g. checking label file modification times
-
-        return True
 
     def filter_data(self, dataset_path: Path, phase_name: str) -> list:
         """
@@ -125,7 +109,7 @@ class YoloDataset(Dataset):
 
             labels = self.load_valid_labels(image_id, image_seg_annotations)
 
-            img_path = images_path / image_name
+            img_path = Path("images") / phase_name / image_name
             data.append((img_path, labels))
             valid_inputs += 1
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
@@ -158,6 +142,7 @@ class YoloDataset(Dataset):
 
     def get_data(self, idx):
         img_path, bboxes = self.data[idx]
+        img_path = self.data_root / Path(img_path)
         img = Image.open(img_path).convert("RGB")
         return img, bboxes, img_path
 
