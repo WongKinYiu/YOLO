@@ -21,9 +21,9 @@ def make_ap_table(score, past_result=[], last_score=None, epoch=-1):
     ap_table = Table()
     ap_table.add_column("Epoch", justify="center", style="white", width=5)
     ap_table.add_column("Avg. Precision", justify="left", style="cyan")
-    ap_table.add_column("", justify="right", style="green", width=5)
+    ap_table.add_column("%", justify="right", style="green", width=5)
     ap_table.add_column("Avg. Recall", justify="left", style="cyan")
-    ap_table.add_column("", justify="right", style="green", width=5)
+    ap_table.add_column("%", justify="right", style="green", width=5)
 
     for eps, (ap_name1, ap_color1, ap_value1, ap_name2, ap_color2, ap_value2) in past_result:
         ap_table.add_row(f"{eps: 3d}", ap_name1, f"{ap_color1}{ap_value1:.2f}", ap_name2, f"{ap_color2}{ap_value2:.2f}")

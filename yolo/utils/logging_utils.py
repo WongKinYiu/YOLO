@@ -117,6 +117,7 @@ class ProgressLogger(Progress):
     @rank_check
     def start_train(self, num_epochs: int):
         self.task_epoch = self.add_task(f"[cyan]Start Training {num_epochs} epochs", total=num_epochs)
+        self.update(self.task_epoch, advance=-0.5)
 
     @rank_check
     def start_one_epoch(
@@ -218,7 +219,7 @@ class ProgressLogger(Progress):
 
     @rank_check
     def finish_pycocotools(self, result, epoch_idx=-1):
-        ap_table, ap_main = make_ap_table(result, self.ap_past_list, self.last_result, epoch_idx)
+        ap_table, ap_main = make_ap_table(result * 100, self.ap_past_list, self.last_result, epoch_idx)
         self.last_result = np.maximum(result, self.last_result)
         self.ap_past_list.append((epoch_idx, ap_main))
         self.ap_table = ap_table

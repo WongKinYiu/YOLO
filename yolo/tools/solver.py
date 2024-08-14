@@ -247,7 +247,7 @@ class ModelValidator:
                     for mAP_key, mAP_val in mAP.items():
                         mAPs[mAP_key].append(mAP_val)
 
-            avg_mAPs = {key: torch.mean(torch.stack(val)) for key, val in mAPs.items()}
+            avg_mAPs = {key: 100 * torch.mean(torch.stack(val)) for key, val in mAPs.items()}
             self.progress.one_batch(avg_mAPs)
 
             predict_json.extend(predicts_to_json(img_paths, predicts, rev_tensor))
