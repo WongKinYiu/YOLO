@@ -54,7 +54,32 @@ class YoloDataset(Dataset):
         else:
             data = torch.load(cache_path)
             logger.info("📦 Loaded {} cache", phase_name)
+            
+            # Validate cache
+            if self.validate_cache(dataset_path, phase_name, data):
+                logger.info("✅ Cache validation successful")
+            else:
+                logger.warning("⚠️ Cache validation failed, regenerating")
+                data = self.filter_data(dataset_path, phase_name)
+                torch.save(data, cache_path)
+        
         return data
+
+    def validate_cache(self, dataset_path: Path, phase_name: str, cached_data: list) -> bool:
+        """
+        Validates if the cached data is consistent with the current dataset, comparing complete file paths
+        """
+        images_path = dataset_path / "images" / phase_name
+        current_images = sorted([p.resolve() for p in images_path.iterdir() if p.is_file()])
+        cached_images = sorted([Path(item[0]).resolve() for item in cached_data])
+
+        # Check if image file paths are completely consistent
+        if current_images != cached_images:
+            return False
+
+        # Can add more validation steps, e.g. checking label file modification times
+
+        return True
 
     def filter_data(self, dataset_path: Path, phase_name: str) -> list:
         """
