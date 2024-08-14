@@ -126,6 +126,7 @@ class ValidationConfig:
 class TrainConfig:
     task: str
     epoch: int
+    eval_interval: int
     data: DataConfig
     optimizer: OptimizerConfig
     loss: LossConfig
