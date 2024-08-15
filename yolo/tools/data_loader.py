@@ -71,7 +71,7 @@ class YoloDataset(Dataset):
         labels_path, data_type = locate_label_paths(dataset_path, phase_name)
         images_list = sorted([p.name for p in Path(images_path).iterdir() if p.is_file()])
         if data_type == "json":
-            annotations_index, image_info_dict = create_image_metadata(labels_path)
+            annotations_dict, image_info_dict = create_image_metadata(labels_path)
 
         data = []
         valid_inputs = 0
@@ -81,10 +81,10 @@ class YoloDataset(Dataset):
             image_id = Path(image_name).stem
 
             if data_type == "json":
-                image_info = image_info_dict.get(image_id, None)
+                image_info = image_info_dict.get(image_name, None)
                 if image_info is None:
                     continue
-                annotations = annotations_index.get(image_info["id"], [])
+                annotations = annotations_dict.get(image_name, [])
                 image_seg_annotations = scale_segmentation(annotations, image_info)
                 if not image_seg_annotations:
                     continue
@@ -99,9 +99,7 @@ class YoloDataset(Dataset):
                 image_seg_annotations = []
 
             labels = self.load_valid_labels(image_id, image_seg_annotations)
-
-            img_path = images_path / image_name
-            data.append((img_path, labels))
+            data.append((image_name, labels))
             valid_inputs += 1
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
