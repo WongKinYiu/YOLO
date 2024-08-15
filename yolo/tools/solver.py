@@ -21,7 +21,7 @@ from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes, draw_model
 from yolo.tools.loss_functions import create_loss_function
 from yolo.utils.bounding_box_utils import Vec2Box, calculate_map
-from yolo.utils.dataset_utils import locate_label_paths
+from yolo.utils.dataset_utils import locate_label_paths,create_image_metadata
 from yolo.utils.logging_utils import ProgressLogger, log_model_structure
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
@@ -58,7 +58,7 @@ class ModelTrainer:
         self.validation_dataloader = create_dataloader(
             cfg.task.validation.data, cfg.dataset, cfg.task.validation.task, use_ddp
         )
-        self.validator = ModelValidator(cfg.task.validation, cfg.dataset, model, vec2box, progress, device)
+        self.validator = ModelValidator(cfg, model, vec2box, progress, device)
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
@@ -126,11 +126,11 @@ class ModelTrainer:
         torch.save(checkpoint, file_path)
 
     def good_epoch(self, mAPs: Dict[str, Tensor]) -> bool:
-        save_flag = True
+        save_flag = False
         for mAP_key, mAP_val in mAPs.items():
+            if not self.mAPs_dict[mAP_key] or mAP_val > max(self.mAPs_dict[mAP_key]):
+                save_flag = True
             self.mAPs_dict[mAP_key].append(mAP_val)
-            if mAP_val < max(self.mAPs_dict[mAP_key]):
-                save_flag = False
         return save_flag
 
     def solve(self, dataloader: DataLoader):
@@ -212,8 +212,7 @@ class ModelTester:
 class ModelValidator:
     def __init__(
         self,
-        validation_cfg: ValidationConfig,
-        dataset_cfg: DatasetConfig,
+        cfg: Config,
         model: YOLO,
         vec2box: Vec2Box,
         progress: ProgressLogger,
@@ -222,13 +221,14 @@ class ModelValidator:
         self.model = model
         self.device = device
         self.progress = progress
-
-        self.post_proccess = PostProccess(vec2box, validation_cfg.nms)
+        
+        self.post_proccess = PostProccess(vec2box, cfg.task.validation.nms)
         self.json_path = self.progress.save_path / "predict.json"
 
         with contextlib.redirect_stdout(io.StringIO()):
             # TODO: load with config file
-            json_path, _ = locate_label_paths(Path(dataset_cfg.path), dataset_cfg.get("validation", "val"))
+            self.labels_path = Path(cfg.dataset.path) / getattr(cfg.dataset, "label_" + cfg.task.validation.task)
+            json_path, _ = locate_label_paths(self.labels_path, cfg.dataset.get("validation", "validation"))
             if json_path:
                 self.coco_gt = COCO(json_path)
 
@@ -236,6 +236,7 @@ class ModelValidator:
         # logger.info("🧪 Start Validation!")
         self.model.eval()
         predict_json, mAPs = [], defaultdict(list)
+        _, image_info_dict = create_image_metadata(self.labels_path)
         self.progress.start_one_epoch(len(dataloader), task="Validate")
         for batch_size, images, targets, rev_tensor, img_paths in dataloader:
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
@@ -250,7 +251,7 @@ class ModelValidator:
             avg_mAPs = {key: torch.mean(torch.stack(val)) for key, val in mAPs.items()}
             self.progress.one_batch(avg_mAPs)
 
-            predict_json.extend(predicts_to_json(img_paths, predicts, rev_tensor))
+            predict_json.extend(predicts_to_json(img_paths, image_info_dict, predicts, rev_tensor))
         self.progress.finish_one_epoch(avg_mAPs, epoch_idx=epoch_idx)
         self.progress.visualize_image(images, targets, predicts, epoch_idx=epoch_idx)
 
@@ -259,9 +260,16 @@ class ModelValidator:
             if self.progress.local_rank != 0:
                 return
             json.dump(predict_json, f)
-        if hasattr(self, "coco_gt"):
+
+        # yolo dataset will ignore
+        if predict_json and hasattr(self, "coco_gt"):
             self.progress.start_pycocotools()
             result = calculate_ap(self.coco_gt, predict_json)
             self.progress.finish_pycocotools(result, epoch_idx)
+        else:
+            if not predict_json:
+                logger.warning("⚠️ No predictions available for evaluation.")
+            if not hasattr(self, "coco_gt"):
+                logger.warning("⚠️ COCO ground truth not found. Please check dataset configuration.")
 
         return avg_mAPs

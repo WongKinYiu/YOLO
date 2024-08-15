@@ -32,7 +32,7 @@ def main(cfg: Config):
     if cfg.task.task == "train":
         solver = ModelTrainer(cfg, model, converter, progress, device, use_ddp)
     if cfg.task.task == "validation":
-        solver = ModelValidator(cfg.task, cfg.dataset, model, converter, progress, device)
+        solver = ModelValidator(cfg, model, converter, progress, device)
     if cfg.task.task == "inference":
         solver = ModelTester(cfg, model, converter, progress, device)
     progress.start()

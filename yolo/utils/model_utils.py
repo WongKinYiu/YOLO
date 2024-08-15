@@ -73,6 +73,7 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
     optimizer_class.next_epoch = next_epoch
     optimizer = optimizer_class(model_parameters, **optim_cfg.args)
     optimizer.max_lr = [0.1, 0, 0]
+    logger.info(f"✅ Optimizer {optim_cfg.type} initialized successfully")
     return optimizer
 
 
@@ -160,7 +161,7 @@ def collect_prediction(predict_json: List, local_rank: int) -> List:
     return predict_json
 
 
-def predicts_to_json(img_paths, predicts, rev_tensor):
+def predicts_to_json(img_paths, image_id_map, predicts, rev_tensor):
     """
     TODO: function document
     turn a batch of imagepath and predicts(n x 6 for each image) to a List of diction(Detection output)
@@ -172,7 +173,7 @@ def predicts_to_json(img_paths, predicts, rev_tensor):
         bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
         for cls, *pos, conf in bboxes:
             bbox = {
-                "image_id": int(Path(img_path).stem),
+                "image_id": image_id_map[img_path.name]["id"],
                 "category_id": IDX_TO_ID[int(cls)],
                 "bbox": [float(p) for p in pos],
                 "score": float(conf),
