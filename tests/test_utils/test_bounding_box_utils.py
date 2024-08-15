@@ -146,27 +146,41 @@ def test_anc2box_autoanchor(inference_v7_cfg: Config):
 
 
 def test_bbox_nms():
-    cls_dist = torch.tensor([
-        [[0.7, 0.1, 0.2],     # High confidence, class 0
-         [0.3, 0.6, 0.1],     # High confidence, class 1
-         [-3.0, -2.0, -1.0],  # low confidence, class 2
-         [0.6, 0.2, 0.2]],    # Medium confidence, class 0
-        [[0.55, 0.25, 0.2],   # Medium confidence, class 0
-         [-4.0, -0.5, -2.0],  # low confidence, class 1
-         [0.15, 0.2, 0.65],   # Medium confidence, class 2
-         [0.8, 0.1, 0.1]]     # High confidence, class 0
-    ], dtype=float32)
+    cls_dist = torch.tensor(
+        [
+            [
+                [0.7, 0.1, 0.2],  # High confidence, class 0
+                [0.3, 0.6, 0.1],  # High confidence, class 1
+                [-3.0, -2.0, -1.0],  # low confidence, class 2
+                [0.6, 0.2, 0.2],  # Medium confidence, class 0
+            ],
+            [
+                [0.55, 0.25, 0.2],  # Medium confidence, class 0
+                [-4.0, -0.5, -2.0],  # low confidence, class 1
+                [0.15, 0.2, 0.65],  # Medium confidence, class 2
+                [0.8, 0.1, 0.1],  # High confidence, class 0
+            ],
+        ],
+        dtype=float32,
+    )
 
-    bbox = torch.tensor([
-        [[0, 0, 160, 120],      # Overlaps with box 4
-         [160, 120, 320, 240],
-         [0, 120, 160, 240],
-         [16, 12, 176, 132]],
-        [[0, 0, 160, 120],      # Overlaps with box 4
-         [160, 120, 320, 240],
-         [0, 120, 160, 240],
-         [16, 12, 176, 132]]
-    ], dtype=float32)
+    bbox = torch.tensor(
+        [
+            [
+                [0, 0, 160, 120],  # Overlaps with box 4
+                [160, 120, 320, 240],
+                [0, 120, 160, 240],
+                [16, 12, 176, 132],
+            ],
+            [
+                [0, 0, 160, 120],  # Overlaps with box 4
+                [160, 120, 320, 240],
+                [0, 120, 160, 240],
+                [16, 12, 176, 132],
+            ],
+        ],
+        dtype=float32,
+    )
 
     nms_cfg = NMSConfig(min_confidence=0.5, min_iou=0.5)
 
@@ -178,12 +192,18 @@ def test_bbox_nms():
     #  - box 4 is kept with class 0 as it has a higher confidence than box 1 i.e. box 1 is filtered out
     #  - box 2 is rejected by the confidence filter
     #  - box 3 is kept with class 2
-    expected_output = torch.tensor([
-        [[0.0, 0.0, 0.0, 160.0, 120.0, 0.6682],
-         [1.0, 160.0, 120.0, 320.0, 240.0, 0.6457]],
-        [[0.0, 16.0, 12.0, 176.0, 132.0, 0.6900],
-         [2.0, 0.0, 120.0, 160.0, 240.0, 0.6570]]
-    ])
+    expected_output = torch.tensor(
+        [
+            [
+                [0.0, 0.0, 0.0, 160.0, 120.0, 0.6682],
+                [1.0, 160.0, 120.0, 320.0, 240.0, 0.6457],
+            ],
+            [
+                [0.0, 16.0, 12.0, 176.0, 132.0, 0.6900],
+                [2.0, 0.0, 120.0, 160.0, 240.0, 0.6570],
+            ],
+        ]
+    )
 
     output = bbox_nms(cls_dist, bbox, nms_cfg)
 
