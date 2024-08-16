@@ -41,13 +41,14 @@ class YoloDataset(Dataset):
         Loads data from a cache or generates a new cache for a specific dataset phase.
 
         Parameters:
-            dataset_path (Path): The root path to the dataset directory.
+            images_path (Path): The root path to the images directory.
+            labels_path (Path): The root path to the labels directory.
             phase_name (str): The specific phase of the dataset (e.g., 'train', 'test') to load or generate data for.
 
         Returns:
             dict: The loaded data from the cache for the specified phase.
         """
-        cache_path = images_path / f"{phase_name}.cache"
+        cache_path = images_path.with_suffix(".cache")
 
         if not cache_path.exists():
             logger.info("🏭 Generating {} cache", phase_name)
