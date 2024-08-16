@@ -31,7 +31,7 @@ from yolo.utils.model_utils import (
     create_scheduler,
     predicts_to_json,
 )
-from yolo.utils.solver_utils import calculate_ap
+from yolo.utils.solver_utils import calculate_ap, merge_coco_objects
 
 
 class ModelTrainer:
@@ -227,18 +227,43 @@ class ModelValidator:
 
         with contextlib.redirect_stdout(io.StringIO()):
             # TODO: load with config file
-            self.labels_path = Path(cfg.dataset.path) / getattr(cfg.dataset, "label_" + cfg.task.validation.task)
-            json_path, _ = locate_label_paths(self.labels_path, cfg.dataset.get("validation", "validation"))
-            if json_path:
-                self.coco_gt = COCO(json_path)
+            labels_paths = getattr(cfg.dataset, "label_" + cfg.task.validation.task)
+            
+            if isinstance(labels_paths, str):
+                labels_paths = [labels_paths]
+            elif isinstance(labels_paths, tuple):
+                labels_paths = list(labels_paths)
+            self.labels_paths = [Path(cfg.dataset.path) / labels_path for labels_path in labels_paths]
+            
+            images_paths = getattr(cfg.dataset, "image_" + cfg.task.validation.task)
+            if isinstance(images_paths, str):
+                images_paths = [images_paths]
+            elif isinstance(images_paths, tuple):
+                images_paths = list(images_paths)
+            self.images_paths = [Path(cfg.dataset.path) / images_path for images_path in images_paths]
+            
+            
+            json_paths = [locate_label_paths(labels_path, cfg.dataset.get("validation", "validation")) \
+                            for labels_path in self.labels_paths]
+
+            # merge coco object, duplicate data is not merged
+            coco_objects = [COCO(json_path[0]) for json_path in json_paths if json_path[0]]
+            self.coco_gt = merge_coco_objects(coco_objects)
 
     def solve(self, dataloader, epoch_idx=1):
         # logger.info("🧪 Start Validation!")
         self.model.eval()
         predict_json, mAPs = [], defaultdict(list)
-        _, image_info_dict = create_image_metadata(self.labels_path)
+        # only save the unique path
+        image_info_dicts = {}
+        for images_path, labels_path in zip(self.images_paths, self.labels_paths):
+            _, image_info_dict = create_image_metadata(labels_path)
+            modified_dict = {f"{images_path/key}": value for key, value in image_info_dict.items()}
+            image_info_dicts.update(modified_dict)
+          
         self.progress.start_one_epoch(len(dataloader), task="Validate")
         for batch_size, images, targets, rev_tensor, img_paths in dataloader:
+            images_path = dataloader.dataset.images_paths
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
                 predicts = self.model(images)
@@ -251,7 +276,7 @@ class ModelValidator:
             avg_mAPs = {key: torch.mean(torch.stack(val)) for key, val in mAPs.items()}
             self.progress.one_batch(avg_mAPs)
 
-            predict_json.extend(predicts_to_json(img_paths, image_info_dict, predicts, rev_tensor))
+            predict_json.extend(predicts_to_json(img_paths, image_info_dicts, predicts, rev_tensor))
         self.progress.finish_one_epoch(avg_mAPs, epoch_idx=epoch_idx)
         self.progress.visualize_image(images, targets, predicts, epoch_idx=epoch_idx)
 
@@ -261,8 +286,8 @@ class ModelValidator:
                 return
             json.dump(predict_json, f)
 
-        # yolo dataset will ignore
-        if predict_json and hasattr(self, "coco_gt"):
+        # yolo dataset or no result will ignore
+        if predict_json and len(self.coco_gt)>0:
             self.progress.start_pycocotools()
             result = calculate_ap(self.coco_gt, predict_json)
             self.progress.finish_pycocotools(result, epoch_idx)

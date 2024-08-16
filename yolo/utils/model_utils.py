@@ -173,7 +173,7 @@ def predicts_to_json(img_paths, image_id_map, predicts, rev_tensor):
         bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
         for cls, *pos, conf in bboxes:
             bbox = {
-                "image_id": image_id_map[img_path.name]["id"],
+                "image_id": image_id_map[str(img_path)]["id"],
                 "category_id": IDX_TO_ID[int(cls)],
                 "bbox": [float(p) for p in pos],
                 "score": float(conf),

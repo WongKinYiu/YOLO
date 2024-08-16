@@ -32,9 +32,32 @@ class YoloDataset(Dataset):
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.images_path = Path(dataset_cfg.path) / getattr(dataset_cfg, "image_" + phase)
-        self.labels_path = Path(dataset_cfg.path) / getattr(dataset_cfg, "label_" + phase)
-        self.data = self.load_data(self.images_path, self.labels_path, phase_name)
+        
+        self.get_dataset_path(cfg=dataset_cfg,phase=phase)
+       
+        self.data = []
+        for images_path, labels_path in zip(self.images_paths, self.labels_paths):
+            datas = self.load_data(images_path, labels_path, phase_name)
+            datas = [ (images_path / data[0], *data[1:]) for data in datas]
+            self.data.extend(datas)
+
+    def get_dataset_path(self,cfg:DataConfig, phase: str = "train"):
+         # dataset source
+        images_paths = getattr(cfg, "image_" + phase)
+        if isinstance(images_paths, str):
+            images_paths = [images_paths]
+        elif isinstance(images_paths, tuple):
+            images_paths = list(images_paths)
+        self.images_paths = [Path(cfg.path) / images_path for images_path in images_paths]
+        
+        labels_paths = getattr(cfg, "label_" + phase)
+        if isinstance(labels_paths, str):
+            labels_paths = [labels_paths]
+        elif isinstance(labels_paths, tuple):
+            labels_paths = list(labels_paths)
+        self.labels_paths = [Path(cfg.path) / labels_path for labels_path in labels_paths]
+        
+        assert len(self.images_paths) == len(self.labels_paths)
 
     def load_data(self, images_path: Path, labels_path: Path, phase_name: str):
         """
@@ -143,7 +166,7 @@ class YoloDataset(Dataset):
 
     def get_data(self, idx):
         img_path, bboxes = self.data[idx]
-        img_path = self.images_path / img_path
+        # img_path = self.images_path / img_path
         img = Image.open(img_path).convert("RGB")
         return img, bboxes, img_path
 
