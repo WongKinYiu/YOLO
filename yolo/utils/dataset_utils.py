@@ -40,30 +40,29 @@ def locate_label_paths(dataset_path: Path, phase_name: Path) -> Tuple[Path, Path
 def create_image_metadata(labels_path: str) -> Tuple[Dict[str, List], Dict[str, Dict]]:
     """
     Create a dictionary containing image information and annotations
-    indexed by image name.
-
-    Image name is the file name of the image including the extension.
+    both indexed by image id. Image id is the file name without the extension.
+    It is not the same as the int image id saved in coco .json files.
 
     Args:
         labels_path (str): The path to the annotation json file.
 
     Returns:
         A Tuple of annotations_dict and image_info_dict.
-        annotations_dict is a dictionary where keys are image names and values
+        annotations_dict is a dictionary where keys are image ids and values
         are lists of annotations.
-        image_info_dict is a dictionary where keys are image file names and
+        image_info_dict is a dictionary where keys are image file id and
         values are image information dictionaries.
     """
     with open(labels_path, "r") as file:
         json_data = json.load(file)
         image_id_to_file_name_dict = {
-            img['id'] : Path(img["file_name"]).name for img in json_data["images"]
+            img['id'] : Path(img["file_name"]).stem for img in json_data["images"]
         }
         # TODO: id_to_idx is unnecessary. `idx = id - 1`` in coco as category_id starts from 1.
         # what if we had 1M images? Unnecessary!
         id_to_idx = discretize_categories(json_data.get("categories", [])) if "categories" in json_data else None
         annotations_dict = map_annotations_to_image_names(json_data, id_to_idx, image_id_to_file_name_dict)  # check lookup is a good name?
-        image_info_dict = {Path(img["file_name"]).name: img for img in json_data["images"]}
+        image_info_dict = {Path(img["file_name"]).stem: img for img in json_data["images"]}
         return annotations_dict, image_info_dict
 
 

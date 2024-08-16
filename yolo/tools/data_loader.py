@@ -65,7 +65,8 @@ class YoloDataset(Dataset):
             labels_path (str): Path to the directory containing label files.
 
         Returns:
-            list: A list of tuples, each containing the path to an image file and its associated segmentation as a tensor.
+            list: A list of tuples, each containing the path to an image file
+                and its associated segmentation as a tensor.
         """
         images_path = dataset_path / "images" / phase_name
         labels_path, data_type = locate_label_paths(dataset_path, phase_name)
@@ -81,10 +82,10 @@ class YoloDataset(Dataset):
             image_id = Path(image_name).stem
 
             if data_type == "json":
-                image_info = image_info_dict.get(image_name, None)
+                image_info = image_info_dict.get(image_id, None)
                 if image_info is None:
                     continue
-                annotations = annotations_dict.get(image_name, [])
+                annotations = annotations_dict.get(image_id, [])
                 image_seg_annotations = scale_segmentation(annotations, image_info)
                 if not image_seg_annotations:
                     continue
@@ -99,7 +100,8 @@ class YoloDataset(Dataset):
                 image_seg_annotations = []
 
             labels = self.load_valid_labels(image_id, image_seg_annotations)
-            data.append((image_name, labels))
+            image_path = images_path / image_name
+            data.append((image_path, labels))
             valid_inputs += 1
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
