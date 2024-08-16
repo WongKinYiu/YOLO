@@ -111,7 +111,6 @@ class YoloDataset(Dataset):
         for image_name in track(images_list, description="Filtering data"):
             if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
                 continue
-            image_id = Path(image_name).stem
 
             if data_type == "json": 
                 image_info = image_info_dict.get(image_name, None)
@@ -124,11 +123,11 @@ class YoloDataset(Dataset):
                     continue
 
             elif data_type == "txt":
-                label_path = labels_path / f"{image_id}.txt"
+                label_path = labels_path / Path(image_name).with_suffix('.txt')
                 if not label_path.is_file():
                     continue
-                with open(label_path, "r") as file:
-                    image_seg_annotations = [list(map(float, line.strip().split())) for line in file]
+                with label_path.open("r") as f:
+                    image_seg_annotations = [list(map(float, line.strip().split())) for line in f]
             else:
                 image_seg_annotations = []
             # TODO: correct the box and log the image file

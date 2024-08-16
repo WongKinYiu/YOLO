@@ -242,12 +242,12 @@ class ModelValidator:
                 images_paths = list(images_paths)
             self.images_paths = [Path(cfg.dataset.path) / images_path for images_path in images_paths]
             
-            
+            # get the gt label
             json_paths = [locate_label_paths(labels_path, cfg.dataset.get("validation", "validation")) \
                             for labels_path in self.labels_paths]
 
             # merge coco object, duplicate data is not merged
-            coco_objects = [COCO(json_path[0]) for json_path in json_paths if json_path[0]]
+            coco_objects = [COCO(json_path[0]) for json_path in json_paths if json_path[0] and json_path[0]=="json"]
             self.coco_gt = merge_coco_objects(coco_objects)
 
     def solve(self, dataloader, epoch_idx=1):
@@ -257,6 +257,7 @@ class ModelValidator:
         # only save the unique path
         image_info_dicts = {}
         for images_path, labels_path in zip(self.images_paths, self.labels_paths):
+            # TODO:YOLO get the match id
             _, image_info_dict = create_image_metadata(labels_path)
             modified_dict = {f"{images_path/key}": value for key, value in image_info_dict.items()}
             image_info_dicts.update(modified_dict)
