@@ -89,8 +89,9 @@ class YoloDataset(Dataset):
                 continue
             image_id = Path(image_name).stem
 
-            if data_type == "json":
-                image_info = image_info_dict[image_name] #.get(image_id, None)
+            if data_type == "json": 
+                image_info = image_info_dict.get(image_name, None)
+                # TODO: neg case can be load
                 if image_info is None:
                     continue
                 annotations = annotations_index.get(image_info["id"], [])
