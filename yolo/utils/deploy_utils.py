@@ -64,10 +64,11 @@ class FastModelLoader:
             logger.info(":rocket: Using ONNX as MODEL frameworks!")
             # required by Anc2Box
             ort_session.num_classes = self.class_num
-            logger.info("🚀 Using ONNX as MODEL frameworks!")
         except Exception as e:
             logger.warning(f"🈳 Error loading ONNX model: {e}")
             ort_session = self._create_onnx_model(providers)
+        # required by Anc2Box
+        ort_session.num_classes = self.class_num
         return ort_session
 
     def _create_onnx_model(self, providers):
