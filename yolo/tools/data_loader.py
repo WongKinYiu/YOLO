@@ -234,7 +234,7 @@ def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: st
     if task == "inference":
         return StreamDataLoader(data_cfg)
 
-    if dataset_cfg.auto_download:
+    if dataset_cfg.get("auto_download",None):
         prepare_dataset(dataset_cfg, task)
 
     return YoloDataLoader(data_cfg, dataset_cfg, task, use_ddp)

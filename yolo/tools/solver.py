@@ -287,7 +287,7 @@ class ModelValidator:
             json.dump(predict_json, f)
 
         # yolo dataset or no result will ignore
-        if predict_json and len(self.coco_gt)>0:
+        if predict_json and self.coco_gt:
             self.progress.start_pycocotools()
             result = calculate_ap(self.coco_gt, predict_json)
             self.progress.finish_pycocotools(result, epoch_idx)
