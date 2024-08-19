@@ -41,7 +41,7 @@ def create_image_metadata(
         labels_path: str
 ) -> Tuple[Dict[int, List], Dict[int, Dict], Dict[str, int]]:
     """
-    Returnes three dictionaries mapping image id to list of annotations, 
+    Returns three dictionaries mapping image id to list of annotations, 
     image id to image information, and image name to image id.
     Image id is the `int` `id` assigned to a image in the COCO formatted .json file.
 

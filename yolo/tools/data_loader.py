@@ -115,12 +115,18 @@ class YoloDataset(Dataset):
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
 
-    def load_valid_labels(self, image_id: str, seg_data_one_img: list) -> Union[Tensor, None]:
+    def load_valid_labels(
+        self,
+        image_id: Union[int, str],
+        seg_data_one_img: list
+    ) -> Union[Tensor, None]:
         """
         Loads and validates bounding box data is [0, 1] from a label file.
 
         Parameters:
-            label_path (str): The filepath to the label file containing bounding box data.
+            image_id (int | str): Image id.
+            If COCO .json file is used, image id is a `int`.
+            If YOLO .txt file is used, image id is a string.
 
         Returns:
             Tensor or None: A tensor of all valid bounding boxes if any are found; otherwise, None.
