@@ -34,7 +34,7 @@ class YoloDataset(Dataset):
         self.transform.get_more_data = self.get_more_data
         self.data = self.load_data(Path(dataset_cfg.path), phase_name)
 
-    def load_data(self, dataset_path: Path, phase_name: str):
+    def load_data(self, dataset_path: Path, phase_name: str) -> list:
         """
         Loads data from a cache or generates a new cache for a specific dataset phase.
 
@@ -43,7 +43,7 @@ class YoloDataset(Dataset):
             phase_name (str): The specific phase of the dataset (e.g., 'train', 'test') to load or generate data for.
 
         Returns:
-            dict: The loaded data from the cache for the specified phase.
+            list: The loaded data from the cache for the specified phase.
         """
         cache_path = dataset_path / f"{phase_name}.cache"
 
@@ -58,21 +58,31 @@ class YoloDataset(Dataset):
 
     def filter_data(self, dataset_path: Path, phase_name: str) -> list:
         """
-        Filters and collects dataset information by pairing images with their corresponding labels.
+        Filters and collects dataset information by pairing images with
+        their corresponding labels.
 
         Parameters:
-            images_path (Path): Path to the directory containing image files.
-            labels_path (str): Path to the directory containing label files.
+            dataset_path (Path): The root path to the dataset directory.
+            phase_name (str): The specific phase of the dataset
+                (e.g., 'train', 'test') to load or generate data for.
 
         Returns:
-            list: A list of tuples, each containing the path to an image file
-                and its associated segmentation as a tensor.
+            list: A list of tuples, each containing image id, path to an image file
+                and its associated segmentation as a tensor. For COCO formatted .json
+                files, image id is the `int` `image_id` attribute for each annotation
+                in the json file.
+                For YOLO formatted .txt files, image id is the image file name without
+                the extension.
         """
         images_path = dataset_path / "images" / phase_name
         labels_path, data_type = locate_label_paths(dataset_path, phase_name)
         images_list = sorted([p.name for p in Path(images_path).iterdir() if p.is_file()])
         if data_type == "json":
-            annotations_dict, image_info_dict, image_name_to_id_dict = create_image_metadata(labels_path)
+            (
+                annotations_dict,
+                image_info_dict,
+                image_name_to_id_dict
+            ) = create_image_metadata(labels_path)
         data = []
         valid_inputs = 0
         for image_name in track(images_list, description="Filtering data"):

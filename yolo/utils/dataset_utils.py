@@ -37,49 +37,55 @@ def locate_label_paths(dataset_path: Path, phase_name: Path) -> Tuple[Path, Path
     return [], None
 
 
-def create_image_metadata(labels_path: str) -> Tuple[Dict[str, List], Dict[str, Dict]]:
+def create_image_metadata(
+        labels_path: str
+) -> Tuple[Dict[int, List], Dict[int, Dict], Dict[str, int]]:
     """
-    Create a dictionary containing image information and annotations
-    both indexed by image id. Image id is the file name without the extension.
-    It is not the same as the int image id saved in coco .json files.
+    Returnes three dictionaries mapping image id to list of annotations, 
+    image id to image information, and image name to image id.
+    Image id is the `int` `id` assigned to a image in the COCO formatted .json file.
 
     Args:
         labels_path (str): The path to the annotation json file.
 
     Returns:
-        A Tuple of annotations_dict and image_info_dict.
-        annotations_dict is a dictionary where keys are image ids and values
-        are lists of annotations.
-        image_info_dict is a dictionary where keys are image file id and
-        values are image information dictionaries.
+        (annotations_dict, image_info_dict, image_name_to_id_dict):
+            annotations_dict is a dictionary where keys are image ids and values
+            are lists of annotation dictionaries.
+            image_info_dict is a dictionary where keys are image file id and
+            values are image information dictionaries.
+            image_name_to_id_dict is a dictionary with image name without
+            extension as key and int image id as value.
     """
     with open(labels_path, "r") as file:
         json_data = json.load(file)
         image_name_to_id_dict = {
             Path(img["file_name"]).name: img['id'] for img in json_data["images"]
         }
-        # TODO: id_to_idx is unnecessary. `idx = id - 1`` in coco as category_id starts from 1.
-        # what if we had 1M images? Unnecessary!
         id_to_idx = discretize_categories(json_data.get("categories", [])) if "categories" in json_data else None
-        annotations_dict = map_annotations_to_image_names(json_data, id_to_idx)  # check lookup is a good name?
+        annotations_dict = organize_annotations_by_image(json_data, id_to_idx)  # check lookup is a good name?
         image_info_dict = {img['id']: img for img in json_data["images"]}
         return annotations_dict, image_info_dict, image_name_to_id_dict
 
 
-def map_annotations_to_image_names(
+def organize_annotations_by_image(
         json_data: Dict[str, Any],
         category_id_to_idx: Optional[Dict[int, int]],
-) -> dict[str, list[dict]]:
+) -> dict[int, list[dict]]:
     """
-    Returns a dict mapping image file names to a list of all corresponding annotations.
+    Returns a dict mapping image id to a list of all corresponding annotations.
+
+    Annotations with "iscrowd" set to True, are excluded. Image id is the `int`
+    `image_id` in the corresponding annotation dict stored in the
+    COCO formatted .json file.
+
     Args:
         json_data: Data read from a COCO json file.
         category_id_to_idx: For COCO dataset, a dict mapping from category_id
-            to (category_id - 1).  # TODO: depricate?
+            to (category_id - 1).
     Returns:
-        image_name_to_annotation_dict_list: A dictionary where keys are image IDs
+        image_name_to_annotation_dict_list: A dictionary where keys are image ids
             and values are lists of annotation dictionaries.
-            Annotations with "iscrowd" set to True, are excluded.
     """
     image_id_to_annotation_dict_list = {}
     for annotation_dict in json_data["annotations"]:

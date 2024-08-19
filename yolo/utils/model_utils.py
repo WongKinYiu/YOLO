@@ -160,10 +160,21 @@ def collect_prediction(predict_json: List, local_rank: int) -> List:
     return predict_json
 
 
-def predicts_to_json(image_ids, predicts, rev_tensor):
+def predicts_to_json(
+        image_ids:tuple[int],
+        predicts:list[Tensor],
+        rev_tensor:Tensor
+) -> list[dict[str, any]]:
     """
-    TODO: function document
-    turn a batch of imagepath and predicts(n x 6 for each image) to a List of diction(Detection output)
+    Returns a list of prediction dictionaries. Each dict contains, image_id,
+    category_id, bbox and score.
+
+    Args:
+        image_ids: Image ids obtained from COCO formatted .json files.
+        predicts: For each iamge, contains a tensor of shape (n, 6),
+            where n is the number of detected bbox in the corresponding image.
+        rev_tensor: A tensor of shape (m,5), where m is the number of images.
+            TODO: add docstring of what this is.
     """
     batch_json = []
     for image_id, bboxes, box_reverse in zip(image_ids, predicts, rev_tensor):
