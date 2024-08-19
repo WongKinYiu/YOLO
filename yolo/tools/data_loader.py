@@ -74,12 +74,12 @@ class YoloDataset(Dataset):
         cache_path = images_path.with_suffix(".cache")
 
         if not cache_path.exists():
-            logger.info("🏭 Generating {} cache", phase_name)
             data = self.filter_data(images_path, labels_path, phase_name)
+            logger.info("🏭 Generating {} cache, containing {} samples", phase_name, len(data))
             torch.save(data, cache_path)
         else:
             data = torch.load(cache_path)
-            logger.info("📦 Loaded {} cache", phase_name)
+            logger.info("📦 Loaded {} cache, containing {} samples", phase_name, len(data))
             # TODO: add Validate cache
             # if data[0][0].parent == Path("images")/phase_name:
             #     logger.info("✅ Cache validation successful")

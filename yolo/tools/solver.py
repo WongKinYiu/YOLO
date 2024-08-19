@@ -58,13 +58,13 @@ class ModelTrainer:
         self.validation_dataloader = create_dataloader(
             cfg.task.validation.data, cfg.dataset, cfg.task.validation.task, use_ddp
         )
-        self.validator = ModelValidator(cfg, model, vec2box, progress, device)
+        self.validator = ModelValidator(cfg, model, vec2box, progress, self.device)
 
-        if getattr(train_cfg.ema, "enabled", False):
-            self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
-        else:
-            self.ema = None
-        self.scaler = GradScaler()
+
+        self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay) if getattr(train_cfg.ema, "enabled", False) else None
+        
+        self.scaler = GradScaler() if self.device == 'cuda' else None
+        
 
     def train_one_batch(self, images: Tensor, targets: Tensor):
         images, targets = images.to(self.device), targets.to(self.device)
@@ -76,11 +76,16 @@ class ModelTrainer:
             main_predicts = self.vec2box(predicts["Main"])
             loss, loss_item = self.loss_fn(aux_predicts, main_predicts, targets)
 
-        self.scaler.scale(loss).backward()
-        self.scaler.unscale_(self.optimizer)
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)
-        self.scaler.step(self.optimizer)
-        self.scaler.update()
+        if self.scaler:
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)
+            self.optimizer.step()
 
         return loss_item
 
@@ -223,6 +228,7 @@ class ModelValidator:
         self.progress = progress
         
         self.post_proccess = PostProccess(vec2box, cfg.task.validation.nms)
+        # TODO: yolo don't need this step
         self.json_path = self.progress.save_path / "predict.json"
 
         with contextlib.redirect_stdout(io.StringIO()):
@@ -243,11 +249,11 @@ class ModelValidator:
             self.images_paths = [Path(cfg.dataset.path) / images_path for images_path in images_paths]
             
             # get the gt label
-            json_paths = [locate_label_paths(labels_path, cfg.dataset.get("validation", "validation")) \
+            self.labels_infos = [locate_label_paths(labels_path, cfg.dataset.get("validation", "validation")) \
                             for labels_path in self.labels_paths]
 
             # merge coco object, duplicate data is not merged
-            coco_objects = [COCO(json_path[0]) for json_path in json_paths if json_path[0] and json_path[0]=="json"]
+            coco_objects = [COCO(json_path[0]) for json_path in self.labels_infos if json_path[0] and json_path[1]=="json"]
             self.coco_gt = merge_coco_objects(coco_objects)
 
     def solve(self, dataloader, epoch_idx=1):
@@ -256,19 +262,20 @@ class ModelValidator:
         predict_json, mAPs = [], defaultdict(list)
         # only save the unique path
         image_info_dicts = {}
-        for images_path, labels_path in zip(self.images_paths, self.labels_paths):
-            # TODO:YOLO get the match id
-            _, image_info_dict = create_image_metadata(labels_path)
-            modified_dict = {f"{images_path/key}": value for key, value in image_info_dict.items()}
-            image_info_dicts.update(modified_dict)
+        for images_path, labels_info in zip(self.images_paths, self.labels_infos):
+            # only coco need to calculate the more ap
+            if labels_info[1] == "json":
+                _, image_info_dict = create_image_metadata(labels_info[0])
+                modified_dict = {f"{images_path/key}": value for key, value in image_info_dict.items()}
+                image_info_dicts.update(modified_dict)
           
         self.progress.start_one_epoch(len(dataloader), task="Validate")
         for batch_size, images, targets, rev_tensor, img_paths in dataloader:
             images_path = dataloader.dataset.images_paths
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
-                predicts = self.model(images)
-                predicts = self.post_proccess(predicts)
+                output = self.model(images)
+                predicts = self.post_proccess(output)
                 for idx, predict in enumerate(predicts):
                     mAP = calculate_map(predict, targets[idx])
                     for mAP_key, mAP_val in mAP.items():
@@ -276,26 +283,26 @@ class ModelValidator:
 
             avg_mAPs = {key: torch.mean(torch.stack(val)) for key, val in mAPs.items()}
             self.progress.one_batch(avg_mAPs)
-
-            predict_json.extend(predicts_to_json(img_paths, image_info_dicts, predicts, rev_tensor))
+            if image_info_dicts:
+                predict_json.extend(predicts_to_json(img_paths, image_info_dicts, predicts, rev_tensor))
         self.progress.finish_one_epoch(avg_mAPs, epoch_idx=epoch_idx)
         self.progress.visualize_image(images, targets, predicts, epoch_idx=epoch_idx)
 
-        with open(self.json_path, "w") as f:
-            predict_json = collect_prediction(predict_json, self.progress.local_rank)
-            if self.progress.local_rank != 0:
-                return
-            json.dump(predict_json, f)
-
-        # yolo dataset or no result will ignore
-        if predict_json and self.coco_gt:
-            self.progress.start_pycocotools()
-            result = calculate_ap(self.coco_gt, predict_json)
-            self.progress.finish_pycocotools(result, epoch_idx)
+        if predict_json:
+            with open(self.json_path, "w") as f:
+                predict_json = collect_prediction(predict_json, self.progress.local_rank)
+                if self.progress.local_rank == 0:
+                    json.dump(predict_json, f)
+                    
+                    if hasattr(self, "coco_gt"):
+                        self.progress.start_pycocotools()
+                        result = calculate_ap(self.coco_gt, predict_json)
+                        self.progress.finish_pycocotools(result, epoch_idx)
+                    else:
+                        logger.warning("⚠️ COCO ground truth not found. Please check dataset configuration.")
+                else:
+                    return
         else:
-            if not predict_json:
-                logger.warning("⚠️ No predictions available for evaluation.")
-            if not hasattr(self, "coco_gt"):
-                logger.warning("⚠️ COCO ground truth not found. Please check dataset configuration.")
+            logger.warning("⚠️ No predictions available for evaluation.")
 
         return avg_mAPs

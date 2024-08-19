@@ -172,8 +172,12 @@ def predicts_to_json(img_paths, image_id_map, predicts, rev_tensor):
         bboxes[:, 1:5] = (bboxes[:, 1:5] - shift[None]) / scale[None]
         bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
         for cls, *pos, conf in bboxes:
+            img_path_map = image_id_map.get(str(img_path))
+            # when not exist, continue
+            if img_path_map is None:
+                continue
             bbox = {
-                "image_id": image_id_map[str(img_path)]["id"],
+                "image_id": img_path_map["id"],
                 "category_id": IDX_TO_ID[int(cls)],
                 "bbox": [float(p) for p in pos],
                 "score": float(conf),
