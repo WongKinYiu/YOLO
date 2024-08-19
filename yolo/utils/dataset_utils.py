@@ -55,21 +55,20 @@ def create_image_metadata(labels_path: str) -> Tuple[Dict[str, List], Dict[str, 
     """
     with open(labels_path, "r") as file:
         json_data = json.load(file)
-        image_id_to_file_name_dict = {
-            img['id'] : Path(img["file_name"]).stem for img in json_data["images"]
+        image_name_to_id_dict = {
+            Path(img["file_name"]).name: img['id'] for img in json_data["images"]
         }
         # TODO: id_to_idx is unnecessary. `idx = id - 1`` in coco as category_id starts from 1.
         # what if we had 1M images? Unnecessary!
         id_to_idx = discretize_categories(json_data.get("categories", [])) if "categories" in json_data else None
-        annotations_dict = map_annotations_to_image_names(json_data, id_to_idx, image_id_to_file_name_dict)  # check lookup is a good name?
-        image_info_dict = {Path(img["file_name"]).stem: img for img in json_data["images"]}
-        return annotations_dict, image_info_dict
+        annotations_dict = map_annotations_to_image_names(json_data, id_to_idx)  # check lookup is a good name?
+        image_info_dict = {img['id']: img for img in json_data["images"]}
+        return annotations_dict, image_info_dict, image_name_to_id_dict
 
 
 def map_annotations_to_image_names(
         json_data: Dict[str, Any],
         category_id_to_idx: Optional[Dict[int, int]],
-        image_id_to_image_name:dict[int, str]
 ) -> dict[str, list[dict]]:
     """
     Returns a dict mapping image file names to a list of all corresponding annotations.
@@ -77,25 +76,22 @@ def map_annotations_to_image_names(
         json_data: Data read from a COCO json file.
         category_id_to_idx: For COCO dataset, a dict mapping from category_id
             to (category_id - 1).  # TODO: depricate?
-        image_id_to_image_name: Dict mapping image_id to image_file name. 
-
     Returns:
         image_name_to_annotation_dict_list: A dictionary where keys are image IDs
             and values are lists of annotation dictionaries.
             Annotations with "iscrowd" set to True, are excluded.
     """
-    image_name_to_annotation_dict_list = {}
+    image_id_to_annotation_dict_list = {}
     for annotation_dict in json_data["annotations"]:
         if annotation_dict["iscrowd"]:
             continue
         image_id = annotation_dict["image_id"]
-        image_name = image_id_to_image_name[image_id]
         if category_id_to_idx:
             annotation_dict["category_id"] = category_id_to_idx[annotation_dict["category_id"]]
-        if image_name not in image_name_to_annotation_dict_list:
-            image_name_to_annotation_dict_list[image_name] = []
-        image_name_to_annotation_dict_list[image_name].append(annotation_dict)
-    return image_name_to_annotation_dict_list
+        if image_id not in image_id_to_annotation_dict_list:
+            image_id_to_annotation_dict_list[image_id] = []
+        image_id_to_annotation_dict_list[image_id].append(annotation_dict)
+    return image_id_to_annotation_dict_list
 
 
 def scale_segmentation(

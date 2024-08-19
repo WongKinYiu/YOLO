@@ -160,19 +160,19 @@ def collect_prediction(predict_json: List, local_rank: int) -> List:
     return predict_json
 
 
-def predicts_to_json(img_paths, predicts, rev_tensor):
+def predicts_to_json(image_ids, predicts, rev_tensor):
     """
     TODO: function document
     turn a batch of imagepath and predicts(n x 6 for each image) to a List of diction(Detection output)
     """
     batch_json = []
-    for img_path, bboxes, box_reverse in zip(img_paths, predicts, rev_tensor):
+    for image_id, bboxes, box_reverse in zip(image_ids, predicts, rev_tensor):
         scale, shift = box_reverse.split([1, 4])
         bboxes[:, 1:5] = (bboxes[:, 1:5] - shift[None]) / scale[None]
         bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
         for cls, *pos, conf in bboxes:
             bbox = {
-                "image_id": int(Path(img_path).stem),
+                "image_id": image_id,
                 "category_id": IDX_TO_ID[int(cls)],
                 "bbox": [float(p) for p in pos],
                 "score": float(conf),

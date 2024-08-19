@@ -72,16 +72,14 @@ class YoloDataset(Dataset):
         labels_path, data_type = locate_label_paths(dataset_path, phase_name)
         images_list = sorted([p.name for p in Path(images_path).iterdir() if p.is_file()])
         if data_type == "json":
-            annotations_dict, image_info_dict = create_image_metadata(labels_path)
-
+            annotations_dict, image_info_dict, image_name_to_id_dict = create_image_metadata(labels_path)
         data = []
         valid_inputs = 0
         for image_name in track(images_list, description="Filtering data"):
             if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
                 continue
-            image_id = Path(image_name).stem
-
             if data_type == "json":
+                image_id = image_name_to_id_dict[image_name]
                 image_info = image_info_dict.get(image_id, None)
                 if image_info is None:
                     continue
@@ -91,6 +89,7 @@ class YoloDataset(Dataset):
                     continue
 
             elif data_type == "txt":
+                image_id = Path(image_name).stem
                 label_path = labels_path / f"{image_id}.txt"
                 if not label_path.is_file():
                     continue
@@ -101,12 +100,12 @@ class YoloDataset(Dataset):
 
             labels = self.load_valid_labels(image_id, image_seg_annotations)
             image_path = images_path / image_name
-            data.append((image_path, labels))
+            data.append((image_id, image_path, labels))
             valid_inputs += 1
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
 
-    def load_valid_labels(self, label_path: str, seg_data_one_img: list) -> Union[Tensor, None]:
+    def load_valid_labels(self, image_id: str, seg_data_one_img: list) -> Union[Tensor, None]:
         """
         Loads and validates bounding box data is [0, 1] from a label file.
 
@@ -128,22 +127,22 @@ class YoloDataset(Dataset):
         if bboxes:
             return torch.stack(bboxes)
         else:
-            logger.warning("No valid BBox in {}", label_path)
+            logger.warning("No valid BBox in image id:{}", image_id)
             return torch.zeros((0, 5))
 
     def get_data(self, idx):
-        img_path, bboxes = self.data[idx]
+        image_id, img_path, bboxes = self.data[idx]
         img = Image.open(img_path).convert("RGB")
-        return img, bboxes, img_path
+        return img, bboxes, image_id
 
     def get_more_data(self, num: int = 1):
         indices = torch.randint(0, len(self), (num,))
         return [self.get_data(idx)[:2] for idx in indices]
 
     def __getitem__(self, idx) -> Tuple[Image.Image, Tensor, Tensor, List[str]]:
-        img, bboxes, img_path = self.get_data(idx)
+        img, bboxes, image_id = self.get_data(idx)
         img, bboxes, rev_tensor = self.transform(img, bboxes)
-        return img, bboxes, rev_tensor, img_path
+        return img, bboxes, rev_tensor, image_id
 
     def __len__(self) -> int:
         return len(self.data)
@@ -189,11 +188,11 @@ class YoloDataLoader(DataLoader):
             batch_targets[idx, : min(target_size, 100)] = batch[idx][1][:100]
         batch_targets[:, :, 1:] *= self.image_size
 
-        batch_images, _, batch_reverse, batch_path = zip(*batch)
+        batch_images, _, batch_reverse, batch_image_ids = zip(*batch)
         batch_images = torch.stack(batch_images)
         batch_reverse = torch.stack(batch_reverse)
 
-        return batch_size, batch_images, batch_targets, batch_reverse, batch_path
+        return batch_size, batch_images, batch_targets, batch_reverse, batch_image_ids
 
 
 def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
