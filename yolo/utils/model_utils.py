@@ -161,7 +161,7 @@ def collect_prediction(predict_json: List, local_rank: int) -> List:
 
 
 def predicts_to_json(
-        image_ids:tuple[int],
+        image_ids:Union[tuple[int], tuple[str]],
         predicts:list[Tensor],
         rev_tensor:Tensor
 ) -> list[dict[str, any]]:
@@ -170,7 +170,9 @@ def predicts_to_json(
     category_id, bbox and score.
 
     Args:
-        image_ids: Image ids obtained from COCO formatted .json files.
+        image_ids: Tuple of image ids.
+            When using a COCO .json annotation file, image ids are int.
+            When using YOLO .txt annotation files, image ids are string. 
         predicts: For each iamge, contains a tensor of shape (n, 6),
             where n is the number of detected bbox in the corresponding image.
         rev_tensor: A tensor of shape (m,5), where m is the number of images.
