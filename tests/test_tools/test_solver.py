@@ -17,7 +17,7 @@ from yolo.utils.bounding_box_utils import Anc2Box, Vec2Box
 @pytest.fixture
 def model_validator(validation_cfg: Config, model: YOLO, vec2box: Vec2Box, validation_progress_logger, device):
     validator = ModelValidator(
-        validation_cfg.task, validation_cfg.dataset, model, vec2box, validation_progress_logger, device
+        validation_cfg, model, vec2box, validation_progress_logger, device
     )
     return validator
 

@@ -12,7 +12,7 @@ def test_create_dataloader_cache(train_cfg: Config):
     train_cfg.task.data.shuffle = False
     train_cfg.task.data.batch_size = 2
 
-    cache_file = Path("tests/data/train.cache")
+    cache_file = Path("tests/data/images/train.cache")
     cache_file.unlink(missing_ok=True)
 
     make_cache_loader = create_dataloader(train_cfg.task.data, train_cfg.dataset)
