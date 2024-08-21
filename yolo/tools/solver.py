@@ -11,7 +11,7 @@ import torch
 from loguru import logger
 from pycocotools.coco import COCO
 from torch import Tensor, distributed
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 
@@ -70,7 +70,7 @@ class ModelTrainer:
         images, targets = images.to(self.device), targets.to(self.device)
         self.optimizer.zero_grad()
 
-        with autocast():
+        with autocast(device_type='cuda'):  # Disabled when not cuda.
             predicts = self.model(images)
             aux_predicts = self.vec2box(predicts["AUX"])
             main_predicts = self.vec2box(predicts["Main"])
