@@ -147,7 +147,7 @@ class ModelTrainer:
             self.progress.finish_one_epoch(epoch_loss, epoch_idx=epoch_idx)
 
             mAPs = self.validator.solve(self.validation_dataloader, epoch_idx=epoch_idx)
-            if mAPs is not None and self.good_epoch(mAPs):
+            if self.good_epoch(mAPs):
                 self.save_checkpoint(epoch_idx=epoch_idx)
             # TODO: save model if result are better than before
         self.progress.finish_train()
@@ -256,9 +256,8 @@ class ModelValidator:
 
         with open(self.json_path, "w") as f:
             predict_json = collect_prediction(predict_json, self.progress.local_rank)
-            if self.progress.local_rank != 0:
-                return
-            json.dump(predict_json, f)
+            if self.progress.local_rank == 0:
+                json.dump(predict_json, f)
         if hasattr(self, "coco_gt"):
             self.progress.start_pycocotools()
             result = calculate_ap(self.coco_gt, predict_json)
