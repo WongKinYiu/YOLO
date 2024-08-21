@@ -66,7 +66,7 @@ class ModelTrainer:
             self.ema = None
         self.scaler = GradScaler()
 
-    def train_one_batch(self, images: Tensor, targets: Tensor):
+    def train_one_batch(self, images: Tensor, targets: Tensor, batch_size: int):
         images, targets = images.to(self.device), targets.to(self.device)
         self.optimizer.zero_grad()
 
@@ -75,7 +75,7 @@ class ModelTrainer:
             aux_predicts = self.vec2box(predicts["AUX"])
             main_predicts = self.vec2box(predicts["Main"])
             loss, loss_item = self.loss_fn(aux_predicts, main_predicts, targets)
-
+        loss *= batch_size
         self.scaler.scale(loss).backward()
         self.scaler.unscale_(self.optimizer)
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)
@@ -91,7 +91,7 @@ class ModelTrainer:
         self.optimizer.next_epoch(len(dataloader))
         for batch_size, images, targets, *_ in dataloader:
             self.optimizer.next_batch()
-            loss_each = self.train_one_batch(images, targets)
+            loss_each = self.train_one_batch(images, targets, batch_size)
 
             for loss_name, loss_val in loss_each.items():
                 if self.use_ddp:  # collecting loss for each batch
