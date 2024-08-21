@@ -1,4 +1,5 @@
 task: train
+mode: detection
 
 defaults:
   - validation: ../validation

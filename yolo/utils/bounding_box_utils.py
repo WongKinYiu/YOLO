@@ -13,6 +13,18 @@ from yolo.model.yolo import YOLO
 
 
 def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
+    """
+    Calculate Intersection over Union (IoU) between two sets of bounding boxes.
+
+    Args:
+        bbox1 (Tensor): First set of bounding boxes. Shape: [A, 4] or [B, A, 4] or [B, Z, A, 4]
+        bbox2 (Tensor): Second set of bounding boxes. Shape: [B, 4] or [B, A, 4] or [B, Z, A, 4]
+        metrics (str, optional): IoU metric to use. Default: "iou".
+
+    Returns:
+        Tensor: IoU scores between each pair of bounding boxes. Shape: [B, A, B] or [B, Z, A, B]
+    """ 
+        
     metrics = metrics.lower()
     EPS = 1e-9
     dtype = bbox1.dtype
@@ -76,6 +88,16 @@ def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
 
 
 def transform_bbox(bbox: Tensor, indicator="xywh -> xyxy"):
+    """
+    Transform bounding boxes between different formats.
+
+    Args:
+        bbox (Tensor): Input bounding boxes. Shape: [B, N, 4]
+        indicator (str, optional): Transformation indicator. Default: "xywh -> xyxy"
+
+    Returns:
+        Tensor: Transformed bounding boxes. Shape: [B, N, 4]
+    """
     data_type = bbox.dtype
     in_type, out_type = indicator.replace(" ", "").split("->")
 
@@ -388,7 +410,7 @@ def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Opt
     valid_box = bbox[valid_mask.repeat(1, 1, 4)].view(-1, 4)
 
     batch_idx, *_ = torch.where(valid_mask)
-    nms_idx = batched_nms(valid_box, valid_cls, batch_idx, nms_cfg.min_iou)
+    nms_idx = batched_nms(valid_box, valid_con, batch_idx, nms_cfg.min_iou)
     predicts_nms = []
     for idx in range(cls_dist.size(0)):
         instance_idx = nms_idx[idx == batch_idx[nms_idx]]
@@ -401,29 +423,73 @@ def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Opt
     return predicts_nms
 
 
-def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05)) -> Dict[str, Tensor]:
-    # TODO: Refactor this block, Flexible for calculate different mAP condition?
+def calculate_map(
+    predictions: Tensor,
+    ground_truths: Tensor,
+    iou_thresholds: Union[List[float], Tensor] = torch.arange(0.5, 1.0, 0.05),
+    class_metrics: bool = True,
+) -> Dict[str, Union[Tensor, Dict[int, Tensor]]]:
+    """
+    Calculate Mean Average Precision (mAP) for object detection.
+
+    Args:
+        predictions (Tensor): Predicted bounding boxes and scores. Shape: [N, 6] (class, x1, y1, x2, y2, confidence)
+        ground_truths (Tensor): Ground truth bounding boxes. Shape: [M, 5] (class, x1, y1, x2, y2)
+        iou_thresholds (Union[List[float], Tensor]): IoU thresholds for mAP calculation. Default: [0.5, 0.55, ..., 0.95]
+        class_metrics (bool): Whether to calculate class-wise mAP. Default: True
+
+    Returns:
+        Dict[str, Union[Tensor, Dict[int, Tensor]]]: A dictionary containing mAP scores:
+            - mAP.XX: mAP at IoU threshold XX
+            - mAP.5:.95: mean mAP over IoU thresholds 0.5 to 0.95
+            - class_mAP: class-wise mAP scores (if class_metrics is True)
+    """
     device = predictions.device
     n_preds = predictions.size(0)
     n_gts = (ground_truths[:, 0] != -1).sum()
+    
+    # process the case of no predictions
+    if n_preds == 0:
+        mAP = {f"mAP.{int(threshold*100)}": torch.tensor(0.0, device=device) for threshold in iou_thresholds}
+        mAP["mAP.5:.95"] = torch.tensor(0.0, device=device)
+        
+        if class_metrics:
+            unique_classes = torch.unique(ground_truths[:n_gts, 0])
+            class_mAP = {int(cls.item()): {f"mAP.{int(threshold*100)}": torch.tensor(0.0, device=device) 
+                                           for threshold in iou_thresholds} for cls in unique_classes}
+            for cls in class_mAP:
+                class_mAP[cls]["mAP.5:.95"] = torch.tensor(0.0, device=device)
+            mAP["class_mAP"] = class_mAP
+        logger.info("🧸 Found no predictions")
+        return mAP
+    
+    # remove the padded data
     ground_truths = ground_truths[:n_gts]
+    
+    ious = calculate_iou(predictions[:, 1:-1], ground_truths[:, 1:1+4])  # [n_preds, n_gts]
+    
+    if isinstance(iou_thresholds, list):
+        iou_thresholds = torch.tensor(iou_thresholds, device=device)
+    
     aps = []
-
-    ious = calculate_iou(predictions[:, 1:-1], ground_truths[:, 1:])  # [n_preds, n_gts]
+    class_aps = {} if class_metrics else None
 
     for threshold in iou_thresholds:
         tp = torch.zeros(n_preds, device=device, dtype=bool)
 
+        # get the max iou and the index of the max iou
         max_iou, max_indices = ious.max(dim=1)
+        # get the index of the max iou that is above the threshold
         above_threshold = max_iou >= threshold
+        # match the class
         matched_classes = predictions[:, 0] == ground_truths[max_indices, 0]
-        max_match = torch.zeros_like(ious)
-        max_match[arange(n_preds), max_indices] = max_iou
-        if max_match.size(0):
-            tp[max_match.argmax(dim=0)] = True
-        tp[~above_threshold | ~matched_classes] = False
+        
+        valid_matches = above_threshold & matched_classes
 
-        _, indices = torch.sort(predictions[:, 1], descending=True)
+        tp[valid_matches] = True
+        
+        # order by confidence
+        _, indices = torch.sort(predictions[:, -1], descending=True)
         tp = tp[indices]
 
         tp_cumsum = torch.cumsum(tp, dim=0)
@@ -432,17 +498,53 @@ def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05
         precision = tp_cumsum / (tp_cumsum + fp_cumsum + 1e-6)
         recall = tp_cumsum / (n_gts + 1e-6)
 
+        # add the first and last point to ensure correct calculation of AP
         precision = torch.cat([torch.ones(1, device=device), precision, torch.zeros(1, device=device)])
         recall = torch.cat([torch.zeros(1, device=device), recall, torch.ones(1, device=device)])
 
-        precision, _ = torch.cummax(precision.flip(0), dim=0)
-        precision = precision.flip(0)
+        # calculate the smoothed precision
+        precision = torch.cummax(precision.flip(0), dim=0)[0].flip(0)
 
-        ap = torch.trapezoid(precision, recall)
+        ap = torch.trapz(precision, recall)
         aps.append(ap)
 
-    mAP = {
-        "mAP.5": aps[0],
-        "mAP.5:.95": torch.mean(torch.stack(aps)),
-    }
+        if class_metrics:
+            for cls in torch.unique(ground_truths[:, 0]):
+                cls_mask = predictions[:, 0] == cls
+                if cls_mask.sum() == 0:
+                    continue
+                cls_tp = tp[cls_mask]
+                cls_fp = ~cls_tp
+                cls_gt_count = (ground_truths[:, 0] == cls).sum()
+                
+                cls_precision = torch.cumsum(cls_tp, dim=0) / (torch.cumsum(cls_tp, dim=0) + torch.cumsum(cls_fp, dim=0) + 1e-6)
+                cls_recall = torch.cumsum(cls_tp, dim=0) / (cls_gt_count + 1e-6)
+                
+                cls_precision = torch.cat([torch.ones(1, device=device), cls_precision, torch.zeros(1, device=device)])
+                cls_recall = torch.cat([torch.zeros(1, device=device), cls_recall, torch.ones(1, device=device)])
+                
+                cls_precision = torch.cummax(cls_precision.flip(0), dim=0)[0].flip(0)
+                
+                cls_ap = torch.trapz(cls_precision, cls_recall)
+                
+                if cls.item() not in class_aps:
+                    class_aps[int(cls.item())] = []
+                class_aps[int(cls.item())].append(cls_ap)
+
+    mAP = {}
+    for i, threshold in enumerate(iou_thresholds):
+        mAP[f"mAP.{int(threshold*100)}"] = aps[i]
+    
+    # add mAP.5:.95
+    mAP["mAP.5:.95"] = torch.mean(torch.stack(aps))
+
+    if class_metrics:
+        class_mAP = {}
+        for cls in class_aps:
+            class_mAP[cls] = {}
+            for i, threshold in enumerate(iou_thresholds):
+                class_mAP[cls][f"mAP.{int(threshold*100)}"] = class_aps[cls][i]
+            class_mAP[cls]["mAP.5:.95"] = torch.mean(torch.stack(class_aps[cls]))
+        mAP["class_mAP"] = class_mAP
+
     return mAP

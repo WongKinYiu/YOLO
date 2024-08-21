@@ -279,7 +279,8 @@ class ModelValidator:
                 for idx, predict in enumerate(predicts):
                     mAP = calculate_map(predict, targets[idx])
                     for mAP_key, mAP_val in mAP.items():
-                        mAPs[mAP_key].append(mAP_val)
+                        if mAP_key != "class_mAP":
+                            mAPs[mAP_key].append(mAP_val)
 
             avg_mAPs = {key: torch.mean(torch.stack(val)) for key, val in mAPs.items()}
             self.progress.one_batch(avg_mAPs)
