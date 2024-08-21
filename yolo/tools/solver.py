@@ -86,7 +86,7 @@ class ModelTrainer:
 
     def train_one_epoch(self, dataloader):
         self.model.train()
-        total_loss = defaultdict(lambda: torch.tensor(0.0, device=self.device))
+        total_loss = defaultdict(float)
         total_samples = 0
         self.optimizer.next_epoch(len(dataloader))
         for batch_size, images, targets, *_ in dataloader:
@@ -96,7 +96,7 @@ class ModelTrainer:
             for loss_name, loss_val in loss_each.items():
                 if self.use_ddp:  # collecting loss for each batch
                     distributed.all_reduce(loss_val, op=distributed.ReduceOp.AVG)
-                total_loss[loss_name] += float(loss_val * batch_size)
+                total_loss[loss_name] += loss_val.item() * batch_size
             total_samples += batch_size
             self.progress.one_batch(loss_each)
 
