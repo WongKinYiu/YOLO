@@ -23,6 +23,20 @@ from yolo.utils.dataset_utils import (
 )
 
 
+def tensorlize(data):
+    # TODO Move Tensorlize to helper
+    img_paths, bboxes = zip(*data)
+    max_box = max(bbox.size(0) for bbox in bboxes)
+    padded_bbox_list = []
+    for bbox in bboxes:
+        padding = torch.full((max_box, 5), -1, dtype=torch.float32)
+        padding[: bbox.size(0)] = bbox
+        padded_bbox_list.append(padding)
+    bboxes = np.stack(padded_bbox_list)
+    img_paths = np.array(img_paths)
+    return img_paths, bboxes
+
+
 class YoloDataset(Dataset):
     def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, phase: str = "train2017"):
         augment_cfg = data_cfg.data_augment
@@ -32,19 +46,8 @@ class YoloDataset(Dataset):
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.img_paths, self.bboxes = self.tensorlize(self.load_data(Path(dataset_cfg.path), phase_name))
-
-    def tensorlize(self, data):
-        img_paths, bboxes = zip(*data)
-        max_box = max(bbox.size(0) for bbox in bboxes)
-        padded_bbox_list = []
-        for bbox in bboxes:
-            padding = torch.full((max_box, 5), -1, dtype=torch.float32)
-            padding[: bbox.size(0)] = bbox
-            padded_bbox_list.append(padding)
-        bboxes = torch.stack(padded_bbox_list)
-        img_paths = np.array(img_paths)
-        return img_paths, bboxes
+        img_paths, bboxes = tensorlize(self.load_data(Path(dataset_cfg.path), phase_name))
+        self.img_paths, self.bboxes = img_paths, bboxes
 
     def load_data(self, dataset_path: Path, phase_name: str):
         """
@@ -145,8 +148,9 @@ class YoloDataset(Dataset):
 
     def get_data(self, idx):
         img_path, bboxes = self.img_paths[idx], self.bboxes[idx]
+        valid_mask = bboxes[:, 0] != -1
         img = Image.open(img_path).convert("RGB")
-        return img, bboxes, img_path
+        return img, torch.from_numpy(bboxes[valid_mask]), img_path
 
     def get_more_data(self, num: int = 1):
         indices = torch.randint(0, len(self), (num,))
