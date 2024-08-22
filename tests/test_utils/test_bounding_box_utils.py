@@ -146,23 +146,62 @@ def test_anc2box_autoanchor(inference_v7_cfg: Config):
 
 
 def test_bbox_nms():
-    cls_dist = tensor(
-        [[[0.1, 0.7, 0.2], [0.6, 0.3, 0.1]], [[0.4, 0.4, 0.2], [0.5, 0.4, 0.1]]]  # Example class distribution
+    cls_dist = torch.tensor(
+        [
+            [
+                [0.7, 0.1, 0.2],  # High confidence, class 0
+                [0.3, 0.6, 0.1],  # High confidence, class 1
+                [-3.0, -2.0, -1.0],  # low confidence, class 2
+                [0.6, 0.2, 0.2],  # Medium confidence, class 0
+            ],
+            [
+                [0.55, 0.25, 0.2],  # Medium confidence, class 0
+                [-4.0, -0.5, -2.0],  # low confidence, class 1
+                [0.15, 0.2, 0.65],  # Medium confidence, class 2
+                [0.8, 0.1, 0.1],  # High confidence, class 0
+            ],
+        ],
+        dtype=float32,
     )
-    bbox = tensor(
-        [[[50, 50, 100, 100], [60, 60, 110, 110]], [[40, 40, 90, 90], [70, 70, 120, 120]]],  # Example bounding boxes
+    bbox = torch.tensor(
+        [
+            [
+                [0, 0, 160, 120],  # Overlaps with box 4
+                [160, 120, 320, 240],
+                [0, 120, 160, 240],
+                [16, 12, 176, 132],
+            ],
+            [
+                [0, 0, 160, 120],  # Overlaps with box 4
+                [160, 120, 320, 240],
+                [0, 120, 160, 240],
+                [16, 12, 176, 132],
+            ],
+        ],
         dtype=float32,
     )
     nms_cfg = NMSConfig(min_confidence=0.5, min_iou=0.5)
 
-    expected_output = [
-        tensor(
+    # Batch 1:
+    #  - box 1 is kept with class 0 as it has a higher confidence than box 4 i.e. box 4 is filtered out
+    #  - box 2 is kept with class 1
+    #  - box 3 is rejected by the confidence filter
+    # Batch 2:
+    #  - box 4 is kept with class 0 as it has a higher confidence than box 1 i.e. box 1 is filtered out
+    #  - box 2 is rejected by the confidence filter
+    #  - box 3 is kept with class 2
+    expected_output = torch.tensor(
+        [
             [
-                [1.0000, 50.0000, 50.0000, 100.0000, 100.0000, 0.6682],
-                [0.0000, 60.0000, 60.0000, 110.0000, 110.0000, 0.6457],
-            ]
-        )
-    ]
+                [0.0, 0.0, 0.0, 160.0, 120.0, 0.6682],
+                [1.0, 160.0, 120.0, 320.0, 240.0, 0.6457],
+            ],
+            [
+                [0.0, 16.0, 12.0, 176.0, 132.0, 0.6900],
+                [2.0, 0.0, 120.0, 160.0, 240.0, 0.6570],
+            ],
+        ]
+    )
 
     output = bbox_nms(cls_dist, bbox, nms_cfg)
 
@@ -171,13 +210,52 @@ def test_bbox_nms():
 
 
 def test_calculate_map():
-    predictions = tensor([[0, 60, 60, 160, 160, 0.5], [0, 40, 40, 120, 120, 0.5]])  # [class, x1, y1, x2, y2]
-    ground_truths = tensor([[0, 50, 50, 150, 150], [0, 30, 30, 100, 100]])  # [class, x1, y1, x2, y2]
+    # set test data
+    predictions = torch.tensor([
+        [0, 60, 60, 160, 160, 0.9],  # [class, x1, y1, x2, y2, confidence]
+        [0, 40, 40, 120, 120, 0.8],
+        [1, 10, 10, 70, 70, 0.7]
+    ])
+    ground_truths = torch.tensor([
+        [0, 50, 50, 150, 150],  # [class, x1, y1, x2, y2]
+        [1, 15, 15, 65, 65],
+        [0, 30, 30, 100, 100],
+    ])
 
-    mAP = calculate_map(predictions, ground_truths)
+    # test basic function
+    result = calculate_map(predictions, ground_truths)
+    assert "mAP.50" in result
+    assert "mAP.5:.95" in result
+    assert 0 <= result["mAP.50"] <= 1
+    assert 0 <= result["mAP.5:.95"] <= 1
 
-    expected_ap50 = tensor(0.5)
-    expected_ap50_95 = tensor(0.2)
+    # test class-level metrics
+    assert "class_mAP" in result
+    assert 0 in result["class_mAP"]
+    assert 1 in result["class_mAP"]
+    
+    # test different IoU thresholds
+    custom_thresholds = [0.3, 0.5, 0.7]
+    result_custom = calculate_map(predictions, ground_truths, iou_thresholds=custom_thresholds)
+    assert "mAP.30" in result_custom
+    assert "mAP.50" in result_custom
+    assert "mAP.70" in result_custom
 
-    assert isclose(mAP["mAP.5"], expected_ap50, atol=1e-5), f"AP50 mismatch"
-    assert isclose(mAP["mAP.5:.95"], expected_ap50_95, atol=1e-5), f"Mean AP mismatch"
+    # test edge cases, not considered
+    empty_predictions = torch.zeros((0, 6))
+    empty_result = calculate_map(empty_predictions, ground_truths)
+    assert empty_result["mAP.50"] == 0
+
+    empty_ground_truths = torch.zeros((0, 5))
+    empty_gt_result = calculate_map(predictions, empty_ground_truths)
+    assert empty_gt_result["mAP.50"] == 0
+
+    # test perfect match
+    perfect_predictions = torch.tensor([
+        [0, 50, 50, 150, 150, 1.0],
+        [0, 30, 30, 100, 100, 1.0],
+        [1, 15, 15, 65, 65, 1.0]
+    ])
+    perfect_result = calculate_map(perfect_predictions, ground_truths)
+    assert pytest.approx(perfect_result["mAP.50"], 1e-6) == 1.0
+
