@@ -1,0 +1,36 @@
+name: v9-c-cls
+
+anchor:
+  reg_max: 16
+  strides: [8, 16, 32]
+
+model:
+  backbone:
+    - Conv:
+        args: {out_channels: 64, kernel_size: 3, stride: 2}
+        source: 0
+    - Conv:
+        args: {out_channels: 128, kernel_size: 3, stride: 2}
+    - RepNCSPELAN:
+        args: {out_channels: 256, part_channels: 128}
+
+    - ADown:
+        args: {out_channels: 256}
+    - RepNCSPELAN:
+        args: {out_channels: 512, part_channels: 256}
+
+    - ADown:
+        args: {out_channels: 512}
+    - RepNCSPELAN:
+        args: {out_channels: 512, part_channels: 512}
+
+    - ADown:
+        args: {out_channels: 512}
+    - RepNCSPELAN:
+        args: {out_channels: 512, part_channels: 512}
+
+  detection:
+    - Classification:
+        source: -1
+        tags: Main
+        output: True
