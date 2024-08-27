@@ -1,6 +1,7 @@
 task: validation
 
-fast_inference:  # onnx, trt, deploy or Empty
+fast_inference:  # onnx, openvino, trt, deploy or Empty
+precision: FP32  # for openvino
 data:
   batch_size: 16
   image_size: ${image_size}

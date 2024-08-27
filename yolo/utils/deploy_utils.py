@@ -17,10 +17,14 @@ class FastModelLoader:
         self._validate_compiler()
         if cfg.weight == True:
             cfg.weight = Path("weights") / f"{cfg.model.name}.pt"
-        self.model_path = Path("weights") / f"{Path(cfg.weight).stem}.{self.compiler}"
+
+        if str(self.compiler).lower() == "openvino":
+            self.model_path: Path = Path("weights") / f"{Path(cfg.weight).stem}.xml"
+        else:
+            self.model_path: Path = Path("weights") / f"{Path(cfg.weight).stem}.{self.compiler}"
 
     def _validate_compiler(self):
-        if self.compiler not in ["onnx", "trt", "deploy"]:
+        if self.compiler not in ["onnx", "openvino", "trt", "deploy"]:
             logger.warning(f"⚠️ Compiler '{self.compiler}' is not supported. Using original model.")
             self.compiler = None
         if self.cfg.device == "mps" and self.compiler == "trt":
@@ -30,6 +34,8 @@ class FastModelLoader:
     def load_model(self, device):
         if self.compiler == "onnx":
             return self._load_onnx_model(device)
+        elif self.compiler == "openvino":
+            return self._load_openvino_model()
         elif self.compiler == "trt":
             return self._load_trt_model().to(device)
         elif self.compiler == "deploy":
@@ -81,6 +87,46 @@ class FastModelLoader:
         )
         logger.info(f"📥 ONNX model saved to {self.model_path}")
         return InferenceSession(self.model_path, providers=providers)
+
+    def _load_openvino_model(self, device: str = "cpu"):
+        from openvino import Core, CompiledModel
+
+        original_call = CompiledModel.__call__
+        def openvino_call(self: CompiledModel, *args, **kwargs):
+            outputs = original_call(self, *args, **kwargs)
+
+            model_outputs, layer_output = [], []
+            for idx, (_, predict) in enumerate(outputs.items()):
+                layer_output.append(torch.from_numpy(predict).to(device))
+                if idx % 3 == 2:
+                    model_outputs.append(layer_output)
+                    layer_output = []
+            if len(model_outputs) == 6:
+                model_outputs = model_outputs[:3]
+            return {"Main": model_outputs}
+
+        CompiledModel.__call__ = openvino_call
+
+        try:
+            core = Core()
+            model_ov = core.read_model(str(self.model_path))
+            logger.info("🚀 Using OpenVINO as MODEL frameworks!")
+        except Exception as e:
+            logger.warning(f"🈳 Error loading OpenVINO model: {e}")
+            model_ov = self._create_openvino_model()
+        return core.compile_model(model_ov, "CPU")
+
+    def _create_openvino_model(self):
+        import openvino as ov
+
+        if not (onnx_model_path := self.model_path.with_suffix(".onnx")).exists():
+            self._create_onnx_model(["CPUExecutionProvider"])
+
+        model_ov = ov.convert_model(onnx_model_path, input=(ov.runtime.PartialShape((-1, 3, *self.cfg.image_size)),))
+
+        ov.save_model(model_ov, self.model_path, compress_to_fp16=(self.cfg.task.precision == "FP16"))
+        logger.info(f"📥 ONNX model saved to {self.model_path}")
+        return model_ov
 
     def _load_trt_model(self):
         from torch2trt import TRTModule
