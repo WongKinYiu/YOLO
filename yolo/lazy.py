@@ -6,6 +6,7 @@ import hydra
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
+from loguru import logger
 from yolo.config.config import Config
 from yolo.model.yolo import create_model
 from yolo.tools.data_loader import create_dataloader
@@ -32,6 +33,8 @@ def main(cfg: Config):
     if cfg.task.task == "train":
         solver = ModelTrainer(cfg, model, converter, progress, device, use_ddp)
     if cfg.task.task == "validation":
+        if cfg.task.fast_inference in ["trt", "deploy"]:
+            logger.warning("⚠️ ONNX is only tested, not responsible about using trt and deploy.")
         solver = ModelValidator(cfg.task, cfg.dataset, model, converter, progress, device)
     if cfg.task.task == "inference":
         solver = ModelTester(cfg, model, converter, progress, device)

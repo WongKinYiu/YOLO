@@ -1,5 +1,6 @@
 task: validation
 
+fast_inference:  # onnx, trt, deploy or Empty
 data:
   batch_size: 16
   image_size: ${image_size}

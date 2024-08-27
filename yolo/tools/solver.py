@@ -233,8 +233,9 @@ class ModelValidator:
                 self.coco_gt = COCO(json_path)
 
     def solve(self, dataloader, epoch_idx=1):
-        # logger.info("🧪 Start Validation!")
-        self.model.eval()
+        logger.info("🧪 Start Validation!")
+        if isinstance(self.model, torch.nn.Module):
+            self.model.eval()
         predict_json, mAPs = [], defaultdict(list)
         self.progress.start_one_epoch(len(dataloader), task="Validate")
         for batch_size, images, targets, rev_tensor, img_paths in dataloader:

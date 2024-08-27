@@ -17,7 +17,7 @@ class FastModelLoader:
         self._validate_compiler()
         if cfg.weight == True:
             cfg.weight = Path("weights") / f"{cfg.model.name}.pt"
-        self.model_path = f"{Path(cfg.weight).stem}.{self.compiler}"
+        self.model_path = Path("weights") / f"{Path(cfg.weight).stem}.{self.compiler}"
 
     def _validate_compiler(self):
         if self.compiler not in ["onnx", "trt", "deploy"]:
