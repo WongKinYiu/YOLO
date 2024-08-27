@@ -19,7 +19,10 @@ class FastModelLoader:
             cfg.weight = Path("weights") / f"{cfg.model.name}.pt"
 
         if str(self.compiler).lower() == "openvino":
-            self.model_path: Path = Path("weights") / f"{Path(cfg.weight).stem}.xml"
+            if self.cfg.task.precision == "FP16":
+                self.model_path: Path = Path("weights") / f"{Path(cfg.weight).stem}_fp16.xml"
+            else:
+                self.model_path: Path = Path("weights") / f"{Path(cfg.weight).stem}.xml"
         else:
             self.model_path: Path = Path("weights") / f"{Path(cfg.weight).stem}.{self.compiler}"
 
@@ -117,14 +120,24 @@ class FastModelLoader:
         return core.compile_model(model_ov, "CPU")
 
     def _create_openvino_model(self):
-        import openvino as ov
+        from openvino import convert_model, save_model, PartialShape
 
-        if not (onnx_model_path := self.model_path.with_suffix(".onnx")).exists():
+        if "fp16" in str(self.model_path):
+            onnx_model_path = Path(str(self.model_path).replace("_fp16.xml", ".onnx"))
+        else:
+            onnx_model_path = self.model_path.with_suffix(".onnx")
+        if not onnx_model_path.exists():
             self._create_onnx_model(["CPUExecutionProvider"])
 
-        model_ov = ov.convert_model(onnx_model_path, input=(ov.runtime.PartialShape((-1, 3, *self.cfg.image_size)),))
+        model_ov = convert_model(onnx_model_path, input=(PartialShape((-1, 3, *self.cfg.image_size)),))
 
-        ov.save_model(model_ov, self.model_path, compress_to_fp16=(self.cfg.task.precision == "FP16"))
+        save_model(model_ov, self.model_path, compress_to_fp16=(self.cfg.task.precision == "FP16"))
+        if self.cfg.task.precision == "FP16":
+            from openvino import Core
+
+            core = Core()
+            model_ov = core.read_model(str(self.model_path))
+
         logger.info(f"📥 ONNX model saved to {self.model_path}")
         return model_ov
 
