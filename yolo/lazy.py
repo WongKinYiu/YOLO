@@ -34,7 +34,7 @@ def main(cfg: Config):
         solver = ModelTrainer(cfg, model, converter, progress, device, use_ddp)
     if cfg.task.task == "validation":
         if cfg.task.fast_inference in ["trt", "deploy"]:
-            logger.warning("⚠️ ONNX is only tested, not responsible about using trt and deploy.")
+            logger.warning("⚠️ ONNX and OpenVINO are only tested, not responsible about using trt and deploy.")
         solver = ModelValidator(cfg.task, cfg.dataset, model, converter, progress, device)
     if cfg.task.task == "inference":
         solver = ModelTester(cfg, model, converter, progress, device)

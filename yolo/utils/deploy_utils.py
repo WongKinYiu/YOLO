@@ -152,7 +152,7 @@ class FastModelLoader:
             core = Core()
             model_ov = core.read_model(str(self.model_path))
 
-        logger.info(f"📥 ONNX model saved to {self.model_path}")
+        logger.info(f"📥 OpenVINO model saved to {self.model_path}")
         return model_ov
 
     def _load_trt_model(self):
