@@ -2,6 +2,7 @@ task: inference
 
 fast_inference:  # onnx, openvino, trt, deploy or Empty
 precision: FP32  # for openvino
+ptq: False  # for openvino
 data:
   source: demo/images/inference/image.png
   image_size: ${image_size}

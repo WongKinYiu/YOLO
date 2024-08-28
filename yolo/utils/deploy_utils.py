@@ -6,6 +6,7 @@ from torch import Tensor
 
 from yolo.config.config import Config
 from yolo.model.yolo import create_model
+from yolo.tools.data_loader import create_dataloader
 
 
 class FastModelLoader:
@@ -117,6 +118,19 @@ class FastModelLoader:
         except Exception as e:
             logger.warning(f"🈳 Error loading OpenVINO model: {e}")
             model_ov = self._create_openvino_model()
+
+        if self.cfg.task.ptq:
+            if "optimized" in str(self.model_path):
+                logger.info("🚀 PTQ Model is already loaded!")
+            else:
+                import nncf
+                from openvino.runtime import serialize
+                
+                train_dataloader = create_dataloader(self.cfg.task.data, self.cfg.dataset, "train", is_ov_ptq=True)
+                ptq_dataset = nncf.Dataset(train_dataloader, lambda x: x)
+                model_ov = nncf.quantize(model_ov, ptq_dataset, preset=nncf.QuantizationPreset.MIXED)
+                serialize(model_ov, str(self.model_path).replace(".xml", "_optimized.xml"))
+
         return core.compile_model(model_ov, "CPU")
 
     def _create_openvino_model(self):
