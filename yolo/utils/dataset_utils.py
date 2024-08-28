@@ -10,7 +10,7 @@ from loguru import logger
 from yolo.tools.data_conversion import discretize_categories
 
 
-def locate_label_paths(dataset_path: Path, phase_name: Path) -> Tuple[Path, Path]:
+def locate_label_paths(label_path: Path, phase_name: Path) -> Tuple[Path, Path]:
     """
     Find the path to label files for a specified dataset and phase(e.g. training).
 
@@ -21,17 +21,14 @@ def locate_label_paths(dataset_path: Path, phase_name: Path) -> Tuple[Path, Path
     Returns:
         Tuple[Path, Path]: A tuple containing the path to the labels file and the file format ("json" or "txt").
     """
-    json_labels_path = dataset_path / "annotations" / f"instances_{phase_name}.json"
 
-    txt_labels_path = dataset_path / "labels" / phase_name
+    if label_path.is_file():
+        return label_path, "json"
 
-    if json_labels_path.is_file():
-        return json_labels_path, "json"
-
-    elif txt_labels_path.is_dir():
-        txt_files = [f for f in os.listdir(txt_labels_path) if f.endswith(".txt")]
+    elif label_path.is_dir():
+        txt_files = [f for f in os.listdir(label_path) if f.endswith(".txt")]
         if txt_files:
-            return txt_labels_path, "txt"
+            return label_path, "txt"
 
     logger.warning("No labels found in the specified dataset path and phase name.")
     return [], None
@@ -52,7 +49,7 @@ def create_image_metadata(labels_path: str) -> Tuple[Dict[str, List], Dict[str, 
         labels_data = json.load(file)
         id_to_idx = discretize_categories(labels_data.get("categories", [])) if "categories" in labels_data else None
         annotations_index = organize_annotations_by_image(labels_data, id_to_idx)  # check lookup is a good name?
-        image_info_dict = {Path(img["file_name"]).stem: img for img in labels_data["images"]}
+        image_info_dict = {img["file_name"]: img for img in labels_data["images"]}
         return annotations_index, image_info_dict
 
 
@@ -81,7 +78,8 @@ def organize_annotations_by_image(data: Dict[str, Any], id_to_idx: Optional[Dict
 
 
 def scale_segmentation(
-    annotations: List[Dict[str, Any]], image_dimensions: Dict[str, int]
+    annotations: List[Dict[str, Any]], image_dimensions: Dict[str, int],
+    mode: str ="detection"
 ) -> Optional[List[List[float]]]:
     """
     Scale the segmentation data based on image dimensions and return a list of scaled segmentation data.
@@ -100,10 +98,13 @@ def scale_segmentation(
     h, w = image_dimensions["height"], image_dimensions["width"]
     for anno in annotations:
         category_id = anno["category_id"]
-        if "segmentation" in anno:
+        if "segmentation" in anno and mode=="segmentation":
             seg_list = [item for sublist in anno["segmentation"] for item in sublist]
-        elif "bbox" in anno:
+        elif "bbox" in anno and mode=="detection":
             seg_list = anno["bbox"]
+        else:
+            # invalid annotation
+            return []
         scaled_seg_data = (
             np.array(seg_list).reshape(-1, 2) / [w, h]
         ).tolist()  # make the list group in x, y pairs and scaled with image width, height

@@ -24,7 +24,7 @@ from yolo.utils.dataset_utils import (
 
 
 class YoloDataset(Dataset):
-    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, phase: str = "train2017"):
+    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, phase: str = "train"):
         augment_cfg = data_cfg.data_augment
         self.image_size = data_cfg.image_size
         phase_name = dataset_cfg.get(phase, phase)
@@ -32,31 +32,65 @@ class YoloDataset(Dataset):
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        self.data = self.load_data(Path(dataset_cfg.path), phase_name)
+        
+        self.get_dataset_path(cfg=dataset_cfg,phase=phase)
+       
+        self.data = []
+        for images_path, labels_path in zip(self.images_paths, self.labels_paths):
+            datas = self.load_data(images_path, labels_path, phase_name)
+            datas = [ (images_path / data[0], *data[1:]) for data in datas]
+            self.data.extend(datas)
 
-    def load_data(self, dataset_path: Path, phase_name: str):
+    def get_dataset_path(self,cfg:DataConfig, phase: str = "train"):
+         # dataset source
+        images_paths = getattr(cfg, "image_" + phase)
+        if isinstance(images_paths, str):
+            images_paths = [images_paths]
+        elif isinstance(images_paths, tuple):
+            images_paths = list(images_paths)
+        self.images_paths = [Path(cfg.path) / images_path for images_path in images_paths]
+        
+        labels_paths = getattr(cfg, "label_" + phase)
+        if isinstance(labels_paths, str):
+            labels_paths = [labels_paths]
+        elif isinstance(labels_paths, tuple):
+            labels_paths = list(labels_paths)
+        self.labels_paths = [Path(cfg.path) / labels_path for labels_path in labels_paths]
+        
+        assert len(self.images_paths) == len(self.labels_paths)
+
+    def load_data(self, images_path: Path, labels_path: Path, phase_name: str):
         """
         Loads data from a cache or generates a new cache for a specific dataset phase.
 
         Parameters:
-            dataset_path (Path): The root path to the dataset directory.
+            images_path (Path): The root path to the images directory.
+            labels_path (Path): The root path to the labels directory.
             phase_name (str): The specific phase of the dataset (e.g., 'train', 'test') to load or generate data for.
 
         Returns:
             dict: The loaded data from the cache for the specified phase.
         """
-        cache_path = dataset_path / f"{phase_name}.cache"
+        cache_path = images_path.with_suffix(".cache")
 
         if not cache_path.exists():
             logger.info("🏭 Generating {} cache", phase_name)
-            data = self.filter_data(dataset_path, phase_name)
+            data = self.filter_data(images_path, labels_path, phase_name)
             torch.save(data, cache_path)
         else:
             data = torch.load(cache_path, weights_only=False)
             logger.info("📦 Loaded {} cache", phase_name)
+            # TODO: add Validate cache
+            # if data[0][0].parent == Path("images")/phase_name:
+            #     logger.info("✅ Cache validation successful")
+            # else:
+            #     logger.warning("⚠️ Cache validation failed, regenerating")
+            #     data = self.filter_data(images_path, labels_path, phase_name)
+            #     torch.save(data, cache_path)
+        
         return data
 
-    def filter_data(self, dataset_path: Path, phase_name: str) -> list:
+    def filter_data(self, images_path: Path, labels_path: Path, phase_name: str) -> list:
         """
         Filters and collects dataset information by pairing images with their corresponding labels.
 
@@ -67,8 +101,7 @@ class YoloDataset(Dataset):
         Returns:
             list: A list of tuples, each containing the path to an image file and its associated segmentation as a tensor.
         """
-        images_path = dataset_path / "images" / phase_name
-        labels_path, data_type = locate_label_paths(dataset_path, phase_name)
+        labels_path, data_type = locate_label_paths(labels_path, phase_name)
         images_list = sorted([p.name for p in Path(images_path).iterdir() if p.is_file()])
         if data_type == "json":
             annotations_index, image_info_dict = create_image_metadata(labels_path)
@@ -78,30 +111,29 @@ class YoloDataset(Dataset):
         for image_name in track(images_list, description="Filtering data"):
             if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
                 continue
-            image_id = Path(image_name).stem
 
-            if data_type == "json":
-                image_info = image_info_dict.get(image_id, None)
+            if data_type == "json": 
+                image_info = image_info_dict.get(image_name, None)
+                # TODO: neg case can be load
                 if image_info is None:
                     continue
                 annotations = annotations_index.get(image_info["id"], [])
-                image_seg_annotations = scale_segmentation(annotations, image_info)
+                image_seg_annotations = scale_segmentation(annotations, image_info) # coco2yolo 
                 if not image_seg_annotations:
                     continue
 
             elif data_type == "txt":
-                label_path = labels_path / f"{image_id}.txt"
+                label_path = labels_path / Path(image_name).with_suffix('.txt')
                 if not label_path.is_file():
                     continue
-                with open(label_path, "r") as file:
-                    image_seg_annotations = [list(map(float, line.strip().split())) for line in file]
+                with label_path.open("r") as f:
+                    image_seg_annotations = [list(map(float, line.strip().split())) for line in f]
             else:
                 image_seg_annotations = []
+            # TODO: correct the box and log the image file
+            labels = self.load_valid_labels(images_path / image_name, image_seg_annotations)
 
-            labels = self.load_valid_labels(image_id, image_seg_annotations)
-
-            img_path = images_path / image_name
-            data.append((img_path, labels))
+            data.append((image_name, labels))
             valid_inputs += 1
         logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
         return data
@@ -133,6 +165,7 @@ class YoloDataset(Dataset):
 
     def get_data(self, idx):
         img_path, bboxes = self.data[idx]
+        # img_path = self.images_path / img_path
         img = Image.open(img_path).convert("RGB")
         return img, bboxes, img_path
 
@@ -200,7 +233,7 @@ def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: st
     if task == "inference":
         return StreamDataLoader(data_cfg)
 
-    if dataset_cfg.auto_download:
+    if dataset_cfg.get("auto_download",None):
         prepare_dataset(dataset_cfg, task)
 
     return YoloDataLoader(data_cfg, dataset_cfg, task, use_ddp)
