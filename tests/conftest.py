@@ -49,6 +49,11 @@ def inference_v7_cfg():
 
 
 @pytest.fixture(scope="session")
+def inference_v7_onnx_cfg():
+    return get_cfg(overrides=["task=inference", "model=v7", "task.fast_inference=onnx"])
+
+
+@pytest.fixture(scope="session")
 def device():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
