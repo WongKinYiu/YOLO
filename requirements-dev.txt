@@ -1,5 +1,7 @@
 -r requirements.txt
 gradio
+onnx
+onnxruntime
 pytest
 pytest-cov
 pre-commit
