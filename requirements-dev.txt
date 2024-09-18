@@ -1,4 +1,6 @@
 -r requirements.txt
+onnx
+onnxruntime
 pytest
 pytest-cov
 pre-commit
