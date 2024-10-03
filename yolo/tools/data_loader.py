@@ -150,11 +150,12 @@ class YoloDataset(Dataset):
 
 
 class YoloDataLoader(DataLoader):
-    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
+    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False, is_ov_ptq: bool = False):
         """Initializes the YoloDataLoader with hydra-config files."""
         dataset = YoloDataset(data_cfg, dataset_cfg, task)
         sampler = DistributedSampler(dataset, shuffle=data_cfg.shuffle) if use_ddp else None
         self.image_size = data_cfg.image_size[0]
+        self.is_ov_ptq = is_ov_ptq
         super().__init__(
             dataset,
             batch_size=data_cfg.batch_size,
@@ -193,17 +194,19 @@ class YoloDataLoader(DataLoader):
         batch_images = torch.stack(batch_images)
         batch_reverse = torch.stack(batch_reverse)
 
+        if self.is_ov_ptq:
+            return batch_images
         return batch_size, batch_images, batch_targets, batch_reverse, batch_path
 
 
-def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
+def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False, is_ov_ptq: bool = False):
     if task == "inference":
         return StreamDataLoader(data_cfg)
 
     if dataset_cfg.auto_download:
         prepare_dataset(dataset_cfg, task)
 
-    return YoloDataLoader(data_cfg, dataset_cfg, task, use_ddp)
+    return YoloDataLoader(data_cfg, dataset_cfg, task, use_ddp, is_ov_ptq)
 
 
 class StreamDataLoader:
