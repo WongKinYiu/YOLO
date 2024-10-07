@@ -160,19 +160,32 @@ def collect_prediction(predict_json: List, local_rank: int) -> List:
     return predict_json
 
 
-def predicts_to_json(img_paths, predicts, rev_tensor):
+def predicts_to_json(
+        image_ids:Union[tuple[int], tuple[str]],
+        predicts:list[Tensor],
+        rev_tensor:Tensor
+) -> list[dict[str, any]]:
     """
-    TODO: function document
-    turn a batch of imagepath and predicts(n x 6 for each image) to a List of diction(Detection output)
+    Returns a list of prediction dictionaries. Each dict contains, image_id,
+    category_id, bbox and score.
+
+    Args:
+        image_ids: Tuple of image ids.
+            When using a COCO .json annotation file, image ids are int.
+            When using YOLO .txt annotation files, image ids are string. 
+        predicts: For each iamge, contains a tensor of shape (n, 6),
+            where n is the number of detected bbox in the corresponding image.
+        rev_tensor: A tensor of shape (m,5), where m is the number of images.
+            TODO: add docstring of what this is.
     """
     batch_json = []
-    for img_path, bboxes, box_reverse in zip(img_paths, predicts, rev_tensor):
+    for image_id, bboxes, box_reverse in zip(image_ids, predicts, rev_tensor):
         scale, shift = box_reverse.split([1, 4])
         bboxes[:, 1:5] = (bboxes[:, 1:5] - shift[None]) / scale[None]
         bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
         for cls, *pos, conf in bboxes:
             bbox = {
-                "image_id": int(Path(img_path).stem),
+                "image_id": image_id,
                 "category_id": IDX_TO_ID[int(cls)],
                 "bbox": [float(p) for p in pos],
                 "score": float(conf),
