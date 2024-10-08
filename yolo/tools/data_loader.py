@@ -9,150 +9,28 @@ from loguru import logger
 from PIL import Image
 from rich.progress import track
 from torch import Tensor
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
 from yolo.config.config import DataConfig, DatasetConfig
 from yolo.tools.data_augmentation import *
 from yolo.tools.data_augmentation import AugmentationComposer
 from yolo.tools.dataset_preparation import prepare_dataset
-from yolo.utils.dataset_utils import (
-    create_image_metadata,
-    locate_label_paths,
-    scale_segmentation,
-)
+from yolo.dataset.base import create_dataset, BaseDataset
 
+def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
+    if task == "inference":
+        return StreamDataLoader(data_cfg)
 
-class YoloDataset(Dataset):
-    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, phase: str = "train2017"):
-        augment_cfg = data_cfg.data_augment
-        self.image_size = data_cfg.image_size
-        phase_name = dataset_cfg.get(phase, phase)
+    if dataset_cfg.auto_download:
+        prepare_dataset(dataset_cfg, task)
 
-        transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
-        self.transform = AugmentationComposer(transforms, self.image_size)
-        self.transform.get_more_data = self.get_more_data
-        self.data = self.load_data(Path(dataset_cfg.path), phase_name)
-
-    def load_data(self, dataset_path: Path, phase_name: str):
-        """
-        Loads data from a cache or generates a new cache for a specific dataset phase.
-
-        Parameters:
-            dataset_path (Path): The root path to the dataset directory.
-            phase_name (str): The specific phase of the dataset (e.g., 'train', 'test') to load or generate data for.
-
-        Returns:
-            dict: The loaded data from the cache for the specified phase.
-        """
-        cache_path = dataset_path / f"{phase_name}.cache"
-
-        if not cache_path.exists():
-            logger.info("🏭 Generating {} cache", phase_name)
-            data = self.filter_data(dataset_path, phase_name)
-            torch.save(data, cache_path)
-        else:
-            data = torch.load(cache_path, weights_only=False)
-            logger.info("📦 Loaded {} cache", phase_name)
-        return data
-
-    def filter_data(self, dataset_path: Path, phase_name: str) -> list:
-        """
-        Filters and collects dataset information by pairing images with their corresponding labels.
-
-        Parameters:
-            images_path (Path): Path to the directory containing image files.
-            labels_path (str): Path to the directory containing label files.
-
-        Returns:
-            list: A list of tuples, each containing the path to an image file and its associated segmentation as a tensor.
-        """
-        images_path = dataset_path / "images" / phase_name
-        labels_path, data_type = locate_label_paths(dataset_path, phase_name)
-        images_list = sorted([p.name for p in Path(images_path).iterdir() if p.is_file()])
-        if data_type == "json":
-            annotations_index, image_info_dict = create_image_metadata(labels_path)
-
-        data = []
-        valid_inputs = 0
-        for image_name in track(images_list, description="Filtering data"):
-            if not image_name.lower().endswith((".jpg", ".jpeg", ".png")):
-                continue
-            image_id = Path(image_name).stem
-
-            if data_type == "json":
-                image_info = image_info_dict.get(image_id, None)
-                if image_info is None:
-                    continue
-                annotations = annotations_index.get(image_info["id"], [])
-                image_seg_annotations = scale_segmentation(annotations, image_info)
-                if not image_seg_annotations:
-                    continue
-
-            elif data_type == "txt":
-                label_path = labels_path / f"{image_id}.txt"
-                if not label_path.is_file():
-                    continue
-                with open(label_path, "r") as file:
-                    image_seg_annotations = [list(map(float, line.strip().split())) for line in file]
-            else:
-                image_seg_annotations = []
-
-            labels = self.load_valid_labels(image_id, image_seg_annotations)
-
-            img_path = images_path / image_name
-            data.append((img_path, labels))
-            valid_inputs += 1
-        logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
-        return data
-
-    def load_valid_labels(self, label_path: str, seg_data_one_img: list) -> Union[Tensor, None]:
-        """
-        Loads and validates bounding box data is [0, 1] from a label file.
-
-        Parameters:
-            label_path (str): The filepath to the label file containing bounding box data.
-
-        Returns:
-            Tensor or None: A tensor of all valid bounding boxes if any are found; otherwise, None.
-        """
-        bboxes = []
-        for seg_data in seg_data_one_img:
-            cls = seg_data[0]
-            points = np.array(seg_data[1:]).reshape(-1, 2)
-            valid_points = points[(points >= 0) & (points <= 1)].reshape(-1, 2)
-            if valid_points.size > 1:
-                bbox = torch.tensor([cls, *valid_points.min(axis=0), *valid_points.max(axis=0)])
-                bboxes.append(bbox)
-
-        if bboxes:
-            return torch.stack(bboxes)
-        else:
-            logger.warning("No valid BBox in {}", label_path)
-            return torch.zeros((0, 5))
-
-    def get_data(self, idx):
-        img_path, bboxes = self.data[idx]
-        img = Image.open(img_path).convert("RGB")
-        return img, bboxes, img_path
-
-    def get_more_data(self, num: int = 1):
-        indices = torch.randint(0, len(self), (num,))
-        return [self.get_data(idx)[:2] for idx in indices]
-
-    def __getitem__(self, idx) -> Tuple[Image.Image, Tensor, Tensor, List[str]]:
-        img, bboxes, img_path = self.get_data(idx)
-        img, bboxes, rev_tensor = self.transform(img, bboxes)
-        return img, bboxes, rev_tensor, img_path
-
-    def __len__(self) -> int:
-        return len(self.data)
-
+    dataset = create_dataset(dataset_cfg, data_cfg, task)
+    return YoloDataLoader(data_cfg, dataset, use_ddp)
 
 class YoloDataLoader(DataLoader):
-    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
+    def __init__(self, data_cfg: DataConfig, dataset: BaseDataset, use_ddp: bool = False):
         """Initializes the YoloDataLoader with hydra-config files."""
-        dataset = YoloDataset(data_cfg, dataset_cfg, task)
         sampler = DistributedSampler(dataset, shuffle=data_cfg.shuffle) if use_ddp else None
         self.image_size = data_cfg.image_size[0]
         super().__init__(
@@ -194,17 +72,6 @@ class YoloDataLoader(DataLoader):
         batch_reverse = torch.stack(batch_reverse)
 
         return batch_size, batch_images, batch_targets, batch_reverse, batch_path
-
-
-def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
-    if task == "inference":
-        return StreamDataLoader(data_cfg)
-
-    if dataset_cfg.auto_download:
-        prepare_dataset(dataset_cfg, task)
-
-    return YoloDataLoader(data_cfg, dataset_cfg, task, use_ddp)
-
 
 class StreamDataLoader:
     def __init__(self, data_cfg: DataConfig):

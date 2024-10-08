@@ -12,11 +12,12 @@ data:
   shuffle: True
   pin_memory: True
   data_augment:
-    Mosaic: 1
-    # MixUp: 1
-    # HorizontalFlip: 0.5
-    RandomCrop: 1
-    RemoveOutliers: 1e-8
+    - _target_: yolo.tools.data_augmentation.Mosaic
+      prob: 1
+    - _target_: yolo.tools.data_augmentation.RandomCrop
+      prob: 1
+    - _target_: yolo.tools.data_augmentation.RemoveOutliers
+      min_box_area: 1e-8
 
 optimizer:
   type: SGD
