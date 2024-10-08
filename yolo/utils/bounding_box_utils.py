@@ -227,7 +227,19 @@ class BoxMatcher:
         2. Select the targets
         2. Noramlize the class probilities of targets
         """
+        
         predict_cls, predict_bbox = predict
+        
+        # return if target has no gt information.
+        n_targets = target.shape[1]
+        if n_targets == 0:
+            device = predict_bbox.device
+            align_cls = torch.zeros_like(predict_cls, device=device)
+            align_bbox = torch.zeros_like(predict_bbox, device=device)
+            valid_mask = torch.zeros(predict_cls.shape[:2], dtype=bool, device=device)
+            anchor_matched_targets = torch.cat([align_cls, align_bbox], dim=-1)
+            return anchor_matched_targets, valid_mask
+        
         target_cls, target_bbox = target.split([1, 4], dim=-1)  # B x N x (C B) -> B x N x C, B x N x B
         target_cls = target_cls.long().clamp(0)
 
@@ -262,7 +274,7 @@ class BoxMatcher:
         normalize_term = normalize_term.permute(0, 2, 1).gather(2, unique_indices)
         align_cls = align_cls * normalize_term * valid_mask[:, :, None]
 
-        return torch.cat([align_cls, align_bbox], dim=-1), valid_mask.bool()
+        return torch.cat([align_cls, align_bbox], dim=-1), valid_mask
 
 
 class Vec2Box:
@@ -399,50 +411,3 @@ def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Opt
 
         predicts_nms.append(predict_nms)
     return predicts_nms
-
-
-def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05)) -> Dict[str, Tensor]:
-    # TODO: Refactor this block, Flexible for calculate different mAP condition?
-    device = predictions.device
-    n_preds = predictions.size(0)
-    n_gts = (ground_truths[:, 0] != -1).sum()
-    ground_truths = ground_truths[:n_gts]
-    aps = []
-
-    ious = calculate_iou(predictions[:, 1:-1], ground_truths[:, 1:])  # [n_preds, n_gts]
-
-    for threshold in iou_thresholds:
-        tp = torch.zeros(n_preds, device=device, dtype=bool)
-
-        max_iou, max_indices = ious.max(dim=1)
-        above_threshold = max_iou >= threshold
-        matched_classes = predictions[:, 0] == ground_truths[max_indices, 0]
-        max_match = torch.zeros_like(ious)
-        max_match[arange(n_preds), max_indices] = max_iou
-        if max_match.size(0):
-            tp[max_match.argmax(dim=0)] = True
-        tp[~above_threshold | ~matched_classes] = False
-
-        _, indices = torch.sort(predictions[:, 1], descending=True)
-        tp = tp[indices]
-
-        tp_cumsum = torch.cumsum(tp, dim=0)
-        fp_cumsum = torch.cumsum(~tp, dim=0)
-
-        precision = tp_cumsum / (tp_cumsum + fp_cumsum + 1e-6)
-        recall = tp_cumsum / (n_gts + 1e-6)
-
-        precision = torch.cat([torch.ones(1, device=device), precision, torch.zeros(1, device=device)])
-        recall = torch.cat([torch.zeros(1, device=device), recall, torch.ones(1, device=device)])
-
-        precision, _ = torch.cummax(precision.flip(0), dim=0)
-        precision = precision.flip(0)
-
-        ap = torch.trapezoid(precision, recall)
-        aps.append(ap)
-
-    mAP = {
-        "mAP.5": aps[0],
-        "mAP.5:.95": torch.mean(torch.stack(aps)),
-    }
-    return mAP

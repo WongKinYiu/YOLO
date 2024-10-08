@@ -26,13 +26,12 @@ def main(cfg: Config):
     else:
         model = create_model(cfg.model, class_num=cfg.dataset.class_num, weight_path=cfg.weight)
         model = model.to(device)
-
     converter = create_converter(cfg.model.name, model, cfg.model.anchor, cfg.image_size, device)
 
     if cfg.task.task == "train":
         solver = ModelTrainer(cfg, model, converter, progress, device, use_ddp)
     if cfg.task.task == "validation":
-        solver = ModelValidator(cfg.task, cfg.dataset, model, converter, progress, device)
+        solver = ModelValidator(cfg.task, model, converter, progress, device)
     if cfg.task.task == "inference":
         solver = ModelTester(cfg, model, converter, progress, device)
     progress.start()

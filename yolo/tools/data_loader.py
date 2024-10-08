@@ -67,11 +67,11 @@ class YoloDataLoader(DataLoader):
             batch_targets[idx, : min(target_size, 100)] = batch[idx][1][:100]
         batch_targets[:, :, 1:] *= self.image_size
 
-        batch_images, _, batch_reverse, batch_path = zip(*batch)
+        batch_images, _, batch_reverse = zip(*batch)
         batch_images = torch.stack(batch_images)
         batch_reverse = torch.stack(batch_reverse)
 
-        return batch_size, batch_images, batch_targets, batch_reverse, batch_path
+        return batch_size, batch_images, batch_targets, batch_reverse
 
 class StreamDataLoader:
     def __init__(self, data_cfg: DataConfig):
