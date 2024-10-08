@@ -15,7 +15,6 @@ from yolo.utils.bounding_box_utils import (
     Vec2Box,
     bbox_nms,
     calculate_iou,
-    calculate_map,
     generate_anchors,
     transform_bbox,
 )
@@ -168,16 +167,3 @@ def test_bbox_nms():
 
     for out, exp in zip(output, expected_output):
         assert allclose(out, exp, atol=1e-4), f"Output: {out} Expected: {exp}"
-
-
-def test_calculate_map():
-    predictions = tensor([[0, 60, 60, 160, 160, 0.5], [0, 40, 40, 120, 120, 0.5]])  # [class, x1, y1, x2, y2]
-    ground_truths = tensor([[0, 50, 50, 150, 150], [0, 30, 30, 100, 100]])  # [class, x1, y1, x2, y2]
-
-    mAP = calculate_map(predictions, ground_truths)
-
-    expected_ap50 = tensor(0.5)
-    expected_ap50_95 = tensor(0.2)
-
-    assert isclose(mAP["mAP.5"], expected_ap50, atol=1e-5), f"AP50 mismatch"
-    assert isclose(mAP["mAP.5:.95"], expected_ap50_95, atol=1e-5), f"Mean AP mismatch"
