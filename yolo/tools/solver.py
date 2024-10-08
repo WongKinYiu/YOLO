@@ -51,7 +51,7 @@ class ModelTrainer:
         self.validation_dataloader = create_dataloader(
             cfg.task.validation.data, cfg.dataset, cfg.task.validation.task, use_ddp
         )
-        self.validator = ModelValidator(cfg.task.validation, cfg.dataset, model, vec2box, progress, device)
+        self.validator = ModelValidator(cfg.task.validation, model, vec2box, progress, device)
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
@@ -82,7 +82,7 @@ class ModelTrainer:
         total_loss = defaultdict(float)
         total_samples = 0
         self.optimizer.next_epoch(len(dataloader))
-        for batch_size, images, targets, *_ in dataloader:
+        for batch_size, images, targets, _ in dataloader:
             self.optimizer.next_batch()
             loss_each = self.train_one_batch(images, targets)
 
@@ -221,7 +221,7 @@ class ModelValidator:
         metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy")
         self.model.eval()
         self.progress.start_one_epoch(len(dataloader), task="Validate")
-        for _, images, targets, rev_tensor, img_paths in dataloader:
+        for _, images, targets, rev_tensor in dataloader:
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
                 predicts = self.model(images)

@@ -134,16 +134,16 @@ class YoloDataset(Dataset):
     def get_data(self, idx):
         img_path, bboxes = self.data[idx]
         img = Image.open(img_path).convert("RGB")
-        return img, bboxes, img_path
+        return img, bboxes
 
     def get_more_data(self, num: int = 1):
         indices = torch.randint(0, len(self), (num,))
-        return [self.get_data(idx)[:2] for idx in indices]
+        return [self.get_data(idx) for idx in indices]
 
     def __getitem__(self, idx) -> Tuple[Image.Image, Tensor, Tensor, List[str]]:
-        img, bboxes, img_path = self.get_data(idx)
+        img, bboxes = self.get_data(idx)
         img, bboxes, rev_tensor = self.transform(img, bboxes)
-        return img, bboxes, rev_tensor, img_path
+        return img, bboxes, rev_tensor
 
     def __len__(self) -> int:
         return len(self.data)
@@ -189,11 +189,11 @@ class YoloDataLoader(DataLoader):
             batch_targets[idx, : min(target_size, 100)] = batch[idx][1][:100]
         batch_targets[:, :, 1:] *= self.image_size
 
-        batch_images, _, batch_reverse, batch_path = zip(*batch)
+        batch_images, _, batch_reverse = zip(*batch)
         batch_images = torch.stack(batch_images)
         batch_reverse = torch.stack(batch_reverse)
 
-        return batch_size, batch_images, batch_targets, batch_reverse, batch_path
+        return batch_size, batch_images, batch_targets, batch_reverse
 
 
 def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
