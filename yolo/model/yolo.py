@@ -123,7 +123,7 @@ class YOLO(nn.Module):
             weights: A OrderedDict containing the new weights.
         """
         if isinstance(weights, Path):
-            weights = torch.load(weights, map_location=torch.device("cpu"))
+            weights = torch.load(weights, map_location=torch.device("cpu"), weights_only=True)
         if "model_state_dict" in weights:
             weights = weights["model_state_dict"]
 
