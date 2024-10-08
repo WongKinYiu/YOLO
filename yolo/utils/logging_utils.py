@@ -41,8 +41,6 @@ from torchvision.transforms.functional import pil_to_tensor
 from yolo.config.config import Config, YOLOLayer
 from yolo.model.yolo import YOLO
 from yolo.tools.drawer import draw_bboxes
-from yolo.utils.solver_utils import make_ap_table
-
 
 def custom_logger(quite: bool = False):
     logger.remove()
@@ -156,11 +154,7 @@ class ProgressLogger(Progress):
 
     @rank_check
     def finish_one_epoch(self, batch_info: Dict[str, Any] = None, epoch_idx: int = -1):
-        if self.task == "Train":
-            prefix = "Loss"
-        elif self.task == "Validate":
-            prefix = "Metrics"
-        batch_info = {f"{prefix}/{key}": value for key, value in batch_info.items()}
+        batch_info = {f"{self.task}/{key}": value for key, value in batch_info.items()}
         if self.use_wandb:
             self.wandb.log(batch_info, step=epoch_idx)
         if self.use_tensorboard:
@@ -212,29 +206,7 @@ class ProgressLogger(Progress):
                 )
             if self.use_tensorboard:
                 self.tb_writer.add_image("Media/Prediction", pil_to_tensor(draw_bboxes(images, pred_boxes)), epoch_idx)
-
-    @rank_check
-    def start_pycocotools(self):
-        self.batch_task = self.add_task("[green]Run pycocotools", total=1)
-
-    @rank_check
-    def finish_pycocotools(self, result, epoch_idx=-1):
-        ap_table, ap_main = make_ap_table(result * 100, self.ap_past_list, self.last_result, epoch_idx)
-        self.last_result = np.maximum(result, self.last_result)
-        self.ap_past_list.append((epoch_idx, ap_main))
-        self.ap_table = ap_table
-
-        if self.use_wandb:
-            self.wandb.log({"PyCOCO/AP @ .5:.95": ap_main[2], "PyCOCO/AP @ .5": ap_main[5]})
-        if self.use_tensorboard:
-            # TODO: waiting torch bugs fix, https://github.com/pytorch/pytorch/issues/32651
-            self.tb_writer.add_scalar("PyCOCO/AP @ .5:.95", ap_main[2], epoch_idx)
-            self.tb_writer.add_scalar("PyCOCO/AP @ .5", ap_main[5], epoch_idx)
-
-        self.update(self.batch_task, advance=1)
-        self.refresh()
-        self.remove_task(self.batch_task)
-
+                
     @rank_check
     def finish_train(self):
         self.remove_task(self.task_epoch)

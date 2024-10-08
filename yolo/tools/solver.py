@@ -1,37 +1,30 @@
-import contextlib
-import io
-import json
 import os
 import time
 from collections import defaultdict
-from pathlib import Path
 from typing import Dict, Optional
 
 import torch
 from loguru import logger
-from pycocotools.coco import COCO
 from torch import Tensor, distributed
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
+from torchmetrics.detection import MeanAveragePrecision
 
 from yolo.config.config import Config, DatasetConfig, TrainConfig, ValidationConfig
 from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.drawer import draw_bboxes, draw_model
 from yolo.tools.loss_functions import create_loss_function
-from yolo.utils.bounding_box_utils import Vec2Box, calculate_map
-from yolo.utils.dataset_utils import locate_label_paths
+from yolo.utils.bounding_box_utils import Vec2Box
 from yolo.utils.logging_utils import ProgressLogger, log_model_structure
+from yolo.utils.solver_utils import format_prediction, format_target
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,
     PostProccess,
-    collect_prediction,
     create_optimizer,
     create_scheduler,
-    predicts_to_json,
 )
-from yolo.utils.solver_utils import calculate_ap
 
 
 class ModelTrainer:
@@ -58,7 +51,7 @@ class ModelTrainer:
         self.validation_dataloader = create_dataloader(
             cfg.task.validation.data, cfg.dataset, cfg.task.validation.task, use_ddp
         )
-        self.validator = ModelValidator(cfg.task.validation, cfg.dataset, model, vec2box, progress, device)
+        self.validator = ModelValidator(cfg.task.validation, model, vec2box, progress, device)
 
         if getattr(train_cfg.ema, "enabled", False):
             self.ema = ExponentialMovingAverage(model, decay=train_cfg.ema.decay)
@@ -89,7 +82,7 @@ class ModelTrainer:
         total_loss = defaultdict(float)
         total_samples = 0
         self.optimizer.next_epoch(len(dataloader))
-        for batch_size, images, targets, *_ in dataloader:
+        for batch_size, images, targets, _ in dataloader:
             self.optimizer.next_batch()
             loss_each = self.train_one_batch(images, targets)
 
@@ -213,7 +206,6 @@ class ModelValidator:
     def __init__(
         self,
         validation_cfg: ValidationConfig,
-        dataset_cfg: DatasetConfig,
         model: YOLO,
         vec2box: Vec2Box,
         progress: ProgressLogger,
@@ -222,46 +214,28 @@ class ModelValidator:
         self.model = model
         self.device = device
         self.progress = progress
-
         self.post_proccess = PostProccess(vec2box, validation_cfg.nms)
-        self.json_path = self.progress.save_path / "predict.json"
-
-        with contextlib.redirect_stdout(io.StringIO()):
-            # TODO: load with config file
-            json_path, _ = locate_label_paths(Path(dataset_cfg.path), dataset_cfg.get("validation", "val"))
-            if json_path:
-                self.coco_gt = COCO(json_path)
 
     def solve(self, dataloader, epoch_idx=1):
-        # logger.info("🧪 Start Validation!")
+        logger.info("🧪 Start Validation!")
+        metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy")
         self.model.eval()
-        predict_json, mAPs = [], defaultdict(list)
         self.progress.start_one_epoch(len(dataloader), task="Validate")
-        for batch_size, images, targets, rev_tensor, img_paths in dataloader:
+        for _, images, targets, rev_tensor in dataloader:
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
                 predicts = self.model(images)
                 predicts = self.post_proccess(predicts)
-                for idx, predict in enumerate(predicts):
-                    mAP = calculate_map(predict, targets[idx])
-                    for mAP_key, mAP_val in mAP.items():
-                        mAPs[mAP_key].append(mAP_val)
+                batch_metrics = metric([format_prediction(predict) for predict in predicts], 
+                       [format_target(target) for target in targets])
+            
+            self.progress.one_batch({
+                "map": batch_metrics["map"],
+                "map_50": batch_metrics["map_50"],
+            })
 
-            avg_mAPs = {key: 100 * torch.mean(torch.stack(val)) for key, val in mAPs.items()}
-            self.progress.one_batch(avg_mAPs)
-
-            predict_json.extend(predicts_to_json(img_paths, predicts, rev_tensor))
-        self.progress.finish_one_epoch(avg_mAPs, epoch_idx=epoch_idx)
+        epoch_metrics = metric.compute()
+        del epoch_metrics['classes']
+        self.progress.finish_one_epoch(epoch_metrics, epoch_idx=epoch_idx)
         self.progress.visualize_image(images, targets, predicts, epoch_idx=epoch_idx)
-
-        with open(self.json_path, "w") as f:
-            predict_json = collect_prediction(predict_json, self.progress.local_rank)
-            if self.progress.local_rank != 0:
-                return
-            json.dump(predict_json, f)
-        if hasattr(self, "coco_gt"):
-            self.progress.start_pycocotools()
-            result = calculate_ap(self.coco_gt, predict_json)
-            self.progress.finish_pycocotools(result, epoch_idx)
-
-        return avg_mAPs
+        return epoch_metrics
