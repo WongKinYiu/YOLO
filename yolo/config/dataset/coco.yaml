@@ -1,4 +1,6 @@
-path: data/coco
+_target_: yolo.dataset.coco.CocoDataset
+
+root_path: data/coco
 train: train2017
 validation: val2017
 

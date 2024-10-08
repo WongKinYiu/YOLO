@@ -6,7 +6,7 @@ data:
   cpu_num: ${cpu_num}
   shuffle: False
   pin_memory: True
-  data_augment: {}
+  data_augment: []
 nms:
   min_confidence: 0.05
   min_iou: 0.9

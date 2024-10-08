@@ -5,7 +5,7 @@ loguru
 numpy
 opencv-python
 Pillow
-pycocotools
+torchmetrics
 requests
 rich
 torch

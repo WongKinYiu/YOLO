@@ -17,7 +17,7 @@ from yolo.utils.bounding_box_utils import Anc2Box, Vec2Box
 @pytest.fixture
 def model_validator(validation_cfg: Config, model: YOLO, vec2box: Vec2Box, validation_progress_logger, device):
     validator = ModelValidator(
-        validation_cfg.task, validation_cfg.dataset, model, vec2box, validation_progress_logger, device
+        validation_cfg.task, model, vec2box, validation_progress_logger, device
     )
     return validator
 
@@ -28,11 +28,10 @@ def test_model_validator_initialization(model_validator: ModelValidator):
 
 
 def test_model_validator_solve_mock_dataset(model_validator: ModelValidator, validation_dataloader: YoloDataLoader):
-    mAPs = model_validator.solve(validation_dataloader)
-    except_mAPs = {"mAP.5": tensor(0.6969), "mAP.5:.95": tensor(0.4195)}
-    assert allclose(mAPs["mAP.5"], except_mAPs["mAP.5"], rtol=0.1)
-    print(mAPs)
-    assert allclose(mAPs["mAP.5:.95"], except_mAPs["mAP.5:.95"], rtol=0.1)
+    metrics = model_validator.solve(validation_dataloader)
+    except_metrics = {"map_50": tensor(0.7515), "map": tensor(0.5986)}
+    assert allclose(metrics["map_50"], except_metrics["map_50"], rtol=0.1)
+    assert allclose(metrics["map"], except_metrics["map"], rtol=0.1)
 
 
 @pytest.fixture
