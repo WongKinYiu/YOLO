@@ -173,7 +173,7 @@ def predicts_to_json(img_paths, predicts, rev_tensor):
         for cls, *pos, conf in bboxes:
             bbox = {
                 "image_id": int(Path(img_path).stem),
-                "category_id": IDX_TO_ID[int(cls)],
+                "category_id": COCO_IDX_TO_ID[int(cls)],
                 "bbox": [float(p) for p in pos],
                 "score": float(conf),
             }
