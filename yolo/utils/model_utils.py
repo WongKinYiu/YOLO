@@ -10,7 +10,7 @@ from torch import Tensor
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR, SequentialLR, _LRScheduler
 
-from yolo.config.config import IDX_TO_ID, NMSConfig, OptimizerConfig, SchedulerConfig
+from yolo.config.config import COCO_IDX_TO_ID, NMSConfig, OptimizerConfig, SchedulerConfig
 from yolo.model.yolo import YOLO
 from yolo.utils.bounding_box_utils import bbox_nms, transform_bbox
 
@@ -173,7 +173,7 @@ def predicts_to_json(img_paths, predicts, rev_tensor):
         for cls, *pos, conf in bboxes:
             bbox = {
                 "image_id": int(Path(img_path).stem),
-                "category_id": IDX_TO_ID[int(cls)],
+                "category_id": COCO_IDX_TO_ID[int(cls)],
                 "bbox": [float(p) for p in pos],
                 "score": float(conf),
             }
