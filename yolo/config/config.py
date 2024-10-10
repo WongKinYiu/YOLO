@@ -165,7 +165,7 @@ class YOLOLayer(nn.Module):
     usable: bool
 
 
-IDX_TO_ID = [
+COCO_IDX_TO_ID = [
     1,
     2,
     3,
