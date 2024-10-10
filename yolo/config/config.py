@@ -1,34 +1,34 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 from torch import nn
 
 
 @dataclass
 class AnchorConfig:
-    strides: List[int]
+    strides: list[int]
     reg_max: Optional[int]
     anchor_num: Optional[int]
-    anchor: List[List[int]]
+    anchor: list[list[int]]
 
 
 @dataclass
-class LayerConfg:
-    args: Dict
-    source: Union[int, str, List[int]]
+class LayerConfig:
+    args: dict
+    source: Union[int, str, list[int]]
     tags: str
 
 
 @dataclass
 class BlockConfig:
-    block: List[Dict[str, LayerConfg]]
+    block: list[dict[str, LayerConfig]]
 
 
 @dataclass
 class ModelConfig:
     name: Optional[str]
     anchor: AnchorConfig
-    model: Dict[str, BlockConfig]
+    model: dict[str, BlockConfig]
 
 
 @dataclass
@@ -39,14 +39,14 @@ class DownloadDetail:
 
 @dataclass
 class DownloadOptions:
-    details: Dict[str, DownloadDetail]
+    details: dict[str, DownloadDetail]
 
 
 @dataclass
 class DatasetConfig:
     path: str
     class_num: int
-    class_list: List[str]
+    class_list: list[str]
     auto_download: Optional[DownloadOptions]
 
 
@@ -56,8 +56,8 @@ class DataConfig:
     batch_size: int
     pin_memory: bool
     cpu_num: int
-    image_size: List[int]
-    data_augment: Dict[str, int]
+    image_size: list[int]
+    data_augment: dict[str, int]
     source: Optional[Union[str, int]]
 
 
@@ -77,12 +77,12 @@ class OptimizerConfig:
 class MatcherConfig:
     iou: str
     topk: int
-    factor: Dict[str, int]
+    factor: dict[str, int]
 
 
 @dataclass
 class LossConfig:
-    objective: Dict[str, int]
+    objective: dict[str, int]
     aux: Union[bool, float]
     matcher: MatcherConfig
 
@@ -90,8 +90,8 @@ class LossConfig:
 @dataclass
 class SchedulerConfig:
     type: str
-    warmup: Dict[str, Union[int, float]]
-    args: Dict[str, Any]
+    warmup: dict[str, Union[int, float]]
+    args: dict[str, Any]
 
 
 @dataclass
@@ -141,10 +141,10 @@ class Config:
     model: ModelConfig
     name: str
 
-    device: Union[str, int, List[int]]
+    device: Union[str, int, list[int]]
     cpu_num: int
 
-    image_size: List[int]
+    image_size: list[int]
 
     out_path: str
     exist_ok: bool
@@ -158,7 +158,7 @@ class Config:
 
 @dataclass
 class YOLOLayer(nn.Module):
-    source: Union[int, str, List[int]]
+    source: Union[int, str, list[int]]
     output: bool
     tags: str
     layer_type: str
