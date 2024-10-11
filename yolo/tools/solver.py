@@ -237,7 +237,7 @@ class ModelValidator:
         self.model.eval()
         predict_json, mAPs = [], defaultdict(list)
         self.progress.start_one_epoch(len(dataloader), task="Validate")
-        for batch_size, images, targets, rev_tensor, img_paths in dataloader:
+        for batch_size, images, targets, rev_tensor, image_ids in dataloader:
             images, targets, rev_tensor = images.to(self.device), targets.to(self.device), rev_tensor.to(self.device)
             with torch.no_grad():
                 predicts = self.model(images)
@@ -250,7 +250,7 @@ class ModelValidator:
             avg_mAPs = {key: 100 * torch.mean(torch.stack(val)) for key, val in mAPs.items()}
             self.progress.one_batch(avg_mAPs)
 
-            predict_json.extend(predicts_to_json(img_paths, predicts, rev_tensor))
+            predict_json.extend(predicts_to_json(image_ids, predicts, rev_tensor))
         self.progress.finish_one_epoch(avg_mAPs, epoch_idx=epoch_idx)
         self.progress.visualize_image(images, targets, predicts, epoch_idx=epoch_idx)
 

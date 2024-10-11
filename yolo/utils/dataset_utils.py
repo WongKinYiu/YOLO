@@ -37,47 +37,67 @@ def locate_label_paths(dataset_path: Path, phase_name: Path) -> Tuple[Path, Path
     return [], None
 
 
-def create_image_metadata(labels_path: str) -> Tuple[Dict[str, List], Dict[str, Dict]]:
+def create_image_metadata(
+        labels_path: str
+) -> Tuple[Dict[int, List], Dict[int, Dict], Dict[str, int]]:
     """
-    Create a dictionary containing image information and annotations indexed by image ID.
+    Returns three dictionaries mapping image id to list of annotations, 
+    image id to image information, and image name to image id.
+    Image id is the `int` `id` assigned to a image in the COCO formatted .json file.
 
     Args:
         labels_path (str): The path to the annotation json file.
 
     Returns:
-        - annotations_index: A dictionary where keys are image IDs and values are lists of annotations.
-        - image_info_dict: A dictionary where keys are image file names without extension and values are image information dictionaries.
+        (annotations_dict, image_info_dict, image_name_to_id_dict):
+            annotations_dict is a dictionary where keys are image ids and values
+            are lists of annotation dictionaries.
+            image_info_dict is a dictionary where keys are image file id and
+            values are image information dictionaries.
+            image_name_to_id_dict is a dictionary with image name without
+            extension as key and int image id as value.
     """
     with open(labels_path, "r") as file:
-        labels_data = json.load(file)
-        id_to_idx = discretize_categories(labels_data.get("categories", [])) if "categories" in labels_data else None
-        annotations_index = organize_annotations_by_image(labels_data, id_to_idx)  # check lookup is a good name?
-        image_info_dict = {Path(img["file_name"]).stem: img for img in labels_data["images"]}
-        return annotations_index, image_info_dict
+        json_data = json.load(file)
+        image_name_to_id_dict = {
+            Path(img["file_name"]).name: img['id'] for img in json_data["images"]
+        }
+        id_to_idx = discretize_categories(json_data.get("categories", [])) if "categories" in json_data else None
+        annotations_dict = organize_annotations_by_image(json_data, id_to_idx)  # check lookup is a good name?
+        image_info_dict = {img['id']: img for img in json_data["images"]}
+        return annotations_dict, image_info_dict, image_name_to_id_dict
 
 
-def organize_annotations_by_image(data: Dict[str, Any], id_to_idx: Optional[Dict[int, int]]):
+def organize_annotations_by_image(
+        json_data: Dict[str, Any],
+        category_id_to_idx: Optional[Dict[int, int]],
+) -> dict[int, list[dict]]:
     """
-    Use image index to lookup every annotations
+    Returns a dict mapping image id to a list of all corresponding annotations.
+
+    Annotations with "iscrowd" set to True, are excluded. Image id is the `int`
+    `image_id` in the corresponding annotation dict stored in the
+    COCO formatted .json file.
+
     Args:
-        data (Dict[str, Any]): A dictionary containing annotation data.
-
+        json_data: Data read from a COCO json file.
+        category_id_to_idx: For COCO dataset, a dict mapping from category_id
+            to (category_id - 1).
     Returns:
-        Dict[int, List[Dict[str, Any]]]: A dictionary where keys are image IDs and values are lists of annotations.
-        Annotations with "iscrowd" set to True are excluded from the index.
-
+        image_name_to_annotation_dict_list: A dictionary where keys are image ids
+            and values are lists of annotation dictionaries.
     """
-    annotation_lookup = {}
-    for anno in data["annotations"]:
-        if anno["iscrowd"]:
+    image_id_to_annotation_dict_list = {}
+    for annotation_dict in json_data["annotations"]:
+        if annotation_dict["iscrowd"]:
             continue
-        image_id = anno["image_id"]
-        if id_to_idx:
-            anno["category_id"] = id_to_idx[anno["category_id"]]
-        if image_id not in annotation_lookup:
-            annotation_lookup[image_id] = []
-        annotation_lookup[image_id].append(anno)
-    return annotation_lookup
+        image_id = annotation_dict["image_id"]
+        if category_id_to_idx:
+            annotation_dict["category_id"] = category_id_to_idx[annotation_dict["category_id"]]
+        if image_id not in image_id_to_annotation_dict_list:
+            image_id_to_annotation_dict_list[image_id] = []
+        image_id_to_annotation_dict_list[image_id].append(annotation_dict)
+    return image_id_to_annotation_dict_list
 
 
 def scale_segmentation(
