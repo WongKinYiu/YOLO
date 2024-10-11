@@ -3,10 +3,10 @@ from pathlib import Path
 from typing import Optional
 
 import requests
-from loguru import logger
 from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 
 from yolo.config.config import DatasetConfig
+from yolo.utils.logger import logger
 
 
 def download_file(url, destination: Path):

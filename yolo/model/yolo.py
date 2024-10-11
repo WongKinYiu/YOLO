@@ -3,12 +3,12 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 import torch
-from loguru import logger
 from omegaconf import ListConfig, OmegaConf
 from torch import nn
 
 from yolo.config.config import ModelConfig, YOLOLayer
 from yolo.tools.dataset_preparation import prepare_weight
+from yolo.utils.logger import logger
 from yolo.utils.module_utils import get_layer_map
 
 

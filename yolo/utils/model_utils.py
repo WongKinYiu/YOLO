@@ -4,7 +4,6 @@ from typing import List, Optional, Type, Union
 
 import torch
 import torch.distributed as dist
-from loguru import logger
 from omegaconf import ListConfig
 from torch import Tensor
 from torch.optim import Optimizer
@@ -13,6 +12,7 @@ from torch.optim.lr_scheduler import LambdaLR, SequentialLR, _LRScheduler
 from yolo.config.config import IDX_TO_ID, NMSConfig, OptimizerConfig, SchedulerConfig
 from yolo.model.yolo import YOLO
 from yolo.utils.bounding_box_utils import bbox_nms, transform_bbox
+from yolo.utils.logger import logger
 
 
 class ExponentialMovingAverage:

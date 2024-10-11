@@ -2,12 +2,12 @@ from typing import Any, Dict, List, Tuple
 
 import torch
 import torch.nn.functional as F
-from loguru import logger
 from torch import Tensor, nn
 from torch.nn import BCEWithLogitsLoss
 
 from yolo.config.config import Config, LossConfig
 from yolo.utils.bounding_box_utils import BoxMatcher, Vec2Box, calculate_iou
+from yolo.utils.logger import logger
 
 
 class BCELoss(nn.Module):

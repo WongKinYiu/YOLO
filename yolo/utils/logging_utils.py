@@ -15,6 +15,7 @@ import os
 import random
 import sys
 from collections import deque
+from logging import FileHandler
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -22,7 +23,6 @@ import numpy as np
 import torch
 import wandb
 import wandb.errors.term
-from loguru import logger
 from omegaconf import ListConfig
 from rich.console import Console, Group
 from rich.progress import (
@@ -41,18 +41,13 @@ from torchvision.transforms.functional import pil_to_tensor
 from yolo.config.config import Config, YOLOLayer
 from yolo.model.yolo import YOLO
 from yolo.tools.drawer import draw_bboxes
+from yolo.utils.logger import logger
 from yolo.utils.solver_utils import make_ap_table
 
 
 def custom_logger(quite: bool = False):
-    logger.remove()
     if quite:
-        return
-    logger.add(
-        sys.stderr,
-        colorize=True,
-        format="<fg #003385>[{time:MM/DD HH:mm:ss}]</> <level>{level: ^8}</level>| <level>{message}</level>",
-    )
+        logger.removeHandler("YOLO_logger")
 
 
 # TODO: should be moved to correct position
@@ -100,7 +95,7 @@ class ProgressLogger(Progress):
             from torch.utils.tensorboard import SummaryWriter
 
             self.tb_writer = SummaryWriter(log_dir=self.save_path / "tensorboard")
-            logger.opt(colors=True).info(f"📍 Enable TensorBoard locally at <blue><u>http://localhost:6006</></>")
+            logger.info(f"📍 Enable TensorBoard locally at <blue><u>http://localhost:6006</></>")
 
     def rank_check(logging_function):
         def wrapper(self, *args, **kwargs):
@@ -249,7 +244,7 @@ def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=Tru
     if silent:
         return
     for line in string.split("\n"):
-        logger.opt(raw=not newline, colors=True).info("🌐 " + line)
+        logger.info("🌐 " + line)
 
 
 def log_model_structure(model: Union[ModuleList, YOLOLayer, YOLO]):
@@ -296,8 +291,8 @@ def validate_log_directory(cfg: Config, exp_name: str) -> Path:
             )
 
     save_path.mkdir(parents=True, exist_ok=True)
-    logger.opt(colors=True).info(f"📄 Created log folder: <u><fg #808080>{save_path}</></>")
-    logger.add(save_path / "output.log", mode="w", backtrace=True, diagnose=True)
+    logger.info(f"📄 Created log folder: [bold gray]{save_path}[/]", extra={"markup": True})
+    logger.addHandler(FileHandler(save_path / "output.log"))
     return save_path
 
 

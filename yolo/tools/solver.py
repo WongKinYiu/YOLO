@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import torch
-from loguru import logger
 from pycocotools.coco import COCO
 from torch import Tensor, distributed
 from torch.cuda.amp import GradScaler, autocast
@@ -22,6 +21,7 @@ from yolo.tools.drawer import draw_bboxes, draw_model
 from yolo.tools.loss_functions import create_loss_function
 from yolo.utils.bounding_box_utils import Vec2Box, calculate_map
 from yolo.utils.dataset_utils import locate_label_paths
+from yolo.utils.logger import logger
 from yolo.utils.logging_utils import ProgressLogger, log_model_structure
 from yolo.utils.model_utils import (
     ExponentialMovingAverage,

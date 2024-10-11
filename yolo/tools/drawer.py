@@ -3,12 +3,12 @@ from typing import List, Optional, Union
 
 import numpy as np
 import torch
-from loguru import logger
 from PIL import Image, ImageDraw, ImageFont
 from torchvision.transforms.functional import to_pil_image
 
 from yolo.config.config import ModelConfig
 from yolo.model.yolo import YOLO
+from yolo.utils.logger import logger
 
 
 def draw_bboxes(

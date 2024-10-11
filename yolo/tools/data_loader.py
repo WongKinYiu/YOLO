@@ -5,7 +5,6 @@ from typing import Generator, List, Tuple, Union
 
 import numpy as np
 import torch
-from loguru import logger
 from PIL import Image
 from rich.progress import track
 from torch import Tensor
@@ -21,6 +20,7 @@ from yolo.utils.dataset_utils import (
     locate_label_paths,
     scale_segmentation,
 )
+from yolo.utils.logger import logger
 
 
 class YoloDataset(Dataset):
@@ -48,12 +48,12 @@ class YoloDataset(Dataset):
         cache_path = dataset_path / f"{phase_name}.cache"
 
         if not cache_path.exists():
-            logger.info("🏭 Generating {} cache", phase_name)
+            logger.info(f"🏭 Generating {phase_name} cache")
             data = self.filter_data(dataset_path, phase_name)
             torch.save(data, cache_path)
         else:
             data = torch.load(cache_path, weights_only=False)
-            logger.info("📦 Loaded {} cache", phase_name)
+            logger.info(f"📦 Loaded {phase_name} cache")
         return data
 
     def filter_data(self, dataset_path: Path, phase_name: str) -> list:

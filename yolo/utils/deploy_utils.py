@@ -1,11 +1,11 @@
 from pathlib import Path
 
 import torch
-from loguru import logger
 from torch import Tensor
 
 from yolo.config.config import Config
 from yolo.model.yolo import create_model
+from yolo.utils.logger import logger
 
 
 class FastModelLoader:

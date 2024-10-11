@@ -4,12 +4,12 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 import torch.nn.functional as F
 from einops import rearrange
-from loguru import logger
 from torch import Tensor, arange, tensor
 from torchvision.ops import batched_nms
 
 from yolo.config.config import AnchorConfig, MatcherConfig, ModelConfig, NMSConfig
 from yolo.model.yolo import YOLO
+from yolo.utils.logger import logger
 
 
 def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
