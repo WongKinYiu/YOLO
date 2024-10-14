@@ -30,7 +30,7 @@ def download_file(url, destination: Path):
                 for data in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
                     file.write(data)
                     progress.update(task, advance=len(data))
-    logger.info("✅ Download completed.")
+    logger.info(":white_check_mark: Download completed.")
 
 
 def unzip_file(source: Path, destination: Path):
@@ -71,7 +71,7 @@ def prepare_dataset(dataset_cfg: DatasetConfig, task: str):
 
             final_place.mkdir(parents=True, exist_ok=True)
             if check_files(final_place, dataset_args.get("file_num")):
-                logger.info(f"✅ Dataset {dataset_type: <12} already verified.")
+                logger.info(f":white_check_mark: Dataset {dataset_type: <12} already verified.")
                 continue
 
             if not local_zip_path.exists():

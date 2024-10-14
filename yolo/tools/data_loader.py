@@ -48,12 +48,12 @@ class YoloDataset(Dataset):
         cache_path = dataset_path / f"{phase_name}.cache"
 
         if not cache_path.exists():
-            logger.info(f"🏭 Generating {phase_name} cache")
+            logger.info(f":factory: Generating {phase_name} cache")
             data = self.filter_data(dataset_path, phase_name)
             torch.save(data, cache_path)
         else:
             data = torch.load(cache_path, weights_only=False)
-            logger.info(f"📦 Loaded {phase_name} cache")
+            logger.info(f":package: Loaded {phase_name} cache")
         return data
 
     def filter_data(self, dataset_path: Path, phase_name: str) -> list:

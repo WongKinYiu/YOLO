@@ -121,6 +121,6 @@ def draw_model(*, model_cfg: ModelConfig = None, model: YOLO = None, v7_base=Fal
                 dot.edge(str(idx), str(jdx))
     try:
         dot.render("Model-arch", format="png", cleanup=True)
-        logger.info("🎨 Drawing Model Architecture at Model-arch.png")
+        logger.info(":artist_palette: Drawing Model Architecture at Model-arch.png")
     except:
-        logger.warning("⚠️ Could not find graphviz backend, continue without drawing the model architecture")
+        logger.warning(":warning: Could not find graphviz backend, continue without drawing the model architecture")
