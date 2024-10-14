@@ -446,3 +446,10 @@ def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05
         "mAP.5:.95": torch.mean(torch.stack(aps)),
     }
     return mAP
+
+
+def to_metrics_format(prediction: Tensor) -> Dict[str, Union[float, Tensor]]:
+    bbox = {"boxes": prediction[:, 1:5], "labels": prediction[:, 0].int()}
+    if prediction.size(1) == 6:
+        bbox["scores"] = prediction[:, 5]
+    return bbox

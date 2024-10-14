@@ -56,23 +56,8 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
         {"params": conv_params},
         {"params": norm_params, "weight_decay": 0},
     ]
-
-    def next_epoch(self, batch_num):
-        self.min_lr = self.max_lr
-        self.max_lr = [param["lr"] for param in self.param_groups]
-        self.batch_num = batch_num
-        self.batch_idx = 0
-
-    def next_batch(self):
-        self.batch_idx += 1
-        for lr_idx, param_group in enumerate(self.param_groups):
-            min_lr, max_lr = self.min_lr[lr_idx], self.max_lr[lr_idx]
-            param_group["lr"] = min_lr + (self.batch_idx) * (max_lr - min_lr) / self.batch_num
-
-    optimizer_class.next_batch = next_batch
-    optimizer_class.next_epoch = next_epoch
     optimizer = optimizer_class(model_parameters, **optim_cfg.args)
-    optimizer.max_lr = [0.1, 0, 0]
+    # TODO: implement batch lr schedular when warm up
     return optimizer
 
 
@@ -168,6 +153,7 @@ def predicts_to_json(img_paths, predicts, rev_tensor):
     batch_json = []
     for img_path, bboxes, box_reverse in zip(img_paths, predicts, rev_tensor):
         scale, shift = box_reverse.split([1, 4])
+        bboxes = bboxes.clone()
         bboxes[:, 1:5] = (bboxes[:, 1:5] - shift[None]) / scale[None]
         bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
         for cls, *pos, conf in bboxes:
