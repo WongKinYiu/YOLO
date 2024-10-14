@@ -103,7 +103,7 @@ class YoloDataset(Dataset):
             img_path = images_path / image_name
             data.append((img_path, labels))
             valid_inputs += 1
-        logger.info("Recorded {}/{} valid inputs", valid_inputs, len(images_list))
+        logger.info(f"Recorded {valid_inputs}/{len(images_list)} valid inputs")
         return data
 
     def load_valid_labels(self, label_path: str, seg_data_one_img: list) -> Union[Tensor, None]:
