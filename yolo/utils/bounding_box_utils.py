@@ -129,7 +129,10 @@ def generate_anchors(image_size: List[int], strides: List[int]):
         shift = stride // 2
         h = torch.arange(0, H, stride) + shift
         w = torch.arange(0, W, stride) + shift
-        anchor_h, anchor_w = torch.meshgrid(h, w, indexing="ij")
+        if torch.__version__ >= "1.10.0":
+            anchor_h, anchor_w = torch.meshgrid(h, w, indexing="ij")
+        else:
+            anchor_h, anchor_w = torch.meshgrid(h, w)
         anchor = torch.stack([anchor_w.flatten(), anchor_h.flatten()], dim=-1)
         anchors.append(anchor)
     all_anchors = torch.cat(anchors, dim=0)
