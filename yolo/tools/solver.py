@@ -27,6 +27,8 @@ class ValidateModel(BaseModel):
         else:
             self.validation_cfg = self.cfg.task.validation
         self.metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy")
+        self.metric.warn_on_many_detections = False
+        self.val_loader = create_dataloader(self.validation_cfg.data, self.cfg.dataset, self.validation_cfg.task)
 
     def setup(self, stage):
         self.vec2box = create_converter(
@@ -35,7 +37,7 @@ class ValidateModel(BaseModel):
         self.post_proccess = PostProccess(self.vec2box, self.validation_cfg.nms)
 
     def val_dataloader(self):
-        return create_dataloader(self.validation_cfg.data, self.cfg.dataset, self.validation_cfg.task)
+        return self.val_loader
 
     def validation_step(self, batch, batch_idx):
         batch_size, images, targets, rev_tensor, img_paths = batch
@@ -68,15 +70,20 @@ class TrainModel(ValidateModel):
     def __init__(self, cfg: Config):
         super().__init__(cfg)
         self.cfg = cfg
+        self.train_loader = create_dataloader(self.cfg.task.data, self.cfg.dataset, self.cfg.task.task)
 
     def setup(self, stage):
         super().setup(stage)
         self.loss_fn = create_loss_function(self.cfg, self.vec2box)
 
     def train_dataloader(self):
-        return create_dataloader(self.cfg.task.data, self.cfg.dataset, self.cfg.task.task)
+        return self.train_loader
+
+    def on_train_epoch_start(self):
+        self.trainer.optimizers[0].next_epoch(len(self.train_loader))
 
     def training_step(self, batch, batch_idx):
+        self.trainer.optimizers[0].next_batch()
         batch_size, images, targets, *_ = batch
         predicts = self(images)
         aux_predicts = self.vec2box(predicts["AUX"])
