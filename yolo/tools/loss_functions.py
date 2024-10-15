@@ -125,9 +125,9 @@ class DualLoss:
         main_iou, main_dfl, main_cls = self.loss(main_predicts, targets)
 
         loss_dict = {
-            "BoxLoss": self.iou_rate * (aux_iou * self.aux_rate + main_iou),
-            "DFLoss": self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl),
-            "BCELoss": self.cls_rate * (aux_cls * self.aux_rate + main_cls),
+            "Loss/BoxLoss": self.iou_rate * (aux_iou * self.aux_rate + main_iou),
+            "Loss/DFLoss": self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl),
+            "Loss/BCELoss": self.cls_rate * (aux_cls * self.aux_rate + main_cls),
         }
         loss_sum = sum(list(loss_dict.values())) / len(loss_dict)
         return loss_sum, loss_dict

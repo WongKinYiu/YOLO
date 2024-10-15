@@ -49,9 +49,10 @@ class ValidateModel(BaseModel):
                 "map": batch_metrics["map"],
                 "map_50": batch_metrics["map_50"],
             },
-            on_step=True,
             prog_bar=True,
             logger=False,
+            on_step=True,
+            sync_dist=True,
             batch_size=batch_size,
         )
         return predicts
@@ -59,7 +60,11 @@ class ValidateModel(BaseModel):
     def on_validation_epoch_end(self):
         epoch_metrics = self.metric.compute()
         del epoch_metrics["classes"]
-        self.log_dict(epoch_metrics, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(
+            {"PyCOCO/AP @ .5:.95": epoch_metrics["map"], "PyCOCO/AP @ .5": epoch_metrics["map_50"]}, rank_zero_only=True
+        )
+        self.log_dict(epoch_metrics, prog_bar=True, logger=True, on_epoch=True, rank_zero_only=True)
+        self.metric.reset()
 
 
 class TrainModel(ValidateModel):
@@ -80,7 +85,14 @@ class TrainModel(ValidateModel):
         aux_predicts = self.vec2box(predicts["AUX"])
         main_predicts = self.vec2box(predicts["Main"])
         loss, loss_item = self.loss_fn(aux_predicts, main_predicts, targets)
-        self.log_dict(loss_item, on_step=True, on_epoch=True, prog_bar=True, logger=True, batch_size=batch_size)
+        self.log_dict(
+            loss_item,
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+            batch_size=batch_size,
+            rank_zero_only=True,
+        )
         return loss * batch_size
 
     def configure_optimizers(self):
