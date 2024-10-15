@@ -124,13 +124,15 @@ class DualLoss:
         aux_iou, aux_dfl, aux_cls = self.loss(aux_predicts, targets)
         main_iou, main_dfl, main_cls = self.loss(main_predicts, targets)
 
-        loss_dict = {
-            "Loss/BoxLoss": self.iou_rate * (aux_iou * self.aux_rate + main_iou),
-            "Loss/DFLoss": self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl),
-            "Loss/BCELoss": self.cls_rate * (aux_cls * self.aux_rate + main_cls),
-        }
-        loss_sum = sum(list(loss_dict.values())) / len(loss_dict)
-        return loss_sum, loss_dict
+        total_loss = [
+            self.iou_rate * (aux_iou * self.aux_rate + main_iou),
+            self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl),
+            self.cls_rate * (aux_cls * self.aux_rate + main_cls),
+        ]
+        loss_dict = dict()
+        for name, value in zip(["Box", "DFL", "BCE"], total_loss):
+            loss_dict[f"Loss/{name}Loss"] = value.detach()
+        return sum(total_loss), loss_dict
 
 
 def create_loss_function(cfg: Config, vec2box) -> DualLoss:

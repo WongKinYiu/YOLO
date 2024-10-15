@@ -23,6 +23,7 @@ def main(cfg: Config):
         callbacks=callbacks,
         logger=loggers,
         log_every_n_steps=1,
+        gradient_clip_val=10,
     )
 
     match cfg.task.task:
