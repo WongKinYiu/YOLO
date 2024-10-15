@@ -52,9 +52,9 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
     conv_params = [p for name, p in model.named_parameters() if "weight" in name and "bn" not in name]
 
     model_parameters = [
-        {"params": bias_params, "weight_decay": 0},
-        {"params": conv_params},
-        {"params": norm_params, "weight_decay": 0},
+        {"params": bias_params, "momentum": 0.8, "weight_decay": 0},
+        {"params": conv_params, "momentum": 0.8},
+        {"params": norm_params, "momentum": 0.8, "weight_decay": 0},
     ]
     optimizer = optimizer_class(model_parameters, **optim_cfg.args)
     # TODO: implement batch lr schedular when warm up
