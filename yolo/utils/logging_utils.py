@@ -23,9 +23,10 @@ import wandb
 from lightning import LightningModule, Trainer, seed_everything
 from lightning.pytorch.callbacks import Callback, RichModelSummary, RichProgressBar
 from lightning.pytorch.callbacks.progress.rich_progress import CustomProgress
-from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
+from lightning.pytorch.utilities import rank_zero_only
 from omegaconf import ListConfig
-from rich import reconfigure
+from rich import get_console, reconfigure
 from rich.console import Console, Group
 from rich.logging import RichHandler
 from rich.table import Table
@@ -60,6 +61,7 @@ class YOLOCustomProgress(CustomProgress):
 
 class YOLORichProgressBar(RichProgressBar):
     @override
+    @rank_zero_only
     def _init_progress(self, trainer: "Trainer") -> None:
         if self.is_enabled and (self.progress is None or self._progress_stopped):
             self._reset_progress_bar_ids()
@@ -85,6 +87,7 @@ class YOLORichProgressBar(RichProgressBar):
         return Text("[cyan]Train [white]|")
 
     @override
+    @rank_zero_only
     def on_train_start(self, trainer, pl_module):
         self._init_progress(trainer)
         num_epochs = trainer.max_epochs - 1
@@ -97,6 +100,7 @@ class YOLORichProgressBar(RichProgressBar):
         self.progress.update(self.task_epoch, advance=-0.5)
 
     @override
+    @rank_zero_only
     def on_train_batch_end(self, trainer, pl_module, outputs, batch: Any, batch_idx: int):
         self._update(self.train_progress_bar_id, batch_idx + 1)
         self._update_metrics(trainer, pl_module)
@@ -106,7 +110,7 @@ class YOLORichProgressBar(RichProgressBar):
         metrics.pop("v_num")
         for metrics_name, metrics_val in metrics.items():
             if "Loss_step" in metrics_name:
-                epoch_descript += f"{metrics_name.removesuffix('_step'): ^9}|"
+                epoch_descript += f"{metrics_name.removesuffix('_step').split('/')[1]: ^9}|"
                 batch_descript += f"   {metrics_val:2.2f}  |"
 
         self.progress.update(self.task_epoch, advance=1 / self.total_train_batches, description=epoch_descript)
@@ -114,12 +118,14 @@ class YOLORichProgressBar(RichProgressBar):
         self.refresh()
 
     @override
+    @rank_zero_only
     def on_train_end(self, trainer: "Trainer", pl_module: "LightningModule") -> None:
         self._update_metrics(trainer, pl_module)
         self.progress.remove_task(self.train_progress_bar_id)
         self.train_progress_bar_id = None
 
     @override
+    @rank_zero_only
     def on_validation_end(self, trainer: "Trainer", pl_module: "LightningModule") -> None:
         if trainer.state.fn == "fit":
             self._update_metrics(trainer, pl_module)
@@ -162,8 +168,6 @@ class YOLORichModelSummary(RichModelSummary):
         **summarize_kwargs: Any,
     ) -> None:
         from lightning.pytorch.utilities.model_summary import get_human_readable_count
-        from rich import get_console
-        from rich.table import Table
 
         console = get_console()
 
@@ -223,6 +227,7 @@ class ImageLogger(Callback):
 
 
 def setup(cfg: Config):
+    seed_everything(cfg.lucky_number)
     if hasattr(cfg, "quite"):
         logger.removeHandler("YOLO_logger")
         return
