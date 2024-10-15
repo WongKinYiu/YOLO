@@ -143,67 +143,59 @@ class YoloDataset(Dataset):
     def __getitem__(self, idx) -> Tuple[Image.Image, Tensor, Tensor, List[str]]:
         img, bboxes, img_path = self.get_data(idx)
         img, bboxes, rev_tensor = self.transform(img, bboxes)
+        bboxes[:, [1, 3]] *= self.image_size[0]
+        bboxes[:, [2, 4]] *= self.image_size[1]
         return img, bboxes, rev_tensor, img_path
 
     def __len__(self) -> int:
         return len(self.data)
 
 
-class YoloDataLoader(DataLoader):
-    def __init__(self, data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
-        """Initializes the YoloDataLoader with hydra-config files."""
-        dataset = YoloDataset(data_cfg, dataset_cfg, task)
-        sampler = DistributedSampler(dataset, shuffle=data_cfg.shuffle) if use_ddp else None
-        self.image_size = data_cfg.image_size[0]
-        super().__init__(
-            dataset,
-            batch_size=data_cfg.batch_size,
-            sampler=sampler,
-            shuffle=data_cfg.shuffle and not use_ddp,
-            num_workers=data_cfg.cpu_num,
-            pin_memory=data_cfg.pin_memory,
-            collate_fn=self.collate_fn,
-        )
+def collate_fn(batch: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, List[Tensor]]:
+    """
+    A collate function to handle batching of images and their corresponding targets.
 
-    def collate_fn(self, batch: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, List[Tensor]]:
-        """
-        A collate function to handle batching of images and their corresponding targets.
+    Args:
+        batch (list of tuples): Each tuple contains:
+            - image (Tensor): The image tensor.
+            - labels (Tensor): The tensor of labels for the image.
 
-        Args:
-            batch (list of tuples): Each tuple contains:
-                - image (Tensor): The image tensor.
-                - labels (Tensor): The tensor of labels for the image.
+    Returns:
+        Tuple[Tensor, List[Tensor]]: A tuple containing:
+            - A tensor of batched images.
+            - A list of tensors, each corresponding to bboxes for each image in the batch.
+    """
+    batch_size = len(batch)
+    target_sizes = [item[1].size(0) for item in batch]
+    # TODO: Improve readability of these proccess
+    # TODO: remove maxBbox or reduce loss function memory usage
+    batch_targets = torch.zeros(batch_size, min(max(target_sizes), 100), 5)
+    batch_targets[:, :, 0] = -1
+    for idx, target_size in enumerate(target_sizes):
+        batch_targets[idx, : min(target_size, 100)] = batch[idx][1][:100]
 
-        Returns:
-            Tuple[Tensor, List[Tensor]]: A tuple containing:
-                - A tensor of batched images.
-                - A list of tensors, each corresponding to bboxes for each image in the batch.
-        """
-        batch_size = len(batch)
-        target_sizes = [item[1].size(0) for item in batch]
-        # TODO: Improve readability of these proccess
-        # TODO: remove maxBbox or reduce loss function memory usage
-        batch_targets = torch.zeros(batch_size, min(max(target_sizes), 100), 5)
-        batch_targets[:, :, 0] = -1
-        for idx, target_size in enumerate(target_sizes):
-            batch_targets[idx, : min(target_size, 100)] = batch[idx][1][:100]
-        batch_targets[:, :, 1:] *= self.image_size
+    batch_images, _, batch_reverse, batch_path = zip(*batch)
+    batch_images = torch.stack(batch_images)
+    batch_reverse = torch.stack(batch_reverse)
 
-        batch_images, _, batch_reverse, batch_path = zip(*batch)
-        batch_images = torch.stack(batch_images)
-        batch_reverse = torch.stack(batch_reverse)
-
-        return batch_size, batch_images, batch_targets, batch_reverse, batch_path
+    return batch_size, batch_images, batch_targets, batch_reverse, batch_path
 
 
-def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train", use_ddp: bool = False):
+def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: str = "train"):
     if task == "inference":
         return StreamDataLoader(data_cfg)
 
     if dataset_cfg.auto_download:
         prepare_dataset(dataset_cfg, task)
+    dataset = YoloDataset(data_cfg, dataset_cfg, task)
 
-    return YoloDataLoader(data_cfg, dataset_cfg, task, use_ddp)
+    return DataLoader(
+        dataset,
+        batch_size=data_cfg.batch_size,
+        num_workers=data_cfg.cpu_num,
+        pin_memory=data_cfg.pin_memory,
+        collate_fn=collate_fn,
+    )
 
 
 class StreamDataLoader:
