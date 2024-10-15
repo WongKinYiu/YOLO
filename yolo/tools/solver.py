@@ -49,10 +49,7 @@ class ValidateModel(BaseModel):
                 "map": batch_metrics["map"],
                 "map_50": batch_metrics["map_50"],
             },
-            prog_bar=True,
-            logger=False,
             on_step=True,
-            sync_dist=True,
             batch_size=batch_size,
         )
         return predicts
