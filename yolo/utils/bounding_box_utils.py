@@ -14,7 +14,7 @@ from yolo.utils.logger import logger
 
 def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
     metrics = metrics.lower()
-    EPS = 1e-9
+    EPS = 1e-7
     dtype = bbox1.dtype
     bbox1 = bbox1.to(torch.float32)
     bbox2 = bbox2.to(torch.float32)
@@ -210,7 +210,7 @@ class BoxMatcher:
         topk_masks = topk_targets > 0
         return topk_targets, topk_masks
 
-    def filter_duplicates(self, target_matrix: Tensor):
+    def filter_duplicates(self, target_matrix: Tensor, topk_mask: Tensor):
         """
         Filter the maximum suitability target index of each anchor.
 
@@ -220,9 +220,11 @@ class BoxMatcher:
         Returns:
             unique_indices [batch x anchors x 1]: The index of the best targets for each anchors
         """
-        # TODO: add a assert for no target on the image
-        unique_indices = target_matrix.argmax(dim=1)
-        return unique_indices[..., None]
+        duplicates = (topk_mask.sum(1, keepdim=True) > 1).repeat([1, topk_mask.size(1), 1])
+        max_idx = F.one_hot(target_matrix.argmax(1), topk_mask.size(1)).permute(0, 2, 1)
+        topk_mask = torch.where(duplicates, max_idx, topk_mask)
+        unique_indices = topk_mask.argmax(dim=1)
+        return unique_indices[..., None], topk_mask.sum(1), topk_mask
 
     def __call__(self, target: Tensor, predict: Tuple[Tensor]) -> Tuple[Tensor, Tensor]:
         """
@@ -249,16 +251,15 @@ class BoxMatcher:
         topk_targets, topk_mask = self.filter_topk(target_matrix, topk=self.topk)
 
         # delete one anchor pred assign to mutliple gts
-        unique_indices = self.filter_duplicates(topk_targets)
-
-        # TODO: do we need grid_mask? Filter the valid groud truth
-        valid_mask = (grid_mask.sum(dim=-2) * topk_mask.sum(dim=-2)).bool()
+        unique_indices, valid_mask, topk_mask = self.filter_duplicates(iou_mat, topk_mask)
 
         align_bbox = torch.gather(target_bbox, 1, unique_indices.repeat(1, 1, 4))
         align_cls = torch.gather(target_cls, 1, unique_indices).squeeze(-1)
         align_cls = F.one_hot(align_cls, self.class_num)
 
         # normalize class ditribution
+        iou_mat *= topk_mask
+        target_matrix *= topk_mask
         max_target = target_matrix.amax(dim=-1, keepdim=True)
         max_iou = iou_mat.amax(dim=-1, keepdim=True)
         normalize_term = (target_matrix / (max_target + 1e-9)) * max_iou
