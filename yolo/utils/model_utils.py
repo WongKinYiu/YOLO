@@ -20,23 +20,28 @@ class ExponentialMovingAverage:
         self.model = model
         self.decay = decay
         self.shadow = {name: param.clone().detach() for name, param in model.named_parameters()}
+        for param in self.shadow.values():
+            param.requires_grad = False
+        self.named_params_backup = None
 
     def update(self):
         """Update the shadow parameters using the current model parameters."""
         for name, param in self.model.named_parameters():
             assert name in self.shadow, "All model parameters should have a corresponding shadow parameter."
-            new_average = (1.0 - self.decay) * param.data + self.decay * self.shadow[name]
-            self.shadow[name] = new_average.clone()
+            self.shadow[name] -= (1 - self.decay) * (self.shadow[name] - param)
 
     def apply_shadow(self):
         """Apply the shadow parameters to the model."""
+        self.named_params_backup = {name: param.clone().detach() for name, param in self.model.named_parameters()}
         for name, param in self.model.named_parameters():
             param.data.copy_(self.shadow[name])
 
     def restore(self):
         """Restore the original parameters from the shadow."""
+        assert self.named_params_backup, "ema.restore() can only be called after ema.apply_shadow()."
         for name, param in self.model.named_parameters():
-            self.shadow[name].copy_(param.data)
+            param.data.copy_(self.named_params_backup[name])
+        self.named_params_backup = None
 
 
 def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
