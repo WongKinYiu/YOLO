@@ -6,6 +6,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Optional
+from copy import deepcopy
 
 import torch
 from loguru import logger
@@ -81,6 +82,8 @@ class ModelTrainer:
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)
         self.scaler.step(self.optimizer)
         self.scaler.update()
+        if self.ema:
+            self.ema.update()
 
         return loss_item
 
@@ -119,7 +122,7 @@ class ModelTrainer:
         }
         if self.ema:
             self.ema.apply_shadow()
-            checkpoint["model_state_dict_ema"] = self.model.state_dict()
+            checkpoint["model_state_dict_ema"] = deepcopy(self.model.state_dict())
             self.ema.restore()
 
         logger.info(f"💾 success save at {file_path}")
@@ -146,7 +149,12 @@ class ModelTrainer:
             epoch_loss = self.train_one_epoch(dataloader)
             self.progress.finish_one_epoch(epoch_loss, epoch_idx=epoch_idx)
 
+            if self.ema:
+                self.ema.apply_shadow()
             mAPs = self.validator.solve(self.validation_dataloader, epoch_idx=epoch_idx)
+            if self.ema:
+                self.ema.restore()
+
             if mAPs is not None and self.good_epoch(mAPs):
                 self.save_checkpoint(epoch_idx=epoch_idx)
             # TODO: save model if result are better than before
