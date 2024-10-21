@@ -174,10 +174,10 @@ class MixUp:
         image1, image2 = TF.to_tensor(image), TF.to_tensor(image2)
         mixed_image = lam * image1 + (1 - lam) * image2
 
-        # Mix bounding boxes
-        mixed_boxes = torch.cat([lam * boxes, (1 - lam) * boxes2])
+        # Merge bounding boxes
+        merged_boxes = torch.cat((boxes, boxes2))
 
-        return TF.to_pil_image(mixed_image), mixed_boxes
+        return TF.to_pil_image(mixed_image), merged_boxes
 
 
 class RandomCrop:
