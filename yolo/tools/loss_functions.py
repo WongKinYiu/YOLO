@@ -129,9 +129,9 @@ class DualLoss:
             self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl),
             self.cls_rate * (aux_cls * self.aux_rate + main_cls),
         ]
-        loss_dict = dict()
-        for name, value in zip(["Box", "DFL", "BCE"], total_loss):
-            loss_dict[f"Loss/{name}Loss"] = value.detach()
+        loss_dict = {
+            f"Loss/{name}Loss": value.detach().item() for name, value in zip(["Box", "DFL", "BCE"], total_loss)
+        }
         return sum(total_loss), loss_dict
 
 

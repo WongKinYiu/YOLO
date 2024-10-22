@@ -154,9 +154,6 @@ class YOLORichProgressBar(RichProgressBar):
 
 
 class YOLORichModelSummary(RichModelSummary):
-
-    from typing_extensions import override
-
     @staticmethod
     @override
     def summarize(

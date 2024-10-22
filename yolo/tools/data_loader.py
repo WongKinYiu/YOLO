@@ -133,7 +133,8 @@ class YoloDataset(Dataset):
 
     def get_data(self, idx):
         img_path, bboxes = self.data[idx]
-        img = Image.open(img_path).convert("RGB")
+        with Image.open(img_path) as img:
+            img = img.convert("RGB")
         return img, bboxes, img_path
 
     def get_more_data(self, num: int = 1):

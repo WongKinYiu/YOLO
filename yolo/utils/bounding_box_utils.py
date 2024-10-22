@@ -69,7 +69,8 @@ def calculate_iou(bbox1, bbox2, metrics="iou") -> Tensor:
         (bbox2[..., 2] - bbox2[..., 0]) / (bbox2[..., 3] - bbox2[..., 1] + EPS)
     )
     v = (4 / (math.pi**2)) * (arctan**2)
-    alpha = v / (v - iou + 1 + EPS)
+    with torch.no_grad():
+        alpha = v / (v - iou + 1 + EPS)
     # Compute CIoU
     ciou = diou - alpha * v
     return ciou.to(dtype)
