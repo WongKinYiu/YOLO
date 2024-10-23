@@ -83,7 +83,7 @@ class TrainModel(ValidateModel):
         self.trainer.optimizers[0].next_epoch(len(self.train_loader))
 
     def training_step(self, batch, batch_idx):
-        self.trainer.optimizers[0].next_batch()
+        lr_dict = self.trainer.optimizers[0].next_batch()
         batch_size, images, targets, *_ = batch
         predicts = self(images)
         aux_predicts = self.vec2box(predicts["AUX"])
@@ -97,6 +97,7 @@ class TrainModel(ValidateModel):
             batch_size=batch_size,
             rank_zero_only=True,
         )
+        self.log_dict(lr_dict, prog_bar=False, logger=True, on_epoch=False, rank_zero_only=True)
         return loss * batch_size
 
     def configure_optimizers(self):

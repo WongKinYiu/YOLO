@@ -65,9 +65,12 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
 
     def next_batch(self):
         self.batch_idx += 1
+        lr_dict = dict()
         for lr_idx, param_group in enumerate(self.param_groups):
             min_lr, max_lr = self.min_lr[lr_idx], self.max_lr[lr_idx]
             param_group["lr"] = min_lr + (self.batch_idx) * (max_lr - min_lr) / self.batch_num
+            lr_dict[f"LR/{lr_idx}"] = param_group["lr"]
+        return lr_dict
 
     optimizer_class.next_batch = next_batch
     optimizer_class.next_epoch = next_epoch

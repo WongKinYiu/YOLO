@@ -9,7 +9,6 @@ from PIL import Image
 from rich.progress import track
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
-from torch.utils.data.distributed import DistributedSampler
 
 from yolo.config.config import DataConfig, DatasetConfig
 from yolo.tools.data_augmentation import *
