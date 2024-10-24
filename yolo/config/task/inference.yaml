@@ -8,4 +8,4 @@ data:
 nms:
   min_confidence: 0.5
   min_iou: 0.5
-# save_predict: True
+save_predict: True

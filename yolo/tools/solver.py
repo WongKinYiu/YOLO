@@ -1,9 +1,15 @@
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
 from lightning import LightningModule
 from torchmetrics.detection import MeanAveragePrecision
 
 from yolo.config.config import Config
 from yolo.model.yolo import create_model
 from yolo.tools.data_loader import create_dataloader
+from yolo.tools.drawer import draw_bboxes
 from yolo.tools.loss_functions import create_loss_function
 from yolo.utils.bounding_box_utils import create_converter, to_metrics_format
 from yolo.utils.model_utils import PostProccess, create_optimizer, create_scheduler
@@ -103,3 +109,46 @@ class TrainModel(ValidateModel):
         optimizer = create_optimizer(self.model, self.cfg.task.optimizer)
         scheduler = create_scheduler(optimizer, self.cfg.task.scheduler)
         return [optimizer], [scheduler]
+
+
+class InferenceModel(BaseModel):
+    def __init__(self, cfg: Config):
+        super().__init__(cfg)
+        self.cfg = cfg
+        # TODO: Add FastModel
+        self.predict_loader = create_dataloader(cfg.task.data, cfg.dataset, cfg.task.task)
+
+    def setup(self, stage):
+        self.vec2box = create_converter(
+            self.cfg.model.name, self.model, self.cfg.model.anchor, self.cfg.image_size, self.device
+        )
+        self.post_process = PostProcess(self.vec2box, self.cfg.task.nms)
+
+    def predict_dataloader(self):
+        return self.predict_loader
+
+    def predict_step(self, batch, batch_idx):
+        images, rev_tensor, origin_frame = batch
+        predicts = self.post_process(self(images), rev_tensor)
+        img = draw_bboxes(origin_frame, predicts, idx2label=self.cfg.dataset.class_list)
+        if getattr(self.predict_loader, "is_stream", None):
+            fps = self._display_stream(img)
+        else:
+            fps = None
+        if getattr(self.cfg.task, "save_predict", None):
+            self._save_image(img, batch_idx)
+        return img, fps
+
+    def _display_stream(self, img):
+        img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+        fps = 1 / (time.time() - self.trainer.current_epoch_start_time)
+        cv2.putText(img, f"FPS: {fps:.2f}", (0, 15), 0, 0.5, (100, 255, 0), 1, cv2.LINE_AA)
+        cv2.imshow("Prediction", img)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            self.trainer.should_stop = True
+        return fps
+
+    def _save_image(self, img, batch_idx):
+        save_image_path = Path(self.logger.save_dir) / f"frame{batch_idx:03d}.png"
+        img.save(save_image_path)
+        print(f"💾 Saved visualize image at {save_image_path}")
