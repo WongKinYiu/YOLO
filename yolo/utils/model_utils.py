@@ -4,7 +4,6 @@ from typing import List, Optional, Type, Union
 
 import torch
 import torch.distributed as dist
-from loguru import logger
 from omegaconf import ListConfig
 from torch import Tensor
 from torch.optim import Optimizer
@@ -13,6 +12,7 @@ from torch.optim.lr_scheduler import LambdaLR, SequentialLR, _LRScheduler
 from yolo.config.config import IDX_TO_ID, NMSConfig, OptimizerConfig, SchedulerConfig
 from yolo.model.yolo import YOLO
 from yolo.utils.bounding_box_utils import bbox_nms, transform_bbox
+from yolo.utils.logger import logger
 
 
 class ExponentialMovingAverage:
@@ -52,9 +52,9 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
     conv_params = [p for name, p in model.named_parameters() if "weight" in name and "bn" not in name]
 
     model_parameters = [
-        {"params": bias_params, "weight_decay": 0},
-        {"params": conv_params},
-        {"params": norm_params, "weight_decay": 0},
+        {"params": bias_params, "momentum": 0.8, "weight_decay": 0},
+        {"params": conv_params, "momentum": 0.8},
+        {"params": norm_params, "momentum": 0.8, "weight_decay": 0},
     ]
 
     def next_epoch(self, batch_num):
@@ -65,12 +65,16 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
 
     def next_batch(self):
         self.batch_idx += 1
+        lr_dict = dict()
         for lr_idx, param_group in enumerate(self.param_groups):
             min_lr, max_lr = self.min_lr[lr_idx], self.max_lr[lr_idx]
             param_group["lr"] = min_lr + (self.batch_idx) * (max_lr - min_lr) / self.batch_num
+            lr_dict[f"LR/{lr_idx}"] = param_group["lr"]
+        return lr_dict
 
     optimizer_class.next_batch = next_batch
     optimizer_class.next_epoch = next_epoch
+
     optimizer = optimizer_class(model_parameters, **optim_cfg.args)
     optimizer.max_lr = [0.1, 0, 0]
     return optimizer
@@ -168,6 +172,7 @@ def predicts_to_json(img_paths, predicts, rev_tensor):
     batch_json = []
     for img_path, bboxes, box_reverse in zip(img_paths, predicts, rev_tensor):
         scale, shift = box_reverse.split([1, 4])
+        bboxes = bboxes.clone()
         bboxes[:, 1:5] = (bboxes[:, 1:5] - shift[None]) / scale[None]
         bboxes[:, 1:5] = transform_bbox(bboxes[:, 1:5], "xyxy -> xywh")
         for cls, *pos, conf in bboxes:

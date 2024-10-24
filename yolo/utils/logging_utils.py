@@ -11,55 +11,39 @@ Example:
     custom_logger()
 """
 
-import os
-import random
-import sys
+import logging
 from collections import deque
+from logging import FileHandler
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 import wandb
-import wandb.errors.term
-from loguru import logger
+from lightning import LightningModule, Trainer, seed_everything
+from lightning.pytorch.callbacks import Callback, RichModelSummary, RichProgressBar
+from lightning.pytorch.callbacks.progress.rich_progress import CustomProgress
+from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
+from lightning.pytorch.utilities import rank_zero_only
 from omegaconf import ListConfig
+from rich import get_console, reconfigure
 from rich.console import Console, Group
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeRemainingColumn,
-)
+from rich.logging import RichHandler
 from rich.table import Table
+from rich.text import Text
 from torch import Tensor
 from torch.nn import ModuleList
-from torch.optim import Optimizer
-from torchvision.transforms.functional import pil_to_tensor
+from typing_extensions import override
 
 from yolo.config.config import Config, YOLOLayer
 from yolo.model.yolo import YOLO
-from yolo.tools.drawer import draw_bboxes
+from yolo.utils.logger import logger
 from yolo.utils.solver_utils import make_ap_table
-
-
-def custom_logger(quite: bool = False):
-    logger.remove()
-    if quite:
-        return
-    logger.add(
-        sys.stderr,
-        colorize=True,
-        format="<fg #003385>[{time:MM/DD HH:mm:ss}]</> <level>{level: ^8}</level>| <level>{message}</level>",
-    )
 
 
 # TODO: should be moved to correct position
 def set_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
+    seed_everything(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
@@ -67,189 +51,220 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
-class ProgressLogger(Progress):
-    def __init__(self, cfg: Config, exp_name: str, *args, **kwargs):
-        set_seed(cfg.lucky_number)
-        self.local_rank = int(os.getenv("LOCAL_RANK", "0"))
-        self.quite_mode = self.local_rank or getattr(cfg, "quite", False)
-        custom_logger(self.quite_mode)
-        self.save_path = validate_log_directory(cfg, exp_name=cfg.name)
-
-        progress_bar = (
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(bar_width=None),
-            TextColumn("{task.completed:.0f}/{task.total:.0f}"),
-            TimeRemainingColumn(),
-        )
-        self.ap_table = Table()
-        # TODO: load maxlen by config files
-        self.ap_past_list = deque(maxlen=5)
-        self.last_result = 0
-        super().__init__(*args, *progress_bar, **kwargs)
-
-        self.use_wandb = cfg.use_wandb
-        if self.use_wandb and self.local_rank == 0:
-            wandb.errors.term._log = custom_wandb_log
-            self.wandb = wandb.init(
-                project="YOLO", resume="allow", mode="online", dir=self.save_path, id=None, name=exp_name
-            )
-
-        self.use_tensorboard = cfg.use_tensorboard
-        if self.use_tensorboard and self.local_rank == 0:
-            from torch.utils.tensorboard import SummaryWriter
-
-            self.tb_writer = SummaryWriter(log_dir=self.save_path / "tensorboard")
-            logger.opt(colors=True).info(f"📍 Enable TensorBoard locally at <blue><u>http://localhost:6006</></>")
-
-    def rank_check(logging_function):
-        def wrapper(self, *args, **kwargs):
-            if getattr(self, "local_rank", 0) != 0:
-                return
-            return logging_function(self, *args, **kwargs)
-
-        return wrapper
-
+class YOLOCustomProgress(CustomProgress):
     def get_renderable(self):
-        renderable = Group(*self.get_renderables(), self.ap_table)
+        renderable = Group(*self.get_renderables())
+        if hasattr(self, "table"):
+            renderable = Group(*self.get_renderables(), self.table)
         return renderable
 
-    @rank_check
-    def start_train(self, num_epochs: int):
-        self.task_epoch = self.add_task(f"[cyan]Start Training {num_epochs} epochs", total=num_epochs)
-        self.update(self.task_epoch, advance=-0.5)
 
-    @rank_check
-    def start_one_epoch(
-        self, num_batches: int, task: str = "Train", optimizer: Optimizer = None, epoch_idx: int = None
-    ):
-        self.num_batches = num_batches
-        self.task = task
-        if hasattr(self, "task_epoch"):
-            self.update(self.task_epoch, description=f"[cyan] Preparing Data")
+class YOLORichProgressBar(RichProgressBar):
+    @override
+    @rank_zero_only
+    def _init_progress(self, trainer: "Trainer") -> None:
+        if self.is_enabled and (self.progress is None or self._progress_stopped):
+            self._reset_progress_bar_ids()
+            reconfigure(**self._console_kwargs)
+            self._console = Console()
+            self._console.clear_live()
+            self.progress = YOLOCustomProgress(
+                *self.configure_columns(trainer),
+                auto_refresh=False,
+                disable=self.is_disabled,
+                console=self._console,
+            )
+            self.progress.start()
 
-        if optimizer is not None:
-            lr_values = [params["lr"] for params in optimizer.param_groups]
-            lr_names = ["Learning Rate/bias", "Learning Rate/norm", "Learning Rate/conv"]
-            if self.use_wandb:
-                for lr_name, lr_value in zip(lr_names, lr_values):
-                    self.wandb.log({lr_name: lr_value}, step=epoch_idx)
+            self._progress_stopped = False
 
-            if self.use_tensorboard:
-                for lr_name, lr_value in zip(lr_names, lr_values):
-                    self.tb_writer.add_scalar(lr_name, lr_value, global_step=epoch_idx)
+            self.max_result = 0
+            self.past_results = deque(maxlen=5)
+            self.progress.table = Table()
 
-        self.batch_task = self.add_task(f"[green] Phase: {task}", total=num_batches)
+    @override
+    def _get_train_description(self, current_epoch: int) -> str:
+        return Text("[cyan]Train [white]|")
 
-    @rank_check
-    def one_batch(self, batch_info: Dict[str, Tensor] = None):
-        epoch_descript = "[cyan]" + self.task + "[white] |"
-        batch_descript = "|"
-        if self.task == "Train":
-            self.update(self.task_epoch, advance=1 / self.num_batches)
-        for info_name, info_val in batch_info.items():
-            epoch_descript += f"{info_name: ^9}|"
-            batch_descript += f"   {info_val:2.2f}  |"
-        self.update(self.batch_task, advance=1, description=f"[green]{self.task} [white]{batch_descript}")
-        if hasattr(self, "task_epoch"):
-            self.update(self.task_epoch, description=epoch_descript)
+    @override
+    @rank_zero_only
+    def on_train_start(self, trainer, pl_module):
+        self._init_progress(trainer)
+        num_epochs = trainer.max_epochs - 1
+        self.task_epoch = self._add_task(
+            total_batches=num_epochs,
+            description=f"[cyan]Start Training {num_epochs} epochs",
+        )
+        self.max_result = 0
+        self.past_results.clear()
+        self.progress.update(self.task_epoch, advance=-0.5)
 
-    @rank_check
-    def finish_one_epoch(self, batch_info: Dict[str, Any] = None, epoch_idx: int = -1):
-        if self.task == "Train":
-            prefix = "Loss"
-        elif self.task == "Validate":
-            prefix = "Metrics"
-        batch_info = {f"{prefix}/{key}": value for key, value in batch_info.items()}
-        if self.use_wandb:
-            self.wandb.log(batch_info, step=epoch_idx)
-        if self.use_tensorboard:
-            for key, value in batch_info.items():
-                self.tb_writer.add_scalar(key, value, epoch_idx)
+    @override
+    @rank_zero_only
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch: Any, batch_idx: int):
+        self._update(self.train_progress_bar_id, batch_idx + 1)
+        self._update_metrics(trainer, pl_module)
+        epoch_descript = "[cyan]Train [white]|"
+        batch_descript = "[green]Train [white]|"
+        metrics = self.get_metrics(trainer, pl_module)
+        metrics.pop("v_num")
+        for metrics_name, metrics_val in metrics.items():
+            if "Loss_step" in metrics_name:
+                epoch_descript += f"{metrics_name.removesuffix('_step').split('/')[1]: ^9}|"
+                batch_descript += f"   {metrics_val:2.2f}  |"
 
-        self.remove_task(self.batch_task)
-
-    @rank_check
-    def visualize_image(
-        self,
-        images: Optional[Tensor] = None,
-        ground_truth: Optional[Tensor] = None,
-        prediction: Optional[Union[List[Tensor], Tensor]] = None,
-        epoch_idx: int = 0,
-    ) -> None:
-        """
-        Upload the ground truth bounding boxes, predicted bounding boxes, and the original image to wandb or TensorBoard.
-
-        Args:
-            images (Optional[Tensor]): Tensor of images with shape (BZ, 3, 640, 640).
-            ground_truth (Optional[Tensor]): Ground truth bounding boxes with shape (BZ, N, 5) or (N, 5). Defaults to None.
-            prediction (prediction: Optional[Union[List[Tensor], Tensor]]): List of predicted bounding boxes with shape (N, 6) or (N, 6). Defaults to None.
-            epoch_idx (int): Current epoch index. Defaults to 0.
-        """
-        if images is not None:
-            images = images[0] if images.ndim == 4 else images
-            if self.use_wandb:
-                wandb.log({"Input Image": wandb.Image(images)}, step=epoch_idx)
-            if self.use_tensorboard:
-                self.tb_writer.add_image("Media/Input Image", images, 1)
-
-        if ground_truth is not None:
-            gt_boxes = ground_truth[0] if ground_truth.ndim == 3 else ground_truth
-            if self.use_wandb:
-                wandb.log(
-                    {"Ground Truth": wandb.Image(images, boxes={"predictions": {"box_data": log_bbox(gt_boxes)}})},
-                    step=epoch_idx,
-                )
-            if self.use_tensorboard:
-                self.tb_writer.add_image("Media/Ground Truth", pil_to_tensor(draw_bboxes(images, gt_boxes)), epoch_idx)
-
-        if prediction is not None:
-            pred_boxes = prediction[0] if isinstance(prediction, list) else prediction
-            if self.use_wandb:
-                wandb.log(
-                    {"Prediction": wandb.Image(images, boxes={"predictions": {"box_data": log_bbox(pred_boxes)}})},
-                    step=epoch_idx,
-                )
-            if self.use_tensorboard:
-                self.tb_writer.add_image("Media/Prediction", pil_to_tensor(draw_bboxes(images, pred_boxes)), epoch_idx)
-
-    @rank_check
-    def start_pycocotools(self):
-        self.batch_task = self.add_task("[green]Run pycocotools", total=1)
-
-    @rank_check
-    def finish_pycocotools(self, result, epoch_idx=-1):
-        ap_table, ap_main = make_ap_table(result * 100, self.ap_past_list, self.last_result, epoch_idx)
-        self.last_result = np.maximum(result, self.last_result)
-        self.ap_past_list.append((epoch_idx, ap_main))
-        self.ap_table = ap_table
-
-        if self.use_wandb:
-            self.wandb.log({"PyCOCO/AP @ .5:.95": ap_main[2], "PyCOCO/AP @ .5": ap_main[5]})
-        if self.use_tensorboard:
-            # TODO: waiting torch bugs fix, https://github.com/pytorch/pytorch/issues/32651
-            self.tb_writer.add_scalar("PyCOCO/AP @ .5:.95", ap_main[2], epoch_idx)
-            self.tb_writer.add_scalar("PyCOCO/AP @ .5", ap_main[5], epoch_idx)
-
-        self.update(self.batch_task, advance=1)
+        self.progress.update(self.task_epoch, advance=1 / self.total_train_batches, description=epoch_descript)
+        self.progress.update(self.train_progress_bar_id, description=batch_descript)
         self.refresh()
-        self.remove_task(self.batch_task)
 
-    @rank_check
-    def finish_train(self):
-        self.remove_task(self.task_epoch)
-        self.stop()
-        if self.use_wandb:
-            self.wandb.finish()
-        if self.use_tensorboard:
-            self.tb_writer.close()
+    @override
+    @rank_zero_only
+    def on_train_end(self, trainer: "Trainer", pl_module: "LightningModule") -> None:
+        self._update_metrics(trainer, pl_module)
+        self.progress.remove_task(self.train_progress_bar_id)
+        self.train_progress_bar_id = None
+
+    @override
+    @rank_zero_only
+    def on_validation_end(self, trainer: "Trainer", pl_module: "LightningModule") -> None:
+        if trainer.state.fn == "fit":
+            self._update_metrics(trainer, pl_module)
+        self.reset_dataloader_idx_tracker()
+        all_metrics = self.get_metrics(trainer, pl_module)
+
+        ap_ar_list = [
+            key
+            for key in all_metrics.keys()
+            if key.startswith(("map", "mar")) and not key.endswith(("_step", "_epoch"))
+        ]
+        score = np.array([all_metrics[key] for key in ap_ar_list]) * 100
+
+        self.progress.table, ap_main = make_ap_table(score, self.past_results, self.max_result, trainer.current_epoch)
+        self.max_result = np.maximum(score, self.max_result)
+        self.past_results.append((trainer.current_epoch, ap_main))
+
+    @override
+    def refresh(self) -> None:
+        if self.progress:
+            self.progress.refresh()
+
+    @property
+    def validation_description(self) -> str:
+        return "[green]Validation"
 
 
-def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=True, silent=False):
-    if silent:
+class YOLORichModelSummary(RichModelSummary):
+    @staticmethod
+    @override
+    def summarize(
+        summary_data: List[Tuple[str, List[str]]],
+        total_parameters: int,
+        trainable_parameters: int,
+        model_size: float,
+        total_training_modes: Dict[str, int],
+        **summarize_kwargs: Any,
+    ) -> None:
+        from lightning.pytorch.utilities.model_summary import get_human_readable_count
+
+        console = get_console()
+
+        header_style: str = summarize_kwargs.get("header_style", "bold magenta")
+        table = Table(header_style=header_style)
+        table.add_column(" ", style="dim")
+        table.add_column("Name", justify="left", no_wrap=True)
+        table.add_column("Type")
+        table.add_column("Params", justify="right")
+        table.add_column("Mode")
+
+        column_names = list(zip(*summary_data))[0]
+
+        for column_name in ["In sizes", "Out sizes"]:
+            if column_name in column_names:
+                table.add_column(column_name, justify="right", style="white")
+
+        rows = list(zip(*(arr[1] for arr in summary_data)))
+        for row in rows:
+            table.add_row(*row)
+
+        console.print(table)
+
+        parameters = []
+        for param in [trainable_parameters, total_parameters - trainable_parameters, total_parameters, model_size]:
+            parameters.append("{:<{}}".format(get_human_readable_count(int(param)), 10))
+
+        grid = Table(header_style=header_style)
+        table.add_column(" ", style="dim")
+        grid.add_column("[bold]Attributes[/]")
+        grid.add_column("Value")
+
+        grid.add_row("[bold]Trainable params[/]", f"{parameters[0]}")
+        grid.add_row("[bold]Non-trainable params[/]", f"{parameters[1]}")
+        grid.add_row("[bold]Total params[/]", f"{parameters[2]}")
+        grid.add_row("[bold]Total estimated model params size (MB)[/]", f"{parameters[3]}")
+        grid.add_row("[bold]Modules in train mode[/]", f"{total_training_modes['train']}")
+        grid.add_row("[bold]Modules in eval mode[/]", f"{total_training_modes['eval']}")
+
+        console.print(grid)
+
+
+class ImageLogger(Callback):
+    def on_validation_batch_end(self, trainer: Trainer, pl_module, outputs, batch, batch_idx) -> None:
+        if batch_idx != 0:
+            return
+        batch_size, images, targets, rev_tensor, img_paths = batch
+        gt_boxes = targets[0] if targets.ndim == 3 else targets
+        pred_boxes = outputs[0] if isinstance(outputs, list) else outputs
+        images = [images[0]]
+        step = trainer.current_epoch
+        for logger in trainer.loggers:
+            if isinstance(logger, WandbLogger):
+                logger.log_image("Input Image", images, step=step)
+                logger.log_image("Ground Truth", images, step=step, boxes=[log_bbox(gt_boxes)])
+                logger.log_image("Prediction", images, step=step, boxes=[log_bbox(pred_boxes)])
+
+
+def setup_logger(logger_name):
+    class EmojiFormatter(logging.Formatter):
+        def format(self, record, emoji=":high_voltage:"):
+            return f"{emoji} {super().format(record)}"
+
+    rich_handler = RichHandler(markup=True)
+    rich_handler.setFormatter(EmojiFormatter("%(message)s"))
+    rich_logger = logging.getLogger(logger_name)
+    if rich_logger:
+        rich_logger.handlers.clear()
+        rich_logger.addHandler(rich_handler)
+
+
+def setup(cfg: Config):
+    # seed_everything(cfg.lucky_number)
+    if hasattr(cfg, "quite"):
+        logger.removeHandler("YOLO_logger")
         return
-    for line in string.split("\n"):
-        logger.opt(raw=not newline, colors=True).info("🌐 " + line)
+
+    setup_logger("lightning.fabric")
+    setup_logger("lightning.pytorch")
+
+    def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=True, silent=False):
+        if silent:
+            return
+        for line in string.split("\n"):
+            logger.info(Text.from_ansi(":globe_with_meridians: " + line))
+
+    wandb.errors.term._log = custom_wandb_log
+
+    save_path = validate_log_directory(cfg, cfg.name)
+
+    progress, loggers = [], []
+    progress.append(YOLORichProgressBar())
+    progress.append(YOLORichModelSummary())
+    progress.append(ImageLogger())
+    if cfg.use_tensorboard:
+        loggers.append(TensorBoardLogger(log_graph="all", save_dir=save_path))
+    if cfg.use_wandb:
+        loggers.append(WandbLogger(project="YOLO", name=cfg.name, save_dir=save_path, id=None))
+
+    return progress, loggers
 
 
 def log_model_structure(model: Union[ModuleList, YOLOLayer, YOLO]):
@@ -279,6 +294,7 @@ def log_model_structure(model: Union[ModuleList, YOLOLayer, YOLO]):
     console.print(table)
 
 
+@rank_zero_only
 def validate_log_directory(cfg: Config, exp_name: str) -> Path:
     base_path = Path(cfg.out_path, cfg.task.task)
     save_path = base_path / exp_name
@@ -296,8 +312,8 @@ def validate_log_directory(cfg: Config, exp_name: str) -> Path:
             )
 
     save_path.mkdir(parents=True, exist_ok=True)
-    logger.opt(colors=True).info(f"📄 Created log folder: <u><fg #808080>{save_path}</></>")
-    logger.add(save_path / "output.log", mode="w", backtrace=True, diagnose=True)
+    logger.info(f"📄 Created log folder: [blue b u]{save_path}[/]")
+    logger.addHandler(FileHandler(save_path / "output.log"))
     return save_path
 
 
@@ -332,4 +348,4 @@ def log_bbox(
             bbox_entry["scores"] = {"confidence": conf[0]}
         bbox_list.append(bbox_entry)
 
-    return bbox_list
+    return {"predictions": {"box_data": bbox_list}}

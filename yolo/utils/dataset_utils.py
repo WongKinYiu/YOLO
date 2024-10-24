@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-from loguru import logger
+import torch
 
 from yolo.tools.data_conversion import discretize_categories
+from yolo.utils.logger import logger
 
 
 def locate_label_paths(dataset_path: Path, phase_name: Path) -> Tuple[Path, Path]:
@@ -111,3 +112,16 @@ def scale_segmentation(
         seg_array_with_cat.append(scaled_flat_seg_data)
 
     return seg_array_with_cat
+
+
+def tensorlize(data):
+    img_paths, bboxes = zip(*data)
+    max_box = max(bbox.size(0) for bbox in bboxes)
+    padded_bbox_list = []
+    for bbox in bboxes:
+        padding = torch.full((max_box, 5), -1, dtype=torch.float32)
+        padding[: bbox.size(0)] = bbox
+        padded_bbox_list.append(padding)
+    bboxes = np.stack(padded_bbox_list)
+    img_paths = np.array(img_paths)
+    return img_paths, bboxes
