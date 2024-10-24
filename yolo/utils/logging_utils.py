@@ -223,21 +223,27 @@ class ImageLogger(Callback):
                 logger.log_image("Prediction", images, step=step, boxes=[log_bbox(pred_boxes)])
 
 
+def setup_logger(logger_name):
+    class EmojiFormatter(logging.Formatter):
+        def format(self, record, emoji=":high_voltage:"):
+            return f"{emoji} {super().format(record)}"
+
+    rich_handler = RichHandler(markup=True)
+    rich_handler.setFormatter(EmojiFormatter("%(message)s"))
+    rich_logger = logging.getLogger(logger_name)
+    if rich_logger:
+        rich_logger.handlers.clear()
+        rich_logger.addHandler(rich_handler)
+
+
 def setup(cfg: Config):
-    seed_everything(cfg.lucky_number)
+    # seed_everything(cfg.lucky_number)
     if hasattr(cfg, "quite"):
         logger.removeHandler("YOLO_logger")
         return
 
-    class EmojiFormatter(logging.Formatter):
-        def format(self, record):
-            return f":high_voltage: {super().format(record)}"
-
-    rich_handler = RichHandler(markup=True)
-    rich_handler.setFormatter(EmojiFormatter("%(message)s"))
-    lightning_logger = logging.getLogger("lightning.pytorch")
-    lightning_logger.handlers.clear()
-    lightning_logger.addHandler(rich_handler)
+    setup_logger("lightning.fabric")
+    setup_logger("lightning.pytorch")
 
     def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=True, silent=False):
         if silent:
@@ -288,6 +294,7 @@ def log_model_structure(model: Union[ModuleList, YOLOLayer, YOLO]):
     console.print(table)
 
 
+@rank_zero_only
 def validate_log_directory(cfg: Config, exp_name: str) -> Path:
     base_path = Path(cfg.out_path, cfg.task.task)
     save_path = base_path / exp_name
@@ -305,7 +312,7 @@ def validate_log_directory(cfg: Config, exp_name: str) -> Path:
             )
 
     save_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"📄 Created log folder: [blue b u]123{save_path}[/]")
+    logger.info(f"📄 Created log folder: [blue b u]{save_path}[/]")
     logger.addHandler(FileHandler(save_path / "output.log"))
     return save_path
 
