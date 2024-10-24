@@ -8,7 +8,7 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
 from yolo.config.config import Config
-from yolo.tools.solver import TrainModel, ValidateModel
+from yolo.tools.solver import InferenceModel, TrainModel, ValidateModel
 from yolo.utils.logging_utils import setup
 
 
@@ -34,6 +34,9 @@ def main(cfg: Config):
         case "validation":
             model = ValidateModel(cfg)
             trainer.validate(model)
+        case "inference":
+            model = InferenceModel(cfg)
+            trainer.predict(model)
 
 
 if __name__ == "__main__":
