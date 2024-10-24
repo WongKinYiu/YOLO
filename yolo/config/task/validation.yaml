@@ -8,5 +8,5 @@ data:
   pin_memory: True
   data_augment: {}
 nms:
-  min_confidence: 0.05
-  min_iou: 0.9
+  min_confidence: 0.0001
+  min_iou: 0.7
