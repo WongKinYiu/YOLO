@@ -223,7 +223,7 @@ class ImageLogger(Callback):
                 logger.log_image("Prediction", images, step=step, boxes=[log_bbox(pred_boxes)])
 
 
-def setup_logger(logger_name):
+def setup_logger(logger_name, quite=False):
     class EmojiFormatter(logging.Formatter):
         def format(self, record, emoji=":high_voltage:"):
             return f"{emoji} {super().format(record)}"
@@ -234,16 +234,14 @@ def setup_logger(logger_name):
     if rich_logger:
         rich_logger.handlers.clear()
         rich_logger.addHandler(rich_handler)
+        if quite:
+            rich_logger.setLevel(logging.ERROR)
 
 
 def setup(cfg: Config):
-    # seed_everything(cfg.lucky_number)
-    if hasattr(cfg, "quite"):
-        logger.removeHandler("YOLO_logger")
-        return
-
-    setup_logger("lightning.fabric")
-    setup_logger("lightning.pytorch")
+    quite = hasattr(cfg, "quite")
+    setup_logger("lightning.fabric", quite=quite)
+    setup_logger("lightning.pytorch", quite=quite)
 
     def custom_wandb_log(string="", level=int, newline=True, repeat=True, prefix=True, silent=False):
         if silent:
@@ -256,6 +254,11 @@ def setup(cfg: Config):
     save_path = validate_log_directory(cfg, cfg.name)
 
     progress, loggers = [], []
+
+    if quite:
+        logger.setLevel(logging.ERROR)
+        return progress, loggers, save_path
+
     progress.append(YOLORichProgressBar())
     progress.append(YOLORichModelSummary())
     progress.append(ImageLogger())
@@ -264,7 +267,7 @@ def setup(cfg: Config):
     if cfg.use_wandb:
         loggers.append(WandbLogger(project="YOLO", name=cfg.name, save_dir=save_path, id=None))
 
-    return progress, loggers
+    return progress, loggers, save_path
 
 
 def log_model_structure(model: Union[ModuleList, YOLOLayer, YOLO]):
@@ -312,7 +315,8 @@ def validate_log_directory(cfg: Config, exp_name: str) -> Path:
             )
 
     save_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"📄 Created log folder: [blue b u]{save_path}[/]")
+    if not getattr(cfg, "quite", False):
+        logger.info(f"📄 Created log folder: [blue b u]{save_path}[/]")
     logger.addHandler(FileHandler(save_path / "output.log"))
     return save_path
 
