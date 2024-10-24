@@ -149,6 +149,6 @@ class InferenceModel(BaseModel):
         return fps
 
     def _save_image(self, img, batch_idx):
-        save_image_path = Path(self.logger.save_dir) / f"frame{batch_idx:03d}.png"
+        save_image_path = Path(self.trainer.default_root_dir) / f"frame{batch_idx:03d}.png"
         img.save(save_image_path)
         print(f"💾 Saved visualize image at {save_image_path}")

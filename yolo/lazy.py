@@ -14,7 +14,7 @@ from yolo.utils.logging_utils import setup
 
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main(cfg: Config):
-    callbacks, loggers = setup(cfg)
+    callbacks, loggers, save_path = setup(cfg)
 
     trainer = Trainer(
         accelerator="cuda",
@@ -25,6 +25,8 @@ def main(cfg: Config):
         log_every_n_steps=1,
         gradient_clip_val=10,
         deterministic=True,
+        enable_progress_bar=not getattr(cfg, "quite", False),
+        default_root_dir=save_path,
     )
 
     match cfg.task.task:

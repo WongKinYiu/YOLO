@@ -67,7 +67,8 @@ def model_v7(inference_v7_cfg: Config, device) -> YOLO:
 
 @pytest.fixture(scope="session")
 def solver(train_cfg: Config) -> Trainer:
-    callbacks, loggers = setup(train_cfg)
+    train_cfg.use_wandb = False
+    callbacks, loggers, save_path = setup(train_cfg)
     trainer = Trainer(
         accelerator="cuda",
         max_epochs=getattr(train_cfg.task, "epoch", None),
@@ -77,6 +78,7 @@ def solver(train_cfg: Config) -> Trainer:
         log_every_n_steps=1,
         gradient_clip_val=10,
         deterministic=True,
+        default_root_dir=save_path,
     )
     return trainer
 
