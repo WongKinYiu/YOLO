@@ -293,7 +293,7 @@ class BoxMatcher:
         normalize_term = normalize_term.permute(0, 2, 1).gather(2, unique_indices)
         align_cls = align_cls * normalize_term * valid_mask[:, :, None]
         anchor_matched_targets = torch.cat([align_cls, align_bbox], dim=-1)
-        return anchor_matched_targets, valid_mask
+        return anchor_matched_targets, valid_mask.bool()
 
 
 class Vec2Box:
