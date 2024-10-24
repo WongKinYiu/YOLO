@@ -12,7 +12,7 @@ sys.path.append(str(project_root))
 from yolo.config.config import Config
 from yolo.model.yolo import YOLO
 from yolo.tools.data_loader import StreamDataLoader
-from yolo.tools.solver import TrainModel, ValidateModel
+from yolo.tools.solver import InferenceModel, TrainModel, ValidateModel
 from yolo.utils.bounding_box_utils import Anc2Box, Vec2Box
 
 
@@ -37,32 +37,36 @@ def test_model_validator_solve_mock_dataset(
 
 
 @pytest.fixture
-def model_tester(inference_cfg: Config, model: YOLO, vec2box: Vec2Box, validation_progress_logger, device):
-    tester = ModelTester(inference_cfg, model, vec2box, validation_progress_logger, device)
+def model_tester(inference_cfg: Config):
+    tester = InferenceModel(inference_cfg)
     return tester
 
 
 @pytest.fixture
-def modelv7_tester(inference_v7_cfg: Config, model_v7: YOLO, anc2box: Anc2Box, validation_progress_logger, device):
-    tester = ModelTester(inference_v7_cfg, model_v7, anc2box, validation_progress_logger, device)
+def modelv7_tester(inference_v7_cfg: Config):
+    tester = InferenceModel(inference_v7_cfg)
     return tester
 
 
-def test_model_tester_initialization(model_tester: ModelTester):
+def test_model_tester_initialization(solver: Trainer, model_tester: InferenceModel):
     assert isinstance(model_tester.model, YOLO)
-    assert hasattr(model_tester, "solve")
+    assert hasattr(solver, "predict")
 
 
-def test_model_tester_solve_single_image(model_tester: ModelTester, file_stream_data_loader: StreamDataLoader):
-    model_tester.solve(file_stream_data_loader)
+def test_model_tester_solve_single_image(
+    solver: Trainer, model_tester: InferenceModel, file_stream_data_loader: StreamDataLoader
+):
+    solver.predict(model_tester, file_stream_data_loader)
 
 
-def test_modelv7_tester_solve_single_image(modelv7_tester: ModelTester, file_stream_data_loader_v7: StreamDataLoader):
-    modelv7_tester.solve(file_stream_data_loader_v7)
+def test_modelv7_tester_solve_single_image(
+    solver: Trainer, modelv7_tester: InferenceModel, file_stream_data_loader_v7: StreamDataLoader
+):
+    solver.predict(modelv7_tester, file_stream_data_loader_v7)
 
 
 @pytest.fixture
-def model_trainer(train_cfg: Config, model: YOLO, vec2box: Vec2Box, train_progress_logger, device):
+def model_trainer(train_cfg: Config):
     train_cfg.task.epoch = 2
     trainer = TrainModel(train_cfg)
     return trainer
