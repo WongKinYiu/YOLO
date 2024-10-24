@@ -127,6 +127,7 @@ class TrainConfig:
     task: str
     epoch: int
     data: DataConfig
+    eval_interval: int
     optimizer: OptimizerConfig
     loss: LossConfig
     scheduler: SchedulerConfig
