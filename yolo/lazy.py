@@ -24,6 +24,7 @@ def main(cfg: Config):
         logger=loggers,
         log_every_n_steps=1,
         gradient_clip_val=10,
+        deterministic=True,
     )
 
     match cfg.task.task:
