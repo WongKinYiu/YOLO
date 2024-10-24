@@ -1,8 +1,5 @@
-import time
 from pathlib import Path
 
-import cv2
-import numpy as np
 from lightning import LightningModule
 from torchmetrics.detection import MeanAveragePrecision
 
@@ -138,15 +135,6 @@ class InferenceModel(BaseModel):
         if getattr(self.cfg.task, "save_predict", None):
             self._save_image(img, batch_idx)
         return img, fps
-
-    def _display_stream(self, img):
-        img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-        fps = 1 / (time.time() - self.trainer.current_epoch_start_time)
-        cv2.putText(img, f"FPS: {fps:.2f}", (0, 15), 0, 0.5, (100, 255, 0), 1, cv2.LINE_AA)
-        cv2.imshow("Prediction", img)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            self.trainer.should_stop = True
-        return fps
 
     def _save_image(self, img, batch_idx):
         save_image_path = Path(self.trainer.default_root_dir) / f"frame{batch_idx:03d}.png"
