@@ -46,7 +46,7 @@ class YoloDataset(Dataset):
         Returns:
             dict: The loaded data from the cache for the specified phase.
         """
-        cache_path = dataset_path / f"{phase_name}.cache1"
+        cache_path = dataset_path / f"{phase_name}.cache"
 
         if not cache_path.exists():
             logger.info(f":factory: Generating {phase_name} cache")
