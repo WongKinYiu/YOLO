@@ -70,7 +70,7 @@ def solver(train_cfg: Config) -> Trainer:
     train_cfg.use_wandb = False
     callbacks, loggers, save_path = setup(train_cfg)
     trainer = Trainer(
-        accelerator="cuda",
+        accelerator="auto",
         max_epochs=getattr(train_cfg.task, "epoch", None),
         precision="16-mixed",
         callbacks=callbacks,

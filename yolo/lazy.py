@@ -17,7 +17,7 @@ def main(cfg: Config):
     callbacks, loggers, save_path = setup(cfg)
 
     trainer = Trainer(
-        accelerator="cuda",
+        accelerator="auto",
         max_epochs=getattr(cfg.task, "epoch", None),
         precision="16-mixed",
         callbacks=callbacks,
@@ -29,16 +29,15 @@ def main(cfg: Config):
         default_root_dir=save_path,
     )
 
-    match cfg.task.task:
-        case "train":
-            model = TrainModel(cfg)
-            trainer.fit(model)
-        case "validation":
-            model = ValidateModel(cfg)
-            trainer.validate(model)
-        case "inference":
-            model = InferenceModel(cfg)
-            trainer.predict(model)
+    if cfg.task.task == "train":
+        model = TrainModel(cfg)
+        trainer.fit(model)
+    if cfg.task.task == "validation":
+        model = ValidateModel(cfg)
+        trainer.validate(model)
+    if cfg.task.task == "inference":
+        model = InferenceModel(cfg)
+        trainer.predict(model)
 
 
 if __name__ == "__main__":
