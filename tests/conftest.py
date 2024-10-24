@@ -4,15 +4,16 @@ from pathlib import Path
 import pytest
 import torch
 from hydra import compose, initialize
+from lightning import Trainer
 
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
 from yolo import Anc2Box, Config, Vec2Box, create_converter, create_model
 from yolo.model.yolo import YOLO
-from yolo.tools.data_loader import StreamDataLoader, YoloDataLoader
+from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 from yolo.tools.dataset_preparation import prepare_dataset
-from yolo.utils.logging_utils import ProgressLogger, set_seed
+from yolo.utils.logging_utils import set_seed, setup
 
 
 def pytest_configure(config):
@@ -53,18 +54,6 @@ def device():
 
 
 @pytest.fixture(scope="session")
-def train_progress_logger(train_cfg: Config):
-    progress_logger = ProgressLogger(train_cfg, exp_name=train_cfg.name)
-    return progress_logger
-
-
-@pytest.fixture(scope="session")
-def validation_progress_logger(validation_cfg: Config):
-    progress_logger = ProgressLogger(validation_cfg, exp_name=validation_cfg.name)
-    return progress_logger
-
-
-@pytest.fixture(scope="session")
 def model(train_cfg: Config, device) -> YOLO:
     model = create_model(train_cfg.model)
     return model.to(device)
@@ -74,6 +63,22 @@ def model(train_cfg: Config, device) -> YOLO:
 def model_v7(inference_v7_cfg: Config, device) -> YOLO:
     model = create_model(inference_v7_cfg.model)
     return model.to(device)
+
+
+@pytest.fixture(scope="session")
+def solver(train_cfg: Config) -> Trainer:
+    callbacks, loggers = setup(train_cfg)
+    trainer = Trainer(
+        accelerator="cuda",
+        max_epochs=getattr(train_cfg.task, "epoch", None),
+        precision="16-mixed",
+        callbacks=callbacks,
+        logger=loggers,
+        log_every_n_steps=1,
+        gradient_clip_val=10,
+        deterministic=True,
+    )
+    return trainer
 
 
 @pytest.fixture(scope="session")
@@ -93,13 +98,13 @@ def anc2box(inference_v7_cfg: Config, model: YOLO, device) -> Anc2Box:
 @pytest.fixture(scope="session")
 def train_dataloader(train_cfg: Config):
     prepare_dataset(train_cfg.dataset, task="train")
-    return YoloDataLoader(train_cfg.task.data, train_cfg.dataset, train_cfg.task.task)
+    return create_dataloader(train_cfg.task.data, train_cfg.dataset, train_cfg.task.task)
 
 
 @pytest.fixture(scope="session")
 def validation_dataloader(validation_cfg: Config):
     prepare_dataset(validation_cfg.dataset, task="val")
-    return YoloDataLoader(validation_cfg.task.data, validation_cfg.dataset, validation_cfg.task.task)
+    return create_dataloader(validation_cfg.task.data, validation_cfg.dataset, validation_cfg.task.task)
 
 
 @pytest.fixture(scope="session")

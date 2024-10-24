@@ -4,10 +4,11 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 import torch.nn.functional as F
 from einops import rearrange
-from torch import Tensor, arange, tensor
+from torch import Tensor, tensor
+from torchmetrics.detection import MeanAveragePrecision
 from torchvision.ops import batched_nms
 
-from yolo.config.config import AnchorConfig, MatcherConfig, ModelConfig, NMSConfig
+from yolo.config.config import AnchorConfig, MatcherConfig, NMSConfig
 from yolo.model.yolo import YOLO
 from yolo.utils.logger import logger
 
@@ -406,50 +407,9 @@ def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Opt
     return predicts_nms
 
 
-def calculate_map(predictions, ground_truths, iou_thresholds=arange(0.5, 1, 0.05)) -> Dict[str, Tensor]:
-    # TODO: Refactor this block, Flexible for calculate different mAP condition?
-    device = predictions.device
-    n_preds = predictions.size(0)
-    n_gts = (ground_truths[:, 0] != -1).sum()
-    ground_truths = ground_truths[:n_gts]
-    aps = []
-
-    ious = calculate_iou(predictions[:, 1:-1], ground_truths[:, 1:])  # [n_preds, n_gts]
-
-    for threshold in iou_thresholds:
-        tp = torch.zeros(n_preds, device=device, dtype=bool)
-
-        max_iou, max_indices = ious.max(dim=1)
-        above_threshold = max_iou >= threshold
-        matched_classes = predictions[:, 0] == ground_truths[max_indices, 0]
-        max_match = torch.zeros_like(ious)
-        max_match[arange(n_preds), max_indices] = max_iou
-        if max_match.size(0):
-            tp[max_match.argmax(dim=0)] = True
-        tp[~above_threshold | ~matched_classes] = False
-
-        _, indices = torch.sort(predictions[:, 1], descending=True)
-        tp = tp[indices]
-
-        tp_cumsum = torch.cumsum(tp, dim=0)
-        fp_cumsum = torch.cumsum(~tp, dim=0)
-
-        precision = tp_cumsum / (tp_cumsum + fp_cumsum + 1e-6)
-        recall = tp_cumsum / (n_gts + 1e-6)
-
-        precision = torch.cat([torch.ones(1, device=device), precision, torch.zeros(1, device=device)])
-        recall = torch.cat([torch.zeros(1, device=device), recall, torch.ones(1, device=device)])
-
-        precision, _ = torch.cummax(precision.flip(0), dim=0)
-        precision = precision.flip(0)
-
-        ap = torch.trapezoid(precision, recall)
-        aps.append(ap)
-
-    mAP = {
-        "mAP.5": aps[0],
-        "mAP.5:.95": torch.mean(torch.stack(aps)),
-    }
+def calculate_map(predictions, ground_truths) -> Dict[str, Tensor]:
+    metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy")
+    mAP = metric([to_metrics_format(predictions)], [to_metrics_format(ground_truths)])
     return mAP
 
 

@@ -119,7 +119,7 @@ class DualLoss:
 
     def __call__(
         self, aux_predicts: List[Tensor], main_predicts: List[Tensor], targets: Tensor
-    ) -> Tuple[Tensor, Dict[str, Tensor]]:
+    ) -> Tuple[Tensor, Dict[str, float]]:
         # TODO: Need Refactor this region, make it flexible!
         aux_iou, aux_dfl, aux_cls = self.loss(aux_predicts, targets)
         main_iou, main_dfl, main_cls = self.loss(main_predicts, targets)
