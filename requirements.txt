@@ -1,6 +1,7 @@
 einops
 graphviz
 hydra-core
+lightning
 loguru
 numpy
 opencv-python
