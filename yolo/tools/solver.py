@@ -6,7 +6,7 @@ from yolo.model.yolo import create_model
 from yolo.tools.data_loader import create_dataloader
 from yolo.tools.loss_functions import create_loss_function
 from yolo.utils.bounding_box_utils import create_converter, to_metrics_format
-from yolo.utils.model_utils import PostProccess, create_optimizer, create_scheduler
+from yolo.utils.model_utils import PostProcess, create_optimizer, create_scheduler
 
 
 class BaseModel(LightningModule):
@@ -34,14 +34,14 @@ class ValidateModel(BaseModel):
         self.vec2box = create_converter(
             self.cfg.model.name, self.model, self.cfg.model.anchor, self.cfg.image_size, self.device
         )
-        self.post_proccess = PostProccess(self.vec2box, self.validation_cfg.nms)
+        self.post_process = PostProcess(self.vec2box, self.validation_cfg.nms)
 
     def val_dataloader(self):
         return self.val_loader
 
     def validation_step(self, batch, batch_idx):
         batch_size, images, targets, rev_tensor, img_paths = batch
-        predicts = self.post_proccess(self(images))
+        predicts = self.post_process(self(images))
         batch_metrics = self.metric(
             [to_metrics_format(predict) for predict in predicts], [to_metrics_format(target) for target in targets]
         )

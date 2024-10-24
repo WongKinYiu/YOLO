@@ -124,7 +124,7 @@ def get_device(device_spec: Union[str, int, List[int]]) -> torch.device:
     return device, ddp_flag
 
 
-class PostProccess:
+class PostProcess:
     """
     TODO: function document
     scale back the prediction and do nms for pred_bbox

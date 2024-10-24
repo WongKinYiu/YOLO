@@ -10,7 +10,7 @@ from yolo.utils.logging_utils import (
     YOLORichModelSummary,
     YOLORichProgressBar,
 )
-from yolo.utils.model_utils import PostProccess
+from yolo.utils.model_utils import PostProcess
 
 all = [
     "create_model",
@@ -29,5 +29,5 @@ all = [
     "create_dataloader",
     "FastModelLoader",
     "TrainModel",
-    "PostProccess",
+    "PostProcess",
 ]
