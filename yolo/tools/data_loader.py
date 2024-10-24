@@ -18,36 +18,9 @@ from yolo.utils.dataset_utils import (
     create_image_metadata,
     locate_label_paths,
     scale_segmentation,
+    tensorlize,
 )
 from yolo.utils.logger import logger
-
-
-def tensorlize(data):
-    # TODO Move Tensorlize to helper
-    img_paths, bboxes = zip(*data)
-    max_box = max(bbox.size(0) for bbox in bboxes)
-    padded_bbox_list = []
-    for bbox in bboxes:
-        padding = torch.full((max_box, 5), -1, dtype=torch.float32)
-        padding[: bbox.size(0)] = bbox
-        padded_bbox_list.append(padding)
-    bboxes = np.stack(padded_bbox_list)
-    img_paths = np.array(img_paths)
-    return img_paths, bboxes
-
-
-def tensorlize(data):
-    # TODO Move Tensorlize to helper
-    img_paths, bboxes = zip(*data)
-    max_box = max(bbox.size(0) for bbox in bboxes)
-    padded_bbox_list = []
-    for bbox in bboxes:
-        padding = torch.full((max_box, 5), -1, dtype=torch.float32)
-        padding[: bbox.size(0)] = bbox
-        padded_bbox_list.append(padding)
-    bboxes = np.stack(padded_bbox_list)
-    img_paths = np.array(img_paths)
-    return img_paths, bboxes
 
 
 class YoloDataset(Dataset):
@@ -160,7 +133,7 @@ class YoloDataset(Dataset):
             return torch.zeros((0, 5))
 
     def get_data(self, idx):
-        img_path, bboxes = self.data[idx]
+        img_path, bboxes = self.img_paths[idx], self.bboxes[idx]
         valid_mask = bboxes[:, 0] != -1
         with Image.open(img_path) as img:
             img = img.convert("RGB")
