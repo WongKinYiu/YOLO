@@ -3,12 +3,12 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 import torch
-from loguru import logger
 from omegaconf import ListConfig, OmegaConf
 from torch import nn
 
 from yolo.config.config import ModelConfig, YOLOLayer
 from yolo.tools.dataset_preparation import prepare_weight
+from yolo.utils.logger import logger
 from yolo.utils.module_utils import get_layer_map
 
 
@@ -32,10 +32,10 @@ class YOLO(nn.Module):
     def build_model(self, model_arch: Dict[str, List[Dict[str, Dict[str, Dict]]]]):
         self.layer_index = {}
         output_dim, layer_idx = [3], 1
-        logger.info(f"🚜 Building YOLO")
+        logger.info(f":tractor: Building YOLO")
         for arch_name in model_arch:
             if model_arch[arch_name]:
-                logger.info(f"  🏗️  Building {arch_name}")
+                logger.info(f"  :building_construction:  Building {arch_name}")
             for layer_idx, layer_spec in enumerate(model_arch[arch_name], start=layer_idx):
                 layer_type, layer_info = next(iter(layer_spec.items()))
                 layer_args = layer_info.get("args", {})
@@ -123,7 +123,7 @@ class YOLO(nn.Module):
             weights: A OrderedDict containing the new weights.
         """
         if isinstance(weights, Path):
-            weights = torch.load(weights, map_location=torch.device("cpu"))
+            weights = torch.load(weights, map_location=torch.device("cpu"), weights_only=False)
         if "model_state_dict" in weights:
             weights = weights["model_state_dict"]
 
@@ -144,7 +144,7 @@ class YOLO(nn.Module):
 
         for error_name, error_set in error_dict.items():
             for weight_name in error_set:
-                logger.warning(f"⚠️ Weight {error_name} for key: {'.'.join(weight_name)}")
+                logger.warning(f":warning: Weight {error_name} for key: {'.'.join(weight_name)}")
 
         self.model.load_state_dict(model_state_dict)
 
@@ -171,7 +171,7 @@ def create_model(model_cfg: ModelConfig, weight_path: Union[bool, Path] = True, 
             prepare_weight(weight_path=weight_path)
         if weight_path.exists():
             model.save_load_weights(weight_path)
-            logger.info("✅ Success load model & weight")
+            logger.info(":white_check_mark: Success load model & weight")
     else:
-        logger.info("✅ Success load model")
+        logger.info(":white_check_mark: Success load model")
     return model

@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
 
+from torch.utils.data import DataLoader
+
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 
 from yolo.config.config import Config
-from yolo.tools.data_loader import StreamDataLoader, YoloDataLoader, create_dataloader
+from yolo.tools.data_loader import StreamDataLoader, create_dataloader
 
 
 def test_create_dataloader_cache(train_cfg: Config):
@@ -25,7 +27,7 @@ def test_create_dataloader_cache(train_cfg: Config):
     assert m_image_paths == l_image_paths
 
 
-def test_training_data_loader_correctness(train_dataloader: YoloDataLoader):
+def test_training_data_loader_correctness(train_dataloader: DataLoader):
     """Test that the training data loader produces correctly shaped data and metadata."""
     batch_size, images, _, reverse_tensors, image_paths = next(iter(train_dataloader))
     assert batch_size == 2
@@ -38,7 +40,7 @@ def test_training_data_loader_correctness(train_dataloader: YoloDataLoader):
     assert list(image_paths) == list(expected_paths)
 
 
-def test_validation_data_loader_correctness(validation_dataloader: YoloDataLoader):
+def test_validation_data_loader_correctness(validation_dataloader: DataLoader):
     batch_size, images, targets, reverse_tensors, image_paths = next(iter(validation_dataloader))
     assert batch_size == 4
     assert images.shape == (4, 3, 640, 640)
