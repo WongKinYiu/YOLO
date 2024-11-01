@@ -83,7 +83,7 @@ class TrainModel(ValidateModel):
         return self.train_loader
 
     def on_train_epoch_start(self):
-        self.trainer.optimizers[0].next_epoch(len(self.train_loader))
+        self.trainer.optimizers[0].next_epoch((len(self.train_loader) + 1) // self.trainer.world_size)
 
     def training_step(self, batch, batch_idx):
         lr_dict = self.trainer.optimizers[0].next_batch()
