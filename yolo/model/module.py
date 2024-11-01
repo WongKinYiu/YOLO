@@ -473,7 +473,7 @@ class ImplicitA(nn.Module):
         self.std = std
 
         self.implicit = nn.Parameter(torch.empty(1, channel, 1, 1))
-        nn.init.normal_(self.implicit, mean=mean, std=self.std)
+        nn.init.normal_(self.implicit, mean=self.mean, std=self.std)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.implicit + x
