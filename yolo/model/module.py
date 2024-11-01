@@ -3,10 +3,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from einops import rearrange
-from loguru import logger
 from torch import Tensor, nn
 from torch.nn.common_types import _size_2_t
 
+from yolo.utils.logger import logger
 from yolo.utils.module_utils import auto_pad, create_activation_function, round_up
 
 
