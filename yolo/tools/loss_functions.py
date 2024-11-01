@@ -2,12 +2,12 @@ from typing import Any, Dict, List, Tuple
 
 import torch
 import torch.nn.functional as F
-from loguru import logger
 from torch import Tensor, nn
 from torch.nn import BCEWithLogitsLoss
 
 from yolo.config.config import Config, LossConfig
 from yolo.utils.bounding_box_utils import BoxMatcher, Vec2Box, calculate_iou
+from yolo.utils.logger import logger
 
 
 class BCELoss(nn.Module):
@@ -119,22 +119,24 @@ class DualLoss:
 
     def __call__(
         self, aux_predicts: List[Tensor], main_predicts: List[Tensor], targets: Tensor
-    ) -> Tuple[Tensor, Dict[str, Tensor]]:
+    ) -> Tuple[Tensor, Dict[str, float]]:
         # TODO: Need Refactor this region, make it flexible!
         aux_iou, aux_dfl, aux_cls = self.loss(aux_predicts, targets)
         main_iou, main_dfl, main_cls = self.loss(main_predicts, targets)
 
+        total_loss = [
+            self.iou_rate * (aux_iou * self.aux_rate + main_iou),
+            self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl),
+            self.cls_rate * (aux_cls * self.aux_rate + main_cls),
+        ]
         loss_dict = {
-            "BoxLoss": self.iou_rate * (aux_iou * self.aux_rate + main_iou),
-            "DFLoss": self.dfl_rate * (aux_dfl * self.aux_rate + main_dfl),
-            "BCELoss": self.cls_rate * (aux_cls * self.aux_rate + main_cls),
+            f"Loss/{name}Loss": value.detach().item() for name, value in zip(["Box", "DFL", "BCE"], total_loss)
         }
-        loss_sum = sum(list(loss_dict.values())) / len(loss_dict)
-        return loss_sum, loss_dict
+        return sum(total_loss), loss_dict
 
 
 def create_loss_function(cfg: Config, vec2box) -> DualLoss:
     # TODO: make it flexible, if cfg doesn't contain aux, only use SingleLoss
     loss_function = DualLoss(cfg, vec2box)
-    logger.info("✅ Success load loss function")
+    logger.info(":white_check_mark: Success load loss function")
     return loss_function
