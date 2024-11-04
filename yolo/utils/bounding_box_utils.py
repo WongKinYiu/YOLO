@@ -424,7 +424,7 @@ def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Opt
             [valid_cls[instance_idx][:, None], valid_box[instance_idx], valid_con[instance_idx][:, None]], dim=-1
         )
 
-        predicts_nms.append(predict_nms)
+        predicts_nms.append(predict_nms[: nms_cfg.max_bbox])
     return predicts_nms
 
 
