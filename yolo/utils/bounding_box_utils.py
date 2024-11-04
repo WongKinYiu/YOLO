@@ -122,7 +122,7 @@ def generate_anchors(image_size: List[int], strides: List[int]):
         all_anchors [HW x 2]:
         all_scalers [HW]: The index of the best targets for each anchors
     """
-    W, H = image_size
+    H, W = image_size
     anchors = []
     scaler = []
     for stride in strides:
@@ -308,6 +308,7 @@ class Vec2Box:
             self.strides = self.create_auto_anchor(model, image_size)
 
         anchor_grid, scaler = generate_anchors(image_size, self.strides)
+        self.image_size = image_size
         self.anchor_grid, self.scaler = anchor_grid.to(device), scaler.to(device)
 
     def create_auto_anchor(self, model: YOLO, image_size):
@@ -320,7 +321,13 @@ class Vec2Box:
         return strides
 
     def update(self, image_size):
+        """
+        image_size: H, W
+        """
+        if self.image_size == image_size:
+            return
         anchor_grid, scaler = generate_anchors(image_size, self.strides)
+        self.image_size = image_size
         self.anchor_grid, self.scaler = anchor_grid.to(self.device), scaler.to(self.device)
 
     def __call__(self, predicts):

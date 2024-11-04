@@ -115,7 +115,7 @@ def scale_segmentation(
 
 
 def tensorlize(data):
-    img_paths, bboxes = zip(*data)
+    img_paths, bboxes, img_ratios = zip(*data)
     max_box = max(bbox.size(0) for bbox in bboxes)
     padded_bbox_list = []
     for bbox in bboxes:
@@ -124,4 +124,5 @@ def tensorlize(data):
         padded_bbox_list.append(padding)
     bboxes = np.stack(padded_bbox_list)
     img_paths = np.array(img_paths)
-    return img_paths, bboxes
+    img_ratios = np.array(img_ratios)
+    return img_paths, bboxes, img_ratios
