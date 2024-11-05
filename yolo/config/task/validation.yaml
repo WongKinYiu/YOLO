@@ -11,3 +11,4 @@ data:
 nms:
   min_confidence: 0.0001
   min_iou: 0.7
+  max_bbox: 1000
