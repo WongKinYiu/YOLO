@@ -9,10 +9,11 @@ from torchvision.transforms import functional as TF
 class AugmentationComposer:
     """Composes several transforms together."""
 
-    def __init__(self, transforms, image_size: int = [640, 640]):
+    def __init__(self, transforms, image_size: int = [640, 640], base_size: int = 640):
         self.transforms = transforms
         # TODO: handle List of image_size [640, 640]
         self.pad_resize = PadAndResize(image_size)
+        self.base_size = base_size
 
         for transform in self.transforms:
             if hasattr(transform, "set_parent"):
@@ -122,7 +123,7 @@ class Mosaic:
 
         assert self.parent is not None, "Parent is not set. Mosaic cannot retrieve image size."
 
-        img_sz = self.parent.image_size[0]  # Assuming `image_size` is defined in parent
+        img_sz = self.parent.base_size  # Assuming `image_size` is defined in parent
         more_data = self.parent.get_more_data(3)  # get 3 more images randomly
 
         data = [(image, boxes)] + more_data

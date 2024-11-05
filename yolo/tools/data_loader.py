@@ -30,11 +30,11 @@ class YoloDataset(Dataset):
         self.image_size = data_cfg.image_size
         phase_name = dataset_cfg.get(phase, phase)
         self.batch_size = data_cfg.batch_size
-        self.dynamic_shape = getattr(data_cfg, "dynamic_shape", True)
+        self.dynamic_shape = getattr(data_cfg, "dynamic_shape", False)
         self.base_size = mean(self.image_size)
 
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
-        self.transform = AugmentationComposer(transforms, self.image_size)
+        self.transform = AugmentationComposer(transforms, self.image_size, self.base_size)
         self.transform.get_more_data = self.get_more_data
         self.img_paths, self.bboxes, self.ratios = tensorlize(self.load_data(Path(dataset_cfg.path), phase_name))
 
@@ -53,20 +53,21 @@ class YoloDataset(Dataset):
 
         if not cache_path.exists():
             logger.info(f":factory: Generating {phase_name} cache")
-            data = self.filter_data(dataset_path, phase_name)
+            data = self.filter_data(dataset_path, phase_name, self.dynamic_shape)
             torch.save(data, cache_path)
         else:
             data = torch.load(cache_path, weights_only=False)
             logger.info(f":package: Loaded {phase_name} cache")
         return data
 
-    def filter_data(self, dataset_path: Path, phase_name: str) -> list:
+    def filter_data(self, dataset_path: Path, phase_name: str, sort_image: bool = False) -> list:
         """
         Filters and collects dataset information by pairing images with their corresponding labels.
 
         Parameters:
             images_path (Path): Path to the directory containing image files.
             labels_path (str): Path to the directory containing label files.
+            sort_image (bool): If True, sorts the dataset by the width-to-height ratio of images in descending order.
 
         Returns:
             list: A list of tuples, each containing the path to an image file and its associated segmentation as a tensor.
@@ -105,8 +106,11 @@ class YoloDataset(Dataset):
             labels = self.load_valid_labels(image_id, image_seg_annotations)
 
             img_path = images_path / image_name
-            with Image.open(img_path) as img:
-                width, height = img.size
+            if sort_image:
+                with Image.open(img_path) as img:
+                    width, height = img.size
+            else:
+                width, height = 0, 1
             data.append((img_path, labels, width / height))
             valid_inputs += 1
 
