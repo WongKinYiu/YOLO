@@ -185,13 +185,15 @@ def test_bbox_nms():
     nms_cfg = NMSConfig(min_confidence=0.5, min_iou=0.5, max_bbox=400)
 
     # Batch 1:
-    #  - box 1 is kept with class 0 as it has a higher confidence than box 4 i.e. box 4 is filtered out
-    #  - box 2 is kept with class 1
-    #  - box 3 is rejected by the confidence filter
+    #  - box 1 is kept with classes 0 and 2 as it overlaps with box 4 and has a higher confidence for classes 0 and 2.
+    #  - box 2 is kept with classes 0, 1, 2 as it does not overlap with any other box.
+    #  - box 3 is rejected by the confidence filter.
+    #  - box 4 is kept with class 1 as it overlaps with box 1 and has a higher confidence for class 1.
     # Batch 2:
-    #  - box 4 is kept with class 0 as it has a higher confidence than box 1 i.e. box 1 is filtered out
-    #  - box 2 is rejected by the confidence filter
-    #  - box 3 is kept with class 2
+    #  - box 1 is kept with classes 1 and 2 as it overlaps with box 1 and has a higher confidence for classes 1 and 2.
+    #  - box 2 is rejected by the confidence filter.
+    #  - box 3 is kept with classes 0, 1, 2 as it does not overlap with any other box.
+    #  - box 4 is kept with class 0 as it overlaps with box 1 and has a higher confidence for class 0.
     expected_output = torch.tensor(
         [
             [
