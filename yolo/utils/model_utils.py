@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import LambdaLR, SequentialLR, _LRScheduler
 
 from yolo.config.config import IDX_TO_ID, NMSConfig, OptimizerConfig, SchedulerConfig
 from yolo.model.yolo import YOLO
-from yolo.utils.bounding_box_utils import bbox_nms, transform_bbox
+from yolo.utils.bounding_box_utils import Anc2Box, Vec2Box, bbox_nms, transform_bbox
 from yolo.utils.logger import logger
 
 
@@ -130,11 +130,15 @@ class PostProcess:
     scale back the prediction and do nms for pred_bbox
     """
 
-    def __init__(self, converter, nms_cfg: NMSConfig) -> None:
+    def __init__(self, converter: Union[Vec2Box, Anc2Box], nms_cfg: NMSConfig) -> None:
         self.converter = converter
         self.nms = nms_cfg
 
-    def __call__(self, predict, rev_tensor: Optional[Tensor] = None) -> List[Tensor]:
+    def __call__(
+        self, predict, rev_tensor: Optional[Tensor] = None, image_size: Optional[List[int]] = None
+    ) -> List[Tensor]:
+        if image_size is not None:
+            self.converter.update(image_size)
         prediction = self.converter(predict["Main"])
         pred_class, _, pred_bbox = prediction[:3]
         pred_conf = prediction[3] if len(prediction) == 4 else None

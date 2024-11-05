@@ -1,5 +1,6 @@
 from pathlib import Path
 from queue import Empty, Queue
+from statistics import mean
 from threading import Event, Thread
 from typing import Generator, List, Tuple, Union
 
@@ -28,12 +29,14 @@ class YoloDataset(Dataset):
         augment_cfg = data_cfg.data_augment
         self.image_size = data_cfg.image_size
         phase_name = dataset_cfg.get(phase, phase)
+        self.batch_size = data_cfg.batch_size
+        self.dynamic_shape = getattr(data_cfg, "dynamic_shape", True)
+        self.base_size = mean(self.image_size)
 
         transforms = [eval(aug)(prob) for aug, prob in augment_cfg.items()]
         self.transform = AugmentationComposer(transforms, self.image_size)
         self.transform.get_more_data = self.get_more_data
-        img_paths, bboxes = tensorlize(self.load_data(Path(dataset_cfg.path), phase_name))
-        self.img_paths, self.bboxes = img_paths, bboxes
+        self.img_paths, self.bboxes, self.ratios = tensorlize(self.load_data(Path(dataset_cfg.path), phase_name))
 
     def load_data(self, dataset_path: Path, phase_name: str):
         """
@@ -102,8 +105,13 @@ class YoloDataset(Dataset):
             labels = self.load_valid_labels(image_id, image_seg_annotations)
 
             img_path = images_path / image_name
-            data.append((img_path, labels))
+            with Image.open(img_path) as img:
+                width, height = img.size
+            data.append((img_path, labels, width / height))
             valid_inputs += 1
+
+        data = sorted(data, key=lambda x: x[2], reverse=True)
+
         logger.info(f"Recorded {valid_inputs}/{len(images_list)} valid inputs")
         return data
 
@@ -143,8 +151,22 @@ class YoloDataset(Dataset):
         indices = torch.randint(0, len(self), (num,))
         return [self.get_data(idx)[:2] for idx in indices]
 
+    def _update_image_size(self, idx: int) -> None:
+        """Update image size based on dynamic shape and batch settings."""
+        batch_start_idx = (idx // self.batch_size) * self.batch_size
+        image_ratio = self.ratios[batch_start_idx]
+
+        shift = ((self.base_size / 32 * (image_ratio - 1)) // (image_ratio + 1)) * 32
+
+        self.image_size = [int(self.base_size + shift), int(self.base_size - shift)]
+        self.transform.pad_resize.set_size(self.image_size)
+
     def __getitem__(self, idx) -> Tuple[Image.Image, Tensor, Tensor, List[str]]:
         img, bboxes, img_path = self.get_data(idx)
+
+        if self.dynamic_shape:
+            self._update_image_size(idx)
+
         img, bboxes, rev_tensor = self.transform(img, bboxes)
         bboxes[:, [1, 3]] *= self.image_size[0]
         bboxes[:, [2, 4]] *= self.image_size[1]

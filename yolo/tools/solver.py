@@ -45,7 +45,7 @@ class ValidateModel(BaseModel):
 
     def validation_step(self, batch, batch_idx):
         batch_size, images, targets, rev_tensor, img_paths = batch
-        predicts = self.post_process(self(images))
+        predicts = self.post_process(self(images), image_size=images.shape[2:])
         batch_metrics = self.metric(
             [to_metrics_format(predict) for predict in predicts], [to_metrics_format(target) for target in targets]
         )
@@ -127,7 +127,7 @@ class InferenceModel(BaseModel):
 
     def predict_step(self, batch, batch_idx):
         images, rev_tensor, origin_frame = batch
-        predicts = self.post_process(self(images), rev_tensor)
+        predicts = self.post_process(self(images), rev_tensor=rev_tensor)
         img = draw_bboxes(origin_frame, predicts, idx2label=self.cfg.dataset.class_list)
         if getattr(self.predict_loader, "is_stream", None):
             fps = self._display_stream(img)

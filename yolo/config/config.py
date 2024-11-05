@@ -59,6 +59,7 @@ class DataConfig:
     image_size: List[int]
     data_augment: Dict[str, int]
     source: Optional[Union[str, int]]
+    dynamic_shape: Optional[bool]
 
 
 @dataclass

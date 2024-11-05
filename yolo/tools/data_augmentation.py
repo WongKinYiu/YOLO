@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import torch
 from PIL import Image
@@ -10,8 +12,7 @@ class AugmentationComposer:
     def __init__(self, transforms, image_size: int = [640, 640]):
         self.transforms = transforms
         # TODO: handle List of image_size [640, 640]
-        self.image_size = image_size
-        self.pad_resize = PadAndResize(self.image_size)
+        self.pad_resize = PadAndResize(image_size)
 
         for transform in self.transforms:
             if hasattr(transform, "set_parent"):
@@ -56,6 +57,9 @@ class PadAndResize:
         """Initialize the object with the target image size."""
         self.target_width, self.target_height = image_size
         self.background_color = background_color
+
+    def set_size(self, image_size: List[int]):
+        self.target_width, self.target_height = image_size
 
     def __call__(self, image: Image, boxes):
         img_width, img_height = image.size
