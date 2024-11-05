@@ -216,7 +216,6 @@ def test_bbox_nms():
     )
 
     output = bbox_nms(cls_dist, bbox, nms_cfg)
-    print(output)
     for out, exp in zip(output, expected_output):
         assert allclose(out, exp, atol=1e-4), f"Output: {out} Expected: {exp}"
 
