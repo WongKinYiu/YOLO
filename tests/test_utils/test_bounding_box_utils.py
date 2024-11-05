@@ -182,7 +182,7 @@ def test_bbox_nms():
         dtype=float32,
     )
 
-    nms_cfg = NMSConfig(min_confidence=0.5, min_iou=0.5)
+    nms_cfg = NMSConfig(min_confidence=0.5, min_iou=0.5, max_bbox=400)
 
     # Batch 1:
     #  - box 1 is kept with class 0 as it has a higher confidence than box 4 i.e. box 4 is filtered out
@@ -197,16 +197,24 @@ def test_bbox_nms():
             [
                 [0.0, 0.0, 0.0, 160.0, 120.0, 0.6682],
                 [1.0, 160.0, 120.0, 320.0, 240.0, 0.6457],
+                [0.0, 160.0, 120.0, 320.0, 240.0, 0.5744],
+                [2.0, 0.0, 0.0, 160.0, 120.0, 0.5498],
+                [1.0, 16.0, 12.0, 176.0, 132.0, 0.5498],
+                [2.0, 160.0, 120.0, 320.0, 240.0, 0.5250],
             ],
             [
                 [0.0, 16.0, 12.0, 176.0, 132.0, 0.6900],
                 [2.0, 0.0, 120.0, 160.0, 240.0, 0.6570],
+                [1.0, 0.0, 0.0, 160.0, 120.0, 0.5622],
+                [2.0, 0.0, 0.0, 160.0, 120.0, 0.5498],
+                [1.0, 0.0, 120.0, 160.0, 240.0, 0.5498],
+                [0.0, 0.0, 120.0, 160.0, 240.0, 0.5374],
             ],
         ]
     )
 
     output = bbox_nms(cls_dist, bbox, nms_cfg)
-
+    print(output)
     for out, exp in zip(output, expected_output):
         assert allclose(out, exp, atol=1e-4), f"Output: {out} Expected: {exp}"
 
