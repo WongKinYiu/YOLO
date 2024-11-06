@@ -84,7 +84,9 @@ class TrainModel(ValidateModel):
         return self.train_loader
 
     def on_train_epoch_start(self):
-        self.trainer.optimizers[0].next_epoch(ceil(len(self.train_loader) / self.trainer.world_size))
+        self.trainer.optimizers[0].next_epoch(
+            ceil(len(self.train_loader) / self.trainer.world_size), self.current_epoch
+        )
         self.vec2box.update(self.cfg.image_size)
 
     def training_step(self, batch, batch_idx):

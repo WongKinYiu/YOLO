@@ -15,6 +15,22 @@ from yolo.utils.bounding_box_utils import Anc2Box, Vec2Box, bbox_nms, transform_
 from yolo.utils.logger import logger
 
 
+def lerp(start: float, end: float, step: Union[int, float], total: int = 1):
+    """
+    Linearly interpolates between start and end values.
+
+    Parameters:
+        start (float): The starting value.
+        end (float): The ending value.
+        step (int): The current step in the interpolation process.
+        total (int): The total number of steps.
+
+    Returns:
+        float: The interpolated value.
+    """
+    return start + (end - start) * step / total
+
+
 class ExponentialMovingAverage:
     def __init__(self, model: torch.nn.Module, decay: float):
         self.model = model
@@ -57,9 +73,15 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
         {"params": norm_params, "momentum": 0.8, "weight_decay": 0},
     ]
 
-    def next_epoch(self, batch_num):
+    def next_epoch(self, batch_num, epoch_idx):
         self.min_lr = self.max_lr
         self.max_lr = [param["lr"] for param in self.param_groups]
+        # TODO: load momentum from config instead a fix number
+        #       0.937: Start Momentum
+        #       0.8  : Normal Momemtum
+        #       3    : The warm up epoch num
+        self.min_mom = lerp(0.937, 0.8, max(epoch_idx, 3), 3)
+        self.max_mom = lerp(0.937, 0.8, max(epoch_idx + 1, 3), 3)
         self.batch_num = batch_num
         self.batch_idx = 0
 
@@ -68,7 +90,8 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
         lr_dict = dict()
         for lr_idx, param_group in enumerate(self.param_groups):
             min_lr, max_lr = self.min_lr[lr_idx], self.max_lr[lr_idx]
-            param_group["lr"] = min_lr + (self.batch_idx) * (max_lr - min_lr) / self.batch_num
+            param_group["lr"] = lerp(min_lr, max_lr, self.batch_idx, self.batch_num)
+            param_group["momentum"] = lerp(self.min_mom, self.max_mom, self.batch_idx, self.batch_num)
             lr_dict[f"LR/{lr_idx}"] = param_group["lr"]
         return lr_dict
 
