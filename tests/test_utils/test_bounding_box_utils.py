@@ -138,9 +138,9 @@ def test_anc2box_autoanchor(inference_v7_cfg: Config):
     anc2box.update((320, 640))
     anchor_grids_shape = [anchor_grid.shape for anchor_grid in anc2box.anchor_grids]
     assert anchor_grids_shape == [
-        torch.Size([1, 1, 80, 80, 2]),
-        torch.Size([1, 1, 40, 40, 2]),
-        torch.Size([1, 1, 20, 20, 2]),
+        torch.Size([1, 1, 80, 40, 2]),
+        torch.Size([1, 1, 40, 20, 2]),
+        torch.Size([1, 1, 20, 10, 2]),
     ]
     assert anc2box.anchor_scale.shape == torch.Size([3, 1, 3, 1, 1, 2])
 
