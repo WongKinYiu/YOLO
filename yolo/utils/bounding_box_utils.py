@@ -385,7 +385,7 @@ class Anc2Box:
         return anchor_grids
 
     def update(self, image_size):
-        self.anchor_grid = self.generate_anchors(image_size)
+        self.anchor_grids = self.generate_anchors(image_size)
 
     def __call__(self, predicts: List[Tensor]):
         preds_box, preds_cls, preds_cnf = [], [], []
