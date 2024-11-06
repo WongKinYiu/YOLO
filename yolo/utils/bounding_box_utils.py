@@ -122,7 +122,7 @@ def generate_anchors(image_size: List[int], strides: List[int]):
         all_anchors [HW x 2]:
         all_scalers [HW]: The index of the best targets for each anchors
     """
-    H, W = image_size
+    W, H = image_size
     anchors = []
     scaler = []
     for stride in strides:
@@ -312,17 +312,18 @@ class Vec2Box:
         self.anchor_grid, self.scaler = anchor_grid.to(device), scaler.to(device)
 
     def create_auto_anchor(self, model: YOLO, image_size):
-        dummy_input = torch.zeros(1, 3, *image_size).to(self.device)
+        W, H = image_size
+        dummy_input = torch.zeros(1, 3, H, W).to(self.device)
         dummy_output = model(dummy_input)
         strides = []
         for predict_head in dummy_output["Main"]:
             _, _, *anchor_num = predict_head[2].shape
-            strides.append(image_size[1] // anchor_num[1])
+            strides.append(W // anchor_num[1])
         return strides
 
     def update(self, image_size):
         """
-        image_size: H, W
+        image_size: W, H
         """
         if self.image_size == image_size:
             return
@@ -365,12 +366,13 @@ class Anc2Box:
         self.class_num = model.num_classes
 
     def create_auto_anchor(self, model: YOLO, image_size):
-        dummy_input = torch.zeros(1, 3, *image_size).to(self.device)
+        W, H = image_size
+        dummy_input = torch.zeros(1, 3, H, W).to(self.device)
         dummy_output = model(dummy_input)
         strides = []
         for predict_head in dummy_output["Main"]:
             _, _, *anchor_num = predict_head.shape
-            strides.append(image_size[1] // anchor_num[1])
+            strides.append(W // anchor_num[1])
         return strides
 
     def generate_anchors(self, image_size: List[int]):
