@@ -53,8 +53,7 @@ class EMA(Callback):
     def on_validation_start(self, trainer: "Trainer", pl_module: "LightningModule"):
         for param, ema_param in zip(pl_module.ema.parameters(), self.ema_parameters):
             param.data.copy_(ema_param)
-            if dist.is_initialized():
-                dist.broadcast(param, src=0)
+            trainer.strategy.broadcast(param)
 
     @rank_zero_only
     @no_grad()
