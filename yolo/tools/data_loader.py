@@ -99,9 +99,6 @@ class YoloDataset(Dataset):
                     continue
                 annotations = annotations_index.get(image_info["id"], [])
                 image_seg_annotations = scale_segmentation(annotations, image_info)
-                if not image_seg_annotations:
-                    continue
-
             elif data_type == "txt":
                 label_path = labels_path / f"{image_id}.txt"
                 if not label_path.is_file():
