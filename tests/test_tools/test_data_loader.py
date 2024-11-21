@@ -42,15 +42,16 @@ def test_training_data_loader_correctness(train_dataloader: DataLoader):
 
 def test_validation_data_loader_correctness(validation_dataloader: DataLoader):
     batch_size, images, targets, reverse_tensors, image_paths = next(iter(validation_dataloader))
-    assert batch_size == 4
-    assert images.shape == (4, 3, 512, 768)
-    assert targets.shape == (4, 18, 5)
-    assert reverse_tensors.shape == (4, 5)
+    assert batch_size == 5
+    assert images.shape == (5, 3, 640, 640)
+    assert targets.shape == (5, 18, 5)
+    assert reverse_tensors.shape == (5, 5)
     expected_paths = [
-        Path("tests/data/images/val/000000284106.jpg"),
         Path("tests/data/images/val/000000151480.jpg"),
-        Path("tests/data/images/val/000000570456.jpg"),
+        Path("tests/data/images/val/000000284106.jpg"),
         Path("tests/data/images/val/000000323571.jpg"),
+        Path("tests/data/images/val/000000556498.jpg"),
+        Path("tests/data/images/val/000000570456.jpg"),
     ]
     assert list(image_paths) == list(expected_paths)
 
