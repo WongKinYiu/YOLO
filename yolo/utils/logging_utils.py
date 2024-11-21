@@ -98,7 +98,6 @@ class YOLORichProgressBar(RichProgressBar):
         )
         self.max_result = 0
         self.past_results.clear()
-        self.progress.update(self.task_epoch, advance=-0.5)
 
     @override
     @rank_zero_only
