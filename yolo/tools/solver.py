@@ -56,7 +56,6 @@ class ValidateModel(BaseModel):
                 "map": batch_metrics["map"],
                 "map_50": batch_metrics["map_50"],
             },
-            on_step=True,
             batch_size=batch_size,
         )
         return predicts
@@ -102,9 +101,10 @@ class TrainModel(ValidateModel):
             prog_bar=True,
             on_epoch=True,
             batch_size=batch_size,
+            sync_dist=True,
             rank_zero_only=True,
         )
-        self.log_dict(lr_dict, prog_bar=False, logger=True, on_epoch=False, rank_zero_only=True)
+        self.log_dict(lr_dict, prog_bar=False, logger=True, on_epoch=False, sync_dist=True, rank_zero_only=True)
         return loss * batch_size
 
     def configure_optimizers(self):

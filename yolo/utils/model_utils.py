@@ -47,6 +47,8 @@ class EMA(Callback):
     def setup(self, trainer, pl_module, stage):
         pl_module.ema = deepcopy(pl_module.model)
         self.ema_parameters = [param.clone().detach().to(pl_module.device) for param in pl_module.parameters()]
+        for param in pl_module.ema.parameters():
+            param.requires_grad = False
 
     def on_validation_start(self, trainer: "Trainer", pl_module: "LightningModule"):
         for param, ema_param in zip(pl_module.ema.parameters(), self.ema_parameters):
