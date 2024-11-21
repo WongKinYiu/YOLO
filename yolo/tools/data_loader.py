@@ -56,7 +56,15 @@ class YoloDataset(Dataset):
             data = self.filter_data(dataset_path, phase_name, self.dynamic_shape)
             torch.save(data, cache_path)
         else:
-            data = torch.load(cache_path, weights_only=False)
+            try:
+                data = torch.load(cache_path, weights_only=False)
+            except Exception as e:
+                logger.error(
+                    f":rotating_light: Failed to load the cache at '{cache_path}'.\n"
+                    ":rotating_light: This may be caused by using cache from different other YOLO.\n"
+                    ":rotating_light: Please clean the cache and try running again."
+                )
+                raise e
             logger.info(f":package: Loaded {phase_name} cache")
         return data
 

@@ -7,7 +7,7 @@ data:
   shuffle: False
   pin_memory: True
   data_augment: {}
-  dynamic_shape: True
+  dynamic_shape: False
 nms:
   min_confidence: 0.0001
   min_iou: 0.7

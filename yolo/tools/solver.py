@@ -33,6 +33,7 @@ class ValidateModel(BaseModel):
         self.metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy")
         self.metric.warn_on_many_detections = False
         self.val_loader = create_dataloader(self.validation_cfg.data, self.cfg.dataset, self.validation_cfg.task)
+        self.ema = self.model
 
     def setup(self, stage):
         self.vec2box = create_converter(
@@ -46,7 +47,7 @@ class ValidateModel(BaseModel):
     def validation_step(self, batch, batch_idx):
         batch_size, images, targets, rev_tensor, img_paths = batch
         H, W = images.shape[2:]
-        predicts = self.post_process(self(images), image_size=[W, H])
+        predicts = self.post_process(self.ema(images), image_size=[W, H])
         batch_metrics = self.metric(
             [to_metrics_format(predict) for predict in predicts], [to_metrics_format(target) for target in targets]
         )
@@ -56,7 +57,6 @@ class ValidateModel(BaseModel):
                 "map": batch_metrics["map"],
                 "map_50": batch_metrics["map_50"],
             },
-            on_step=True,
             batch_size=batch_size,
         )
         return predicts
@@ -64,9 +64,11 @@ class ValidateModel(BaseModel):
     def on_validation_epoch_end(self):
         epoch_metrics = self.metric.compute()
         del epoch_metrics["classes"]
-        self.log_dict(epoch_metrics, prog_bar=True, rank_zero_only=True)
+        self.log_dict(epoch_metrics, prog_bar=True, sync_dist=True, rank_zero_only=True)
         self.log_dict(
-            {"PyCOCO/AP @ .5:.95": epoch_metrics["map"], "PyCOCO/AP @ .5": epoch_metrics["map_50"]}, rank_zero_only=True
+            {"PyCOCO/AP @ .5:.95": epoch_metrics["map"], "PyCOCO/AP @ .5": epoch_metrics["map_50"]},
+            sync_dist=True,
+            rank_zero_only=True,
         )
         self.metric.reset()
 
@@ -85,7 +87,9 @@ class TrainModel(ValidateModel):
         return self.train_loader
 
     def on_train_epoch_start(self):
-        self.trainer.optimizers[0].next_epoch(ceil(len(self.train_loader) / self.trainer.world_size))
+        self.trainer.optimizers[0].next_epoch(
+            ceil(len(self.train_loader) / self.trainer.world_size), self.current_epoch
+        )
         self.vec2box.update(self.cfg.image_size)
 
     def training_step(self, batch, batch_idx):

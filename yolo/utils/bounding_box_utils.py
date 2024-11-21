@@ -212,19 +212,20 @@ class BoxMatcher:
         topk_masks = topk_targets > 0
         return topk_targets, topk_masks
 
-    def filter_duplicates(self, target_matrix: Tensor, topk_mask: Tensor):
+    def filter_duplicates(self, iou_mat: Tensor, topk_mask: Tensor, grid_mask: Tensor):
         """
         Filter the maximum suitability target index of each anchor.
 
         Args:
-            target_matrix [batch x targets x anchors]: The suitability for each targets-anchors
+            iou_mat [batch x targets x anchors]: The suitability for each targets-anchors
 
         Returns:
             unique_indices [batch x anchors x 1]: The index of the best targets for each anchors
         """
         duplicates = (topk_mask.sum(1, keepdim=True) > 1).repeat([1, topk_mask.size(1), 1])
-        max_idx = F.one_hot(target_matrix.argmax(1), topk_mask.size(1)).permute(0, 2, 1)
+        max_idx = F.one_hot(iou_mat.argmax(1), topk_mask.size(1)).permute(0, 2, 1)
         topk_mask = torch.where(duplicates, max_idx, topk_mask)
+        topk_mask &= grid_mask
         unique_indices = topk_mask.argmax(dim=1)
         return unique_indices[..., None], topk_mask.sum(1), topk_mask
 
@@ -278,7 +279,7 @@ class BoxMatcher:
         topk_targets, topk_mask = self.filter_topk(target_matrix, topk=self.topk)
 
         # delete one anchor pred assign to mutliple gts
-        unique_indices, valid_mask, topk_mask = self.filter_duplicates(iou_mat, topk_mask)
+        unique_indices, valid_mask, topk_mask = self.filter_duplicates(iou_mat, topk_mask, grid_mask)
 
         align_bbox = torch.gather(target_bbox, 1, unique_indices.repeat(1, 1, 4))
         align_cls = torch.gather(target_cls, 1, unique_indices).squeeze(-1)
