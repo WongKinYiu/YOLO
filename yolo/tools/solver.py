@@ -45,7 +45,8 @@ class ValidateModel(BaseModel):
 
     def validation_step(self, batch, batch_idx):
         batch_size, images, targets, rev_tensor, img_paths = batch
-        predicts = self.post_process(self(images), image_size=images.shape[2:])
+        H, W = images.shape[2:]
+        predicts = self.post_process(self(images), image_size=[W, H])
         batch_metrics = self.metric(
             [to_metrics_format(predict) for predict in predicts], [to_metrics_format(target) for target in targets]
         )
