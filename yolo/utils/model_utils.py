@@ -1,11 +1,16 @@
 import os
+from copy import deepcopy
+from math import exp
 from pathlib import Path
 from typing import List, Optional, Type, Union
 
 import torch
 import torch.distributed as dist
+from lightning import LightningModule, Trainer
+from lightning.pytorch.callbacks import Callback
+from lightning.pytorch.utilities import rank_zero_only
 from omegaconf import ListConfig
-from torch import Tensor
+from torch import Tensor, no_grad
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR, SequentialLR, _LRScheduler
 
@@ -31,28 +36,31 @@ def lerp(start: float, end: float, step: Union[int, float], total: int = 1):
     return start + (end - start) * step / total
 
 
-class ExponentialMovingAverage:
-    def __init__(self, model: torch.nn.Module, decay: float):
-        self.model = model
+class EMA(Callback):
+    def __init__(self, decay: float = 0.9999, tau: float = 500):
+        super().__init__()
+        logger.info(":chart_with_upwards_trend: Enable Model EMA")
         self.decay = decay
-        self.shadow = {name: param.clone().detach() for name, param in model.named_parameters()}
+        self.tau = tau
+        self.step = 0
 
-    def update(self):
-        """Update the shadow parameters using the current model parameters."""
-        for name, param in self.model.named_parameters():
-            assert name in self.shadow, "All model parameters should have a corresponding shadow parameter."
-            new_average = (1.0 - self.decay) * param.data + self.decay * self.shadow[name]
-            self.shadow[name] = new_average.clone()
+    def setup(self, trainer, pl_module, stage):
+        pl_module.ema = deepcopy(pl_module.model)
+        self.ema_parameters = [param.clone().detach().to(pl_module.device) for param in pl_module.parameters()]
 
-    def apply_shadow(self):
-        """Apply the shadow parameters to the model."""
-        for name, param in self.model.named_parameters():
-            param.data.copy_(self.shadow[name])
+    def on_validation_start(self, trainer: "Trainer", pl_module: "LightningModule"):
+        for param, ema_param in zip(pl_module.ema.parameters(), self.ema_parameters):
+            param.data.copy_(ema_param)
+            if dist.is_initialized():
+                dist.broadcast(param, src=0)
 
-    def restore(self):
-        """Restore the original parameters from the shadow."""
-        for name, param in self.model.named_parameters():
-            self.shadow[name].copy_(param.data)
+    @rank_zero_only
+    @no_grad()
+    def on_train_batch_end(self, trainer: "Trainer", pl_module: "LightningModule", *args, **kwargs) -> None:
+        self.step += 1
+        decay_factor = self.decay * (1 - exp(-self.step / self.tau))
+        for param, ema_param in zip(pl_module.parameters(), self.ema_parameters):
+            ema_param.data.copy_(lerp(param.detach(), ema_param, decay_factor))
 
 
 def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:

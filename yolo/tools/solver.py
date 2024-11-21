@@ -33,6 +33,7 @@ class ValidateModel(BaseModel):
         self.metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy")
         self.metric.warn_on_many_detections = False
         self.val_loader = create_dataloader(self.validation_cfg.data, self.cfg.dataset, self.validation_cfg.task)
+        self.ema = self.model
 
     def setup(self, stage):
         self.vec2box = create_converter(
@@ -45,7 +46,7 @@ class ValidateModel(BaseModel):
 
     def validation_step(self, batch, batch_idx):
         batch_size, images, targets, rev_tensor, img_paths = batch
-        predicts = self.post_process(self(images), image_size=images.shape[2:])
+        predicts = self.post_process(self.ema(images), image_size=images.shape[2:])
         batch_metrics = self.metric(
             [to_metrics_format(predict) for predict in predicts], [to_metrics_format(target) for target in targets]
         )
