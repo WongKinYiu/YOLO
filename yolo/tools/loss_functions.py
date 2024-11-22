@@ -93,7 +93,7 @@ class YOLOLoss:
         targets_cls, targets_bbox = self.separate_anchor(align_targets)
         predicts_box = predicts_box / self.vec2box.scaler[None, :, None]
 
-        cls_norm = targets_cls.sum()
+        cls_norm = max(targets_cls.sum(), 1)
         box_norm = targets_cls.sum(-1)[valid_masks]
 
         ## -- CLS -- ##

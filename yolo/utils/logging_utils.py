@@ -38,6 +38,7 @@ from typing_extensions import override
 from yolo.config.config import Config, YOLOLayer
 from yolo.model.yolo import YOLO
 from yolo.utils.logger import logger
+from yolo.utils.model_utils import EMA
 from yolo.utils.solver_utils import make_ap_table
 
 
@@ -97,7 +98,6 @@ class YOLORichProgressBar(RichProgressBar):
         )
         self.max_result = 0
         self.past_results.clear()
-        self.progress.update(self.task_epoch, advance=-0.5)
 
     @override
     @rank_zero_only
@@ -255,6 +255,8 @@ def setup(cfg: Config):
 
     progress, loggers = [], []
 
+    if hasattr(cfg.task, "ema") and cfg.task.ema.enable:
+        progress.append(EMA(cfg.task.ema.decay))
     if quite:
         logger.setLevel(logging.ERROR)
         return progress, loggers, save_path

@@ -97,7 +97,7 @@ class SchedulerConfig:
 
 @dataclass
 class EMAConfig:
-    enabled: bool
+    enable: bool
     decay: float
 
 

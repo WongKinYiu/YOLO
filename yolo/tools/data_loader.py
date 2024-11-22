@@ -56,7 +56,15 @@ class YoloDataset(Dataset):
             data = self.filter_data(dataset_path, phase_name, self.dynamic_shape)
             torch.save(data, cache_path)
         else:
-            data = torch.load(cache_path, weights_only=False)
+            try:
+                data = torch.load(cache_path, weights_only=False)
+            except Exception as e:
+                logger.error(
+                    f":rotating_light: Failed to load the cache at '{cache_path}'.\n"
+                    ":rotating_light: This may be caused by using cache from different other YOLO.\n"
+                    ":rotating_light: Please clean the cache and try running again."
+                )
+                raise e
             logger.info(f":package: Loaded {phase_name} cache")
         return data
 
@@ -91,9 +99,6 @@ class YoloDataset(Dataset):
                     continue
                 annotations = annotations_index.get(image_info["id"], [])
                 image_seg_annotations = scale_segmentation(annotations, image_info)
-                if not image_seg_annotations:
-                    continue
-
             elif data_type == "txt":
                 label_path = labels_path / f"{image_id}.txt"
                 if not label_path.is_file():
@@ -141,7 +146,7 @@ class YoloDataset(Dataset):
         if bboxes:
             return torch.stack(bboxes)
         else:
-            logger.warning("No valid BBox in {}", label_path)
+            logger.warning(f"No valid BBox in {label_path}")
             return torch.zeros((0, 5))
 
     def get_data(self, idx):
@@ -158,8 +163,7 @@ class YoloDataset(Dataset):
     def _update_image_size(self, idx: int) -> None:
         """Update image size based on dynamic shape and batch settings."""
         batch_start_idx = (idx // self.batch_size) * self.batch_size
-        image_ratio = self.ratios[batch_start_idx]
-
+        image_ratio = self.ratios[batch_start_idx].clip(1 / 3, 3)
         shift = ((self.base_size / 32 * (image_ratio - 1)) // (image_ratio + 1)) * 32
 
         self.image_size = [int(self.base_size + shift), int(self.base_size - shift)]
@@ -214,7 +218,7 @@ def create_dataloader(data_cfg: DataConfig, dataset_cfg: DatasetConfig, task: st
     if task == "inference":
         return StreamDataLoader(data_cfg)
 
-    if dataset_cfg.auto_download:
+    if getattr(dataset_cfg, "auto_download", False):
         prepare_dataset(dataset_cfg, task)
     dataset = YoloDataset(data_cfg, dataset_cfg, task)
 

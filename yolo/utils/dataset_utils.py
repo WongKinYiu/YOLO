@@ -115,7 +115,14 @@ def scale_segmentation(
 
 
 def tensorlize(data):
-    img_paths, bboxes, img_ratios = zip(*data)
+    try:
+        img_paths, bboxes, img_ratios = zip(*data)
+    except ValueError as e:
+        logger.error(
+            ":rotating_light: This may be caused by using old cache or another version of YOLO's cache.\n"
+            ":rotating_light: Please clean the cache and try running again."
+        )
+        raise e
     max_box = max(bbox.size(0) for bbox in bboxes)
     padded_bbox_list = []
     for bbox in bboxes:

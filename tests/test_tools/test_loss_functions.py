@@ -51,7 +51,6 @@ def data():
 def test_yolo_loss(loss_function, data):
     predicts, targets = data
     loss, loss_dict = loss_function(predicts, predicts, targets)
-    assert torch.isnan(loss)
-    assert isnan(loss_dict["Loss/BoxLoss"])
-    assert isnan(loss_dict["Loss/DFLLoss"])
-    assert isinf(loss_dict["Loss/BCELoss"])
+    assert loss_dict["Loss/BoxLoss"] == 0
+    assert loss_dict["Loss/DFLLoss"] == 0
+    assert loss_dict["Loss/BCELoss"] >= 2e5

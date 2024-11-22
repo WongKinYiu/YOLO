@@ -251,7 +251,7 @@ class BoxMatcher:
 
         Returns:
             unique_indices [batch x anchors x 1]: The index of the best targets for each anchors
-            valid_mask [batch x targets]: Mask indicating the validity of each target
+            valid_mask [batch x anchors]: Mask indicating the validity of each anchor
             topk_mask [batch x targets x anchors]: A boolean mask indicating the updated top-k scores' positions.
         """
         duplicates = (topk_mask.sum(1, keepdim=True) > 1).repeat([1, topk_mask.size(1), 1])
@@ -392,7 +392,7 @@ class Anc2Box:
             logger.info(f":japanese_not_free_of_charge_button: Found stride of model {anchor_cfg.strides}")
             self.strides = anchor_cfg.strides
         else:
-            logger.info("🧸 Found no stride of model, performed a dummy test for auto-anchor size")
+            logger.info(":teddy_bear: Found no stride of model, performed a dummy test for auto-anchor size")
             self.strides = self.create_auto_anchor(model, image_size)
 
         self.head_num = len(anchor_cfg.anchor)
