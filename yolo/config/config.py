@@ -66,6 +66,7 @@ class DataConfig:
 class OptimizerArgs:
     lr: float
     weight_decay: float
+    momentum: float
 
 
 @dataclass
