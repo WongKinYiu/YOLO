@@ -1,13 +1,5 @@
 # YOLO: Official Implementation of YOLOv9, YOLOv7
 
-> [!CAUTION]
-> We wanted to inform you that the training code for this project is still in progress, and there are two known issues:
->
-> - Slower convergence speed
->
-> We strongly recommend refraining from training the model until version 1.0 is released.
-> However, inference and validation with pre-trained weights on COCO are available and can be used safely.
-
 [![Documentation Status](https://readthedocs.org/projects/yolo-docs/badge/?version=latest)](https://yolo-docs.readthedocs.io/en/latest/?badge=latest)
 ![GitHub License](https://img.shields.io/github/license/WongKinYiu/YOLO)
 ![WIP](https://img.shields.io/badge/status-WIP-orange)
@@ -111,33 +103,6 @@ python yolo/lazy.py task=validation dataset=toy
 ## Contributing
 
 Contributions to the YOLO project are welcome! See [CONTRIBUTING](docs/CONTRIBUTING.md) for guidelines on how to contribute.
-
-### TODO Diagrams
-
-```mermaid
-flowchart TB
-    subgraph Features
-      Taskv7-->Segmentation["#35 Segmentation"]
-      Taskv7-->Classification["#34 Classification"]
-      Taskv9-->Segmentation
-      Taskv9-->Classification
-      Trainv7
-    end
-    subgraph Model
-      MODELv7-->v7-X
-      MODELv7-->v7-E6
-      MODELv7-->v7-E6E
-      MODELv9-->v9-T
-      MODELv9-->v9-S
-      MODELv9-->v9-E
-    end
-    subgraph Bugs
-      Fix-->Fix1["#12 mAP > 1"]
-      Fix-->Fix2["v9 Gradient Bump"]
-      Reply-->Reply1["#39"]
-      Reply-->Reply2["#36"]
-    end
-```
 
 ## Star History
 
