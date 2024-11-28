@@ -8,7 +8,6 @@ import torch
 import torch.distributed as dist
 from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import Callback
-from lightning.pytorch.utilities import rank_zero_only
 from omegaconf import ListConfig
 from torch import Tensor, no_grad
 from torch.optim import Optimizer
@@ -37,31 +36,31 @@ def lerp(start: float, end: float, step: Union[int, float], total: int = 1):
 
 
 class EMA(Callback):
-    def __init__(self, decay: float = 0.9999, tau: float = 500):
+    def __init__(self, decay: float = 0.9999, tau: float = 2000):
         super().__init__()
         logger.info(":chart_with_upwards_trend: Enable Model EMA")
         self.decay = decay
         self.tau = tau
         self.step = 0
+        self.ema_state_dict = None
 
     def setup(self, trainer, pl_module, stage):
         pl_module.ema = deepcopy(pl_module.model)
-        self.ema_parameters = [param.clone().detach().to(pl_module.device) for param in pl_module.parameters()]
+        self.tau /= trainer.world_size
         for param in pl_module.ema.parameters():
             param.requires_grad = False
 
     def on_validation_start(self, trainer: "Trainer", pl_module: "LightningModule"):
-        for param, ema_param in zip(pl_module.ema.parameters(), self.ema_parameters):
-            param.data.copy_(ema_param)
-            trainer.strategy.broadcast(param)
+        if self.ema_state_dict is None:
+            self.ema_state_dict = deepcopy(pl_module.model.state_dict())
+        pl_module.ema.load_state_dict(self.ema_state_dict)
 
-    @rank_zero_only
     @no_grad()
     def on_train_batch_end(self, trainer: "Trainer", pl_module: "LightningModule", *args, **kwargs) -> None:
         self.step += 1
         decay_factor = self.decay * (1 - exp(-self.step / self.tau))
-        for param, ema_param in zip(pl_module.parameters(), self.ema_parameters):
-            ema_param.data.copy_(lerp(param.detach(), ema_param, decay_factor))
+        for key, param in pl_module.model.state_dict().items():
+            self.ema_state_dict[key] = lerp(param.detach(), self.ema_state_dict[key], decay_factor)
 
 
 def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
@@ -77,9 +76,9 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
     conv_params = [p for name, p in model.named_parameters() if "weight" in name and "bn" not in name]
 
     model_parameters = [
-        {"params": bias_params, "momentum": 0.8, "weight_decay": 0},
-        {"params": conv_params, "momentum": 0.8},
-        {"params": norm_params, "momentum": 0.8, "weight_decay": 0},
+        {"params": bias_params, "momentum": 0.937, "weight_decay": 0},
+        {"params": conv_params, "momentum": 0.937},
+        {"params": norm_params, "momentum": 0.937, "weight_decay": 0},
     ]
 
     def next_epoch(self, batch_num, epoch_idx):
@@ -89,8 +88,8 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
         #       0.937: Start Momentum
         #       0.8  : Normal Momemtum
         #       3    : The warm up epoch num
-        self.min_mom = lerp(0.937, 0.8, max(epoch_idx, 3), 3)
-        self.max_mom = lerp(0.937, 0.8, max(epoch_idx + 1, 3), 3)
+        self.min_mom = lerp(0.937, 0.8, min(epoch_idx, 3), 3)
+        self.max_mom = lerp(0.937, 0.8, min(epoch_idx + 1, 3), 3)
         self.batch_num = batch_num
         self.batch_idx = 0
 
@@ -100,7 +99,7 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
         for lr_idx, param_group in enumerate(self.param_groups):
             min_lr, max_lr = self.min_lr[lr_idx], self.max_lr[lr_idx]
             param_group["lr"] = lerp(min_lr, max_lr, self.batch_idx, self.batch_num)
-            param_group["momentum"] = lerp(self.min_mom, self.max_mom, self.batch_idx, self.batch_num)
+            # param_group["momentum"] = lerp(self.min_mom, self.max_mom, self.batch_idx, self.batch_num)
             lr_dict[f"LR/{lr_idx}"] = param_group["lr"]
         return lr_dict
 
@@ -125,7 +124,7 @@ def create_scheduler(optimizer: Optimizer, schedule_cfg: SchedulerConfig) -> _LR
         lambda1 = lambda epoch: (epoch + 1) / wepoch if epoch < wepoch else 1
         lambda2 = lambda epoch: 10 - 9 * ((epoch + 1) / wepoch) if epoch < wepoch else 1
         warmup_schedule = LambdaLR(optimizer, lr_lambda=[lambda2, lambda1, lambda1])
-        schedule = SequentialLR(optimizer, schedulers=[warmup_schedule, schedule], milestones=[2])
+        schedule = SequentialLR(optimizer, schedulers=[warmup_schedule, schedule], milestones=[wepoch - 1])
     return schedule
 
 
