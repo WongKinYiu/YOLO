@@ -107,7 +107,7 @@ def scale_segmentation(
             x,y,width,height = anno["bbox"]
             seg_list = [
                 x, y,  # Top-left corner
-                x + width, height,  # Top-right corner
+                x + width, y,  # Top-right corner
                 x + width, y + height,  # Bottom-right corner
                 x, y + height  # Bottom-left corner
             ]
