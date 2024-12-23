@@ -3,5 +3,4 @@ gradio
 pytest
 pytest-cov
 pre-commit
-pycocotools
 tensorboard

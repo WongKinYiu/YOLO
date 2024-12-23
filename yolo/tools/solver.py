@@ -30,7 +30,7 @@ class ValidateModel(BaseModel):
             self.validation_cfg = self.cfg.task
         else:
             self.validation_cfg = self.cfg.task.validation
-        self.metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy")
+        self.metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy", backend="faster_coco_eval")
         self.metric.warn_on_many_detections = False
         self.val_loader = create_dataloader(self.validation_cfg.data, self.cfg.dataset, self.validation_cfg.task)
         self.ema = self.model
