@@ -75,7 +75,7 @@ class YOLOLoss:
         self.dfl = DFLoss(vec2box, reg_max)
         self.iou = BoxLoss()
 
-        self.matcher = BoxMatcher(loss_cfg.matcher, self.class_num, vec2box.anchor_grid)
+        self.matcher = BoxMatcher(loss_cfg.matcher, self.class_num, vec2box, reg_max)
 
     def separate_anchor(self, anchors):
         """
