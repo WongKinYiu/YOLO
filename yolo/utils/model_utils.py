@@ -23,6 +23,8 @@ def lerp(start: float, end: float, step: Union[int, float], total: int = 1):
     """
     Linearly interpolates between start and end values.
 
+    start * (1 - step) + end * step
+
     Parameters:
         start (float): The starting value.
         end (float): The ending value.
@@ -88,8 +90,8 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
         #       0.937: Start Momentum
         #       0.8  : Normal Momemtum
         #       3    : The warm up epoch num
-        self.min_mom = lerp(0.937, 0.8, min(epoch_idx, 3), 3)
-        self.max_mom = lerp(0.937, 0.8, min(epoch_idx + 1, 3), 3)
+        self.min_mom = lerp(0.8, 0.937, min(epoch_idx, 3), 3)
+        self.max_mom = lerp(0.8, 0.937, min(epoch_idx + 1, 3), 3)
         self.batch_num = batch_num
         self.batch_idx = 0
 
@@ -99,8 +101,9 @@ def create_optimizer(model: YOLO, optim_cfg: OptimizerConfig) -> Optimizer:
         for lr_idx, param_group in enumerate(self.param_groups):
             min_lr, max_lr = self.min_lr[lr_idx], self.max_lr[lr_idx]
             param_group["lr"] = lerp(min_lr, max_lr, self.batch_idx, self.batch_num)
-            # param_group["momentum"] = lerp(self.min_mom, self.max_mom, self.batch_idx, self.batch_num)
+            param_group["momentum"] = lerp(self.min_mom, self.max_mom, self.batch_idx, self.batch_num)
             lr_dict[f"LR/{lr_idx}"] = param_group["lr"]
+            lr_dict[f"momentum/{lr_idx}"] = param_group["momentum"]
         return lr_dict
 
     optimizer_class.next_batch = next_batch
