@@ -10,11 +10,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from yolo import (
     AugmentationComposer,
     NMSConfig,
-    PostProccess,
     create_converter,
     create_model,
     draw_bboxes,
 )
+
+from yolo.utils.model_utils import PostProcess
 
 DEFAULT_MODEL = "v9-c"
 IMAGE_SIZE = (640, 640)
@@ -31,7 +32,7 @@ def load_model(model_name, device):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model, model_cfg = load_model(DEFAULT_MODEL, device)
 converter = create_converter(model_cfg.name, model, model_cfg.anchor, IMAGE_SIZE, device)
-class_list = OmegaConf.load("yolo/config/dataset/coco.yaml").class_list
+class_list = OmegaConf.load("yolo/config/dataset/coco.yaml").class_list # pick manually with ['Person','Chair']...
 
 transform = AugmentationComposer([])
 
