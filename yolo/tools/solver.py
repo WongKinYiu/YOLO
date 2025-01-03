@@ -48,17 +48,8 @@ class ValidateModel(BaseModel):
         batch_size, images, targets, rev_tensor, img_paths = batch
         H, W = images.shape[2:]
         predicts = self.post_process(self.ema(images), image_size=[W, H])
-        batch_metrics = self.metric(
-            [to_metrics_format(predict) for predict in predicts], [to_metrics_format(target) for target in targets]
-        )
-
-        self.log_dict(
-            {
-                "map": batch_metrics["map"],
-                "map_50": batch_metrics["map_50"],
-            },
-            batch_size=batch_size,
-        )
+        self.metric.update([to_metrics_format(predict) for predict in predicts],
+                           [to_metrics_format(target) for target in targets])
         return predicts
 
     def on_validation_epoch_end(self):
