@@ -484,6 +484,7 @@ def calculate_map(predictions, ground_truths) -> Dict[str, Tensor]:
 
 
 def to_metrics_format(prediction: Tensor) -> Dict[str, Union[float, Tensor]]:
+    prediction = prediction[prediction[:, 0] != -1]
     bbox = {"boxes": prediction[:, 1:5], "labels": prediction[:, 0].int()}
     if prediction.size(1) == 6:
         bbox["scores"] = prediction[:, 5]
