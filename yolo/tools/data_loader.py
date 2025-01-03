@@ -126,10 +126,12 @@ class YoloDataset(Dataset):
 
     def load_valid_labels(self, label_path: str, seg_data_one_img: list) -> Union[Tensor, None]:
         """
-        Loads and validates bounding box data is [0, 1] from a label file.
+        Loads valid COCO style segmentation data (values between [0, 1]) and converts it to bounding box coordinates
+        by finding the minimum and maximum x and y values.
 
         Parameters:
-            label_path (str): The filepath to the label file containing bounding box data.
+            label_path (str): The filepath to the label file containing annotation data.
+            seg_data_one_img (list): The actual list of annotations (in segmentation format)
 
         Returns:
             Tensor or None: A tensor of all valid bounding boxes if any are found; otherwise, None.
