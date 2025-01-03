@@ -119,7 +119,7 @@ class YOLORichProgressBar(RichProgressBar):
 
     @override
     @rank_zero_only
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx) -> None:
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx) -> None:
         if self.is_disabled:
             return
         if trainer.sanity_checking:
