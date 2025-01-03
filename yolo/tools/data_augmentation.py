@@ -67,7 +67,7 @@ class PadAndResize:
         scale = min(self.target_width / img_width, self.target_height / img_height)
         new_width, new_height = int(img_width * scale), int(img_height * scale)
 
-        resized_image = image.resize((new_width, new_height), Image.LANCZOS)
+        resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
         pad_left = (self.target_width - new_width) // 2
         pad_top = (self.target_height - new_height) // 2
