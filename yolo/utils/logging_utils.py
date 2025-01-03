@@ -237,6 +237,9 @@ def setup_logger(logger_name, quite=False):
         if quite:
             rich_logger.setLevel(logging.ERROR)
 
+    coco_logger = logging.getLogger("faster_coco_eval.core.cocoeval")
+    coco_logger.setLevel(logging.ERROR)
+
 
 def setup(cfg: Config):
     quite = hasattr(cfg, "quite")
