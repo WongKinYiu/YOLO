@@ -1,6 +1,6 @@
 -r requirements.txt
-gradio
-pytest
-pytest-cov
-pre-commit
-tensorboard
+gradio==6.5.1
+pytest==9.0.2
+pytest-cov==7.0.0
+pre-commit==4.5.1
+tensorboard==2.20.0

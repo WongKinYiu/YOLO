@@ -21,7 +21,12 @@ import numpy as np
 import torch
 import wandb
 from lightning import LightningModule, Trainer, seed_everything
-from lightning.pytorch.callbacks import Callback, RichModelSummary, RichProgressBar
+from lightning.pytorch.callbacks import (
+    Callback,
+    ModelCheckpoint,
+    RichModelSummary,
+    RichProgressBar,
+)
 from lightning.pytorch.callbacks.progress.rich_progress import CustomProgress
 from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
 from lightning.pytorch.utilities import rank_zero_only
@@ -272,9 +277,27 @@ def setup(cfg: Config):
 
     progress, loggers = [], []
 
-    if cfg.task.task == "train" and hasattr(cfg.task.data, "equivalent_batch_size"):
-        progress.append(GradientAccumulation(data_cfg=cfg.task.data, scheduler_cfg=cfg.task.scheduler))
+    if cfg.task.task == "train":
+        if hasattr(cfg.task.data, "equivalent_batch_size"):
+            progress.append(GradientAccumulation(data_cfg=cfg.task.data, scheduler_cfg=cfg.task.scheduler))
 
+        progress.append(
+            ModelCheckpoint(
+                dirpath=save_path,
+                filename="best-{epoch}-{map:.3f}",
+                monitor="map",
+                save_last=True,
+                save_top_k=3,
+                mode="max",
+            )
+        )
+
+        progress.append(
+            ModelCheckpoint(
+                dirpath=save_path,
+                save_weights_only=True,
+            )
+        )
     if hasattr(cfg.task, "ema") and cfg.task.ema.enable:
         progress.append(EMA(cfg.task.ema.decay))
     if quiet:
