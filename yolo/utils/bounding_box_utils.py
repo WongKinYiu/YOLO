@@ -464,7 +464,7 @@ def bbox_nms(cls_dist: Tensor, bbox: Tensor, nms_cfg: NMSConfig, confidence: Opt
     valid_con = cls_dist[batch_idx, valid_grid, valid_cls]
     valid_box = bbox[batch_idx, valid_grid]
 
-    nms_idx = batched_nms(valid_box, valid_con, batch_idx + valid_cls * bbox.size(0), nms_cfg.min_iou)
+    nms_idx = batched_nms(valid_box.float(), valid_con.float(), batch_idx + valid_cls * bbox.size(0), nms_cfg.min_iou)
     predicts_nms = []
     for idx in range(cls_dist.size(0)):
         instance_idx = nms_idx[idx == batch_idx[nms_idx]]
